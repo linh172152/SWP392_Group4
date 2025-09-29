@@ -1,0 +1,6 @@
+.dash-page{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f8fafc}
+.dash-card{background:#fff;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,.08);padding:24px;min-width:320px;text-align:center}
+.dash-card h2{margin:0 0 8px 0}
+.dash-card button{margin-top:12px;padding:8px 12px;border-radius:8px;border:1px solid #e5e7eb;background:#fff;cursor:pointer}
+.dash-card button:hover{background:#f3f4f6}
+
