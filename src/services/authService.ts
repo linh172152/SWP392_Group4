@@ -7,9 +7,9 @@ type MockUser = {
 }
 
 const USERS: MockUser[] = [
-	{ email: 'admin@test.com', password: '123456', role: 'Admin' },
-	{ email: 'staff@test.com', password: '123456', role: 'Staff' },
-	{ email: 'user@test.com', password: '123456', role: 'User' },
+	{ email: 'admin@ev.com', password: 'admin123', role: 'Admin' },
+	{ email: 'staff@ev.com', password: 'staff123', role: 'Staff' },
+	{ email: 'user@ev.com', password: 'user123', role: 'User' },
 ]
 
 export async function fakeLogin(identifier: string, password: string): Promise<UserRole> {

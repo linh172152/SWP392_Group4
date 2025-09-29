@@ -1,9 +1,9 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import LoginPageLayout from '../pages/Login/LoginPageLayout'
-import LoginPage from '../components/Login/LoginPage'
-import UserDashboard from '../components/User/UserDashboard'
-import StaffDashboard from '../components/Staff/StaffDashboard'
-import AdminDashboard from '../components/Admin/AdminDashboard'
+import LoginPage from '../pages/Login/LoginPage'
+import UserDashboard from '../pages/User/UserDashboard'
+import StaffDashboard from '../pages/Staff/StaffDashboard'
+import AdminDashboard from '../pages/Admin/AdminDashboard'
 
 export default function AppRouter() {
   return (

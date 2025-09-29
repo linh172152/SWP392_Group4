@@ -1,17 +1,15 @@
 import { logout, getStoredRole } from '../../services/authService'
-import '../User/UserDashboard.css'
+import './StaffDashboard.css'
 
-export default function AdminDashboard() {
+export default function StaffDashboard() {
   const role = getStoredRole()
   return (
     <div className="dash-page">
       <div className="dash-card">
-        <h2>Admin Dashboard</h2>
+        <h2>Staff Dashboard</h2>
         <p>Logged in as: {role}</p>
         <button onClick={() => { logout(); location.href = '/' }}>Logout</button>
       </div>
     </div>
   )
 }
-
-
