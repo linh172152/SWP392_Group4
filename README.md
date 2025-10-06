@@ -1,73 +1,67 @@
-# React + TypeScript + Vite
+# EV Battery Swap Station Management System
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Hệ thống quản lý trạm đổi pin xe điện - Web Application
 
-Currently, two official plugins are available:
+## 📁 Cấu trúc Monorepo
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```
+SWP392_Group4/
+├── frontend/          # React + Vite + TypeScript
+│   ├── src/
+│   └── package.json
+├── backend/           # Express + TypeScript + Prisma
+│   ├── src/
+│   ├── prisma/
+│   └── package.json
+└── README.md
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 🚀 Quick Start
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Backend Setup
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cd backend
+npm install
+cp env.example .env     # Điền thông tin database, JWT secrets
+npm run prisma:migrate  # Setup database
+npm run dev            # Start backend: http://localhost:5000
 ```
+
+### Frontend Setup
+
+```bash
+cd frontend
+npm install
+npm run dev            # Start frontend: http://localhost:3000
+```
+
+## 🛠️ Tech Stack
+
+### Frontend
+
+- React 18 + TypeScript
+- Vite
+- Ant Design / Material-UI
+
+### Backend
+
+- Node.js + Express + TypeScript
+- PostgreSQL + Prisma ORM
+- JWT Authentication
+- Redis (optional)
+
+## 👥 Roles
+
+- **Driver**: Đặt lịch, thanh toán, xem lịch sử
+- **Staff**: Quản lý tồn kho pin, xử lý đổi pin
+- **Admin**: Quản lý trạm, user, báo cáo, AI insights
+
+## 📚 Documentation
+
+- [Backend API](./backend/README.md)
+- [Frontend](./frontend/README.md)
+
+## 👨‍💻 Team
+
+SWP392 Group 4 - FPT University
