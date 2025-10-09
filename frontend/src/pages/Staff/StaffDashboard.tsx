@@ -4,10 +4,11 @@ import BatteryInventory from '../../components/Staff/BatteryInventory';
 import TransactionManagement from '../../components/Staff/TransactionManagement';
 import './StaffDashboard.css';
 
-type StaffSection = 'overview' | 'inventory' | 'transactions';
+type StaffSection = 'overview' | 'inventory' | 'transactions' | 'schedule' | 'history' | 'profile';
 
 export default function StaffDashboard() {
   const [activeSection, setActiveSection] = useState<StaffSection>('overview');
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const [error, setError] = useState<string>('');
   const role = getStoredRole();
 
@@ -18,6 +19,10 @@ export default function StaffDashboard() {
     } catch (err) {
       setError('Lỗi khi đăng xuất: ' + (err as Error).message);
     }
+  };
+
+  const toggleTheme = () => {
+    setIsDarkMode(!isDarkMode);
   };
 
   const renderSection = () => {
@@ -212,7 +217,7 @@ export default function StaffDashboard() {
   };
 
   return (
-    <div className="staff-dashboard">
+    <div className={`staff-dashboard ${isDarkMode ? 'dark-mode' : 'light-mode'}`}>
       {error && (
         <div className="error-banner">
           {error}
@@ -220,27 +225,19 @@ export default function StaffDashboard() {
         </div>
       )}
       
-      {/* Header */}
-      <header className="dashboard-header">
-        <div className="header-content">
-          <div className="header-left">
-            <h1 className="dashboard-title">Staff Dashboard</h1>
-            <span className="user-badge">Nhân viên trạm</span>
+      {/* Sidebar */}
+      <aside className="sidebar">
+        <div className="sidebar-header">
+          <div className="logo">
+            <span className="logo-icon">⚡</span>
+            <span className="logo-text">EVSwap Nhân viên</span>
           </div>
-          <div className="header-right">
-            <div className="user-info">
-              <span className="user-name">Xin chào, {role}!</span>
-              <button className="logout-btn" onClick={handleLogout}>
-                Đăng xuất
-              </button>
-            </div>
-          </div>
+          <button className="theme-toggle" onClick={toggleTheme}>
+            {isDarkMode ? '🌙' : '☀️'}
+          </button>
         </div>
-      </header>
 
-      {/* Navigation */}
-      <nav className="dashboard-nav">
-        <div className="nav-content">
+        <nav className="sidebar-nav">
           <button 
             className={`nav-item ${activeSection === 'overview' ? 'active' : ''}`}
             onClick={() => setActiveSection('overview')}
@@ -252,40 +249,152 @@ export default function StaffDashboard() {
             className={`nav-item ${activeSection === 'inventory' ? 'active' : ''}`}
             onClick={() => setActiveSection('inventory')}
           >
-            <span className="nav-icon">🔋</span>
-            Quản lý Pin
+            <span className="nav-icon">🗄️</span>
+            Kho pin
           </button>
           <button 
             className={`nav-item ${activeSection === 'transactions' ? 'active' : ''}`}
             onClick={() => setActiveSection('transactions')}
           >
-            <span className="nav-icon">📋</span>
-            Giao dịch
+            <span className="nav-icon">⚡</span>
+            Giao dịch thay pin
+          </button>
+          <button 
+            className={`nav-item ${activeSection === 'schedule' ? 'active' : ''}`}
+            onClick={() => setActiveSection('schedule')}
+          >
+            <span className="nav-icon">📅</span>
+            Lịch làm việc
+          </button>
+          <button 
+            className={`nav-item ${activeSection === 'history' ? 'active' : ''}`}
+            onClick={() => setActiveSection('history')}
+          >
+            <span className="nav-icon">🕒</span>
+            Lịch sử ca làm
+          </button>
+          <button 
+            className={`nav-item ${activeSection === 'profile' ? 'active' : ''}`}
+            onClick={() => setActiveSection('profile')}
+          >
+            <span className="nav-icon">👤</span>
+            Hồ sơ cá nhân
+          </button>
+        </nav>
+
+        <div className="sidebar-footer">
+          <div className="user-profile">
+            <div className="user-avatar">T</div>
+            <div className="user-info">
+              <div className="user-name">Trần Thị Nhân Viên</div>
+              <div className="user-email">nhanvien@demo.com</div>
+            </div>
+          </div>
+          <button className="logout-btn" onClick={handleLogout}>
+            <span className="logout-icon">→</span>
+            Đăng xuất
           </button>
         </div>
-      </nav>
+      </aside>
 
       {/* Main Content */}
-      <main className="dashboard-main">
-        <div className="content-wrapper">
-          {activeSection === 'overview' ? (
-            <div className="overview-layout">
-              {renderSection()}
-            </div>
-          ) : (
-            <div className="section-layout">
-              {renderSection()}
-            </div>
-          )}
-        </div>
-      </main>
+      <main className="main-content">
+        {activeSection === 'overview' ? (
+          <div className="overview-content">
+            <div className="recent-transactions">
+              <div className="section-header">
+                <div>
+                  <h2>Giao dịch gần đây</h2>
+                  <p>Các hoạt động thay pin mới nhất</p>
+                </div>
+                <button className="view-all-btn">Xem tất cả</button>
+              </div>
+              
+              <div className="transactions-list">
+                <div className="transaction-item">
+                  <div className="transaction-info">
+                    <div className="customer-name">Nguyễn Văn Minh</div>
+                    <div className="vehicle-info">Tesla Model 3</div>
+                    <div className="transaction-details">
+                      <span className="transaction-type">Trao đổi pin</span>
+                      <span className="battery-change">STD-001 → STD-045</span>
+                    </div>
+                    <div className="transaction-time">14:30 (2.5 phút)</div>
+                  </div>
+                  <div className="transaction-status completed">
+                    <span className="status-icon">✓</span>
+                    Hoàn thành
+                  </div>
+                </div>
 
-      {/* Footer */}
-      <footer className="dashboard-footer">
-        <div className="footer-content">
-          <p>&copy; 2024 EV Battery Swap System. All rights reserved.</p>
-        </div>
-      </footer>
+                <div className="transaction-item">
+                  <div className="transaction-info">
+                    <div className="customer-name">Trần Thị Lan</div>
+                    <div className="vehicle-info">BYD Tang EV</div>
+                    <div className="transaction-details">
+                      <span className="transaction-type">Trao đổi pin</span>
+                      <span className="battery-change">LR-003 → LR-012</span>
+                    </div>
+                    <div className="transaction-time">14:25 (3.1 phút)</div>
+                  </div>
+                  <div className="transaction-status completed">
+                    <span className="status-icon">✓</span>
+                    Hoàn thành
+                  </div>
+                </div>
+
+                <div className="transaction-item">
+                  <div className="transaction-info">
+                    <div className="customer-name">Lê Hoàng Nam</div>
+                    <div className="vehicle-info">Tesla Model Y</div>
+                    <div className="transaction-details">
+                      <span className="transaction-type">Trao đổi pin</span>
+                      <span className="battery-change">Mới → STD-023</span>
+                    </div>
+                    <div className="transaction-time">14:20 (1.8 phút)</div>
+                  </div>
+                  <div className="transaction-status in-progress">
+                    <span className="status-icon">🕒</span>
+                    Đang thực hiện
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="quick-actions">
+              <div className="section-header">
+                <div>
+                  <h2>Thao tác nhanh</h2>
+                  <p>Các hoạt động trạm thường sử dụng</p>
+                </div>
+              </div>
+              
+              <div className="actions-grid">
+                <button className="action-btn">
+                  <span className="action-icon">☐</span>
+                  <span className="action-text">Kiểm tra pin</span>
+                </button>
+                <button className="action-btn">
+                  <span className="action-icon">⟳</span>
+                  <span className="action-text">Khởi động lại</span>
+                </button>
+                <button className="action-btn">
+                  <span className="action-icon">👤</span>
+                  <span className="action-text">Lịch nhân viên</span>
+                </button>
+                <button className="action-btn">
+                  <span className="action-icon">📅</span>
+                  <span className="action-text">Bảo trì</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="section-content">
+            {renderSection()}
+          </div>
+        )}
+      </main>
     </div>
   );
 }
