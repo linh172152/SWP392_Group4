@@ -1,0 +1,35 @@
+import React from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { User } from '../../App';
+import AdminLayout from './AdminLayout';
+import AdminHome from './AdminHome';
+import StationManagement from './StationManagement';
+import BatteryCoordination from './BatteryCoordination';
+import UserManagement from './UserManagement';
+import EmployeeManagement from '../staff/EmployeeManagement'; // Import from staff folder
+import ReportsAnalytics from './ReportsAnalytics';
+import AISuggestions from './AISuggestions';
+
+interface AdminDashboardProps {
+  user: User;
+  onLogout: () => void;
+}
+
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
+  return (
+    <AdminLayout user={user} onLogout={onLogout}>
+      <Routes>
+        <Route path="/" element={<Navigate to="/admin/home" replace />} />
+        <Route path="/home" element={<AdminHome />} />
+        <Route path="/stations" element={<StationManagement />} />
+        <Route path="/coordination" element={<BatteryCoordination />} />
+        <Route path="/users" element={<UserManagement />} />
+        <Route path="/employees" element={<EmployeeManagement />} />
+        <Route path="/reports" element={<ReportsAnalytics />} />
+        <Route path="/ai-suggestions" element={<AISuggestions />} />
+      </Routes>
+    </AdminLayout>
+  );
+};
+
+export default AdminDashboard;
