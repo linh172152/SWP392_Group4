@@ -1,0 +1,826 @@
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+
+async function main() {
+  console.log("🌱 Starting comprehensive database seeding...");
+
+  // ===========================================
+  // CREATE ADMIN USERS
+  // ===========================================
+  const admins = await Promise.all([
+    prisma.user.create({
+      data: {
+        full_name: "Nguyen Van Admin",
+        email: "admin@evbattery.com",
+        password_hash: "$2b$10$example.hash.for.admin.password",
+        phone: "0123456789",
+        role: "ADMIN",
+        status: "ACTIVE",
+      },
+    }),
+    prisma.user.create({
+      data: {
+        full_name: "Tran Thi Manager",
+        email: "manager@evbattery.com",
+        password_hash: "$2b$10$example.hash.for.manager.password",
+        phone: "0123456790",
+        role: "ADMIN",
+        status: "ACTIVE",
+      },
+    }),
+  ]);
+  console.log("✅ Created admin users:", admins.length);
+
+  // ===========================================
+  // CREATE STATIONS
+  // ===========================================
+  const stations = await Promise.all([
+    prisma.station.create({
+      data: {
+        name: "EV Battery Station - District 1",
+        address: "123 Nguyen Hue, District 1, Ho Chi Minh City",
+        latitude: 10.7769,
+        longitude: 106.7009,
+        capacity: 50,
+        supported_models: [
+          "Tesla Model 3",
+          "VinFast VF8",
+          "BYD Atto 3",
+          "BMW iX3",
+        ],
+        operating_hours: "24/7",
+        status: "active",
+      },
+    }),
+    prisma.station.create({
+      data: {
+        name: "EV Battery Station - District 7",
+        address: "456 Nguyen Thi Thap, District 7, Ho Chi Minh City",
+        latitude: 10.7374,
+        longitude: 106.7223,
+        capacity: 40,
+        supported_models: ["VinFast VF8", "BYD Atto 3", "Hyundai IONIQ 5"],
+        operating_hours: "6:00 - 22:00",
+        status: "active",
+      },
+    }),
+    prisma.station.create({
+      data: {
+        name: "EV Battery Station - Thu Duc",
+        address: "789 Vo Van Ngan, Thu Duc City, Ho Chi Minh City",
+        latitude: 10.8603,
+        longitude: 106.7599,
+        capacity: 60,
+        supported_models: [
+          "Tesla Model 3",
+          "VinFast VF8",
+          "BYD Atto 3",
+          "BMW iX3",
+          "Mercedes EQS",
+        ],
+        operating_hours: "24/7",
+        status: "active",
+      },
+    }),
+    prisma.station.create({
+      data: {
+        name: "EV Battery Station - Binh Thanh",
+        address: "321 Dien Bien Phu, Binh Thanh District, Ho Chi Minh City",
+        latitude: 10.8106,
+        longitude: 106.7091,
+        capacity: 35,
+        supported_models: ["VinFast VF8", "BYD Atto 3"],
+        operating_hours: "7:00 - 21:00",
+        status: "maintenance",
+      },
+    }),
+  ]);
+  console.log("✅ Created stations:", stations.length);
+
+  // ===========================================
+  // CREATE STAFF USERS
+  // ===========================================
+  const staffs = await Promise.all([
+    prisma.user.create({
+      data: {
+        full_name: "Le Van Staff 1",
+        email: "staff1@evbattery.com",
+        password_hash: "$2b$10$example.hash.for.staff1.password",
+        phone: "0987654321",
+        role: "STAFF",
+        station_id: stations[0].station_id,
+        status: "ACTIVE",
+      },
+    }),
+    prisma.user.create({
+      data: {
+        full_name: "Pham Thi Staff 2",
+        email: "staff2@evbattery.com",
+        password_hash: "$2b$10$example.hash.for.staff2.password",
+        phone: "0987654322",
+        role: "STAFF",
+        station_id: stations[0].station_id,
+        status: "ACTIVE",
+      },
+    }),
+    prisma.user.create({
+      data: {
+        full_name: "Hoang Van Staff 3",
+        email: "staff3@evbattery.com",
+        password_hash: "$2b$10$example.hash.for.staff3.password",
+        phone: "0987654323",
+        role: "STAFF",
+        station_id: stations[1].station_id,
+        status: "ACTIVE",
+      },
+    }),
+    prisma.user.create({
+      data: {
+        full_name: "Vu Thi Staff 4",
+        email: "staff4@evbattery.com",
+        password_hash: "$2b$10$example.hash.for.staff4.password",
+        phone: "0987654324",
+        role: "STAFF",
+        station_id: stations[2].station_id,
+        status: "ACTIVE",
+      },
+    }),
+  ]);
+  console.log("✅ Created staff users:", staffs.length);
+
+  // ===========================================
+  // CREATE DRIVER USERS
+  // ===========================================
+  const drivers = await Promise.all([
+    prisma.user.create({
+      data: {
+        full_name: "Tran Van Driver 1",
+        email: "driver1@evbattery.com",
+        password_hash: "$2b$10$example.hash.for.driver1.password",
+        phone: "0912345678",
+        role: "DRIVER",
+        status: "ACTIVE",
+      },
+    }),
+    prisma.user.create({
+      data: {
+        full_name: "Nguyen Thi Driver 2",
+        email: "driver2@evbattery.com",
+        password_hash: "$2b$10$example.hash.for.driver2.password",
+        phone: "0912345679",
+        role: "DRIVER",
+        status: "ACTIVE",
+      },
+    }),
+    prisma.user.create({
+      data: {
+        full_name: "Le Van Driver 3",
+        email: "driver3@evbattery.com",
+        password_hash: "$2b$10$example.hash.for.driver3.password",
+        phone: "0912345680",
+        role: "DRIVER",
+        status: "ACTIVE",
+      },
+    }),
+    prisma.user.create({
+      data: {
+        full_name: "Pham Thi Driver 4",
+        email: "driver4@evbattery.com",
+        password_hash: "$2b$10$example.hash.for.driver4.password",
+        phone: "0912345681",
+        role: "DRIVER",
+        status: "ACTIVE",
+      },
+    }),
+    prisma.user.create({
+      data: {
+        full_name: "Hoang Van Driver 5",
+        email: "driver5@evbattery.com",
+        password_hash: "$2b$10$example.hash.for.driver5.password",
+        phone: "0912345682",
+        role: "DRIVER",
+        status: "ACTIVE",
+      },
+    }),
+    prisma.user.create({
+      data: {
+        full_name: "Vu Thi Driver 6",
+        email: "driver6@evbattery.com",
+        password_hash: "$2b$10$example.hash.for.driver6.password",
+        phone: "0912345683",
+        role: "DRIVER",
+        status: "INACTIVE",
+      },
+    }),
+  ]);
+  console.log("✅ Created driver users:", drivers.length);
+
+  // ===========================================
+  // CREATE VEHICLES
+  // ===========================================
+  const vehicles = await Promise.all([
+    prisma.vehicle.create({
+      data: {
+        user_id: drivers[0].user_id,
+        license_plate: "51A-12345",
+        vehicle_type: "car",
+        make: "VinFast",
+        model: "VF8",
+        year: 2023,
+        battery_model: "VinFast VF8 Battery",
+      },
+    }),
+    prisma.vehicle.create({
+      data: {
+        user_id: drivers[1].user_id,
+        license_plate: "51B-67890",
+        vehicle_type: "car",
+        make: "Tesla",
+        model: "Model 3",
+        year: 2022,
+        battery_model: "Tesla Model 3 Battery",
+      },
+    }),
+    prisma.vehicle.create({
+      data: {
+        user_id: drivers[2].user_id,
+        license_plate: "51C-11111",
+        vehicle_type: "car",
+        make: "BYD",
+        model: "Atto 3",
+        year: 2023,
+        battery_model: "BYD Atto 3 Battery",
+      },
+    }),
+    prisma.vehicle.create({
+      data: {
+        user_id: drivers[3].user_id,
+        license_plate: "51D-22222",
+        vehicle_type: "car",
+        make: "BMW",
+        model: "iX3",
+        year: 2022,
+        battery_model: "BMW iX3 Battery",
+      },
+    }),
+    prisma.vehicle.create({
+      data: {
+        user_id: drivers[4].user_id,
+        license_plate: "51E-33333",
+        vehicle_type: "car",
+        make: "Hyundai",
+        model: "IONIQ 5",
+        year: 2023,
+        battery_model: "Hyundai IONIQ 5 Battery",
+      },
+    }),
+    prisma.vehicle.create({
+      data: {
+        user_id: drivers[5].user_id,
+        license_plate: "51F-44444",
+        vehicle_type: "motorbike",
+        make: "VinFast",
+        model: "Theon",
+        year: 2023,
+        battery_model: "VinFast Theon Battery",
+      },
+    }),
+  ]);
+  console.log("✅ Created vehicles:", vehicles.length);
+
+  // ===========================================
+  // CREATE BATTERIES
+  // ===========================================
+  const batteries = [];
+
+  // Station 1 - District 1 (50 capacity)
+  for (let i = 1; i <= 15; i++) {
+    batteries.push(
+      prisma.battery.create({
+        data: {
+          battery_code: `BAT-D1-${i.toString().padStart(3, "0")}`,
+          station_id: stations[0].station_id,
+          model:
+            i <= 5
+              ? "VinFast VF8 Battery"
+              : i <= 10
+                ? "Tesla Model 3 Battery"
+                : "BYD Atto 3 Battery",
+          capacity_kwh: i <= 5 ? 87.7 : i <= 10 ? 75 : 60.48,
+          voltage: i <= 5 ? 400 : i <= 10 ? 350 : 400,
+          current_charge: Math.floor(Math.random() * 40) + 60, // 60-100%
+          status: i <= 8 ? "full" : i <= 12 ? "charging" : "maintenance",
+          last_charged_at: new Date(
+            Date.now() - Math.random() * 24 * 60 * 60 * 1000
+          ),
+        },
+      })
+    );
+  }
+
+  // Station 2 - District 7 (40 capacity)
+  for (let i = 1; i <= 12; i++) {
+    batteries.push(
+      prisma.battery.create({
+        data: {
+          battery_code: `BAT-D7-${i.toString().padStart(3, "0")}`,
+          station_id: stations[1].station_id,
+          model:
+            i <= 4
+              ? "VinFast VF8 Battery"
+              : i <= 8
+                ? "BYD Atto 3 Battery"
+                : "Hyundai IONIQ 5 Battery",
+          capacity_kwh: i <= 4 ? 87.7 : i <= 8 ? 60.48 : 72.6,
+          voltage: i <= 4 ? 400 : i <= 8 ? 400 : 400,
+          current_charge: Math.floor(Math.random() * 30) + 70, // 70-100%
+          status: i <= 6 ? "full" : i <= 10 ? "charging" : "in_use",
+          last_charged_at: new Date(
+            Date.now() - Math.random() * 12 * 60 * 60 * 1000
+          ),
+        },
+      })
+    );
+  }
+
+  // Station 3 - Thu Duc (60 capacity)
+  for (let i = 1; i <= 18; i++) {
+    batteries.push(
+      prisma.battery.create({
+        data: {
+          battery_code: `BAT-TD-${i.toString().padStart(3, "0")}`,
+          station_id: stations[2].station_id,
+          model:
+            i <= 6
+              ? "Tesla Model 3 Battery"
+              : i <= 12
+                ? "VinFast VF8 Battery"
+                : i <= 15
+                  ? "BYD Atto 3 Battery"
+                  : "BMW iX3 Battery",
+          capacity_kwh: i <= 6 ? 75 : i <= 12 ? 87.7 : i <= 15 ? 60.48 : 80,
+          voltage: i <= 6 ? 350 : i <= 12 ? 400 : i <= 15 ? 400 : 400,
+          current_charge: Math.floor(Math.random() * 25) + 75, // 75-100%
+          status: i <= 10 ? "full" : i <= 15 ? "charging" : "maintenance",
+          last_charged_at: new Date(
+            Date.now() - Math.random() * 6 * 60 * 60 * 1000
+          ),
+        },
+      })
+    );
+  }
+
+  await Promise.all(batteries);
+  console.log("✅ Created batteries:", batteries.length);
+
+  // ===========================================
+  // CREATE SERVICE PACKAGES
+  // ===========================================
+  const servicePackages = await Promise.all([
+    prisma.servicePackage.create({
+      data: {
+        name: "Basic Monthly Plan",
+        description: "Unlimited battery swaps for 1 month",
+        price: 500000,
+        swap_limit: null, // unlimited
+        duration_days: 30,
+        battery_models: [
+          "VinFast VF8 Battery",
+          "Tesla Model 3 Battery",
+          "BYD Atto 3 Battery",
+        ],
+        is_active: true,
+      },
+    }),
+    prisma.servicePackage.create({
+      data: {
+        name: "Premium Monthly Plan",
+        description:
+          "Unlimited battery swaps for 1 month with priority support",
+        price: 800000,
+        swap_limit: null, // unlimited
+        duration_days: 30,
+        battery_models: [
+          "VinFast VF8 Battery",
+          "Tesla Model 3 Battery",
+          "BYD Atto 3 Battery",
+          "BMW iX3 Battery",
+        ],
+        is_active: true,
+      },
+    }),
+    prisma.servicePackage.create({
+      data: {
+        name: "Pay Per Swap",
+        description: "Pay for each battery swap individually",
+        price: 0,
+        swap_limit: null, // unlimited
+        duration_days: 365,
+        battery_models: [
+          "VinFast VF8 Battery",
+          "Tesla Model 3 Battery",
+          "BYD Atto 3 Battery",
+          "BMW iX3 Battery",
+          "Hyundai IONIQ 5 Battery",
+        ],
+        is_active: true,
+      },
+    }),
+    prisma.servicePackage.create({
+      data: {
+        name: "Student Plan",
+        description: "Special discount for students - 20 swaps per month",
+        price: 300000,
+        swap_limit: 20,
+        duration_days: 30,
+        battery_models: ["VinFast VF8 Battery", "BYD Atto 3 Battery"],
+        is_active: true,
+      },
+    }),
+    prisma.servicePackage.create({
+      data: {
+        name: "Corporate Plan",
+        description: "Bulk plan for companies - 100 swaps per month",
+        price: 2000000,
+        swap_limit: 100,
+        duration_days: 30,
+        battery_models: [
+          "VinFast VF8 Battery",
+          "Tesla Model 3 Battery",
+          "BYD Atto 3 Battery",
+          "BMW iX3 Battery",
+        ],
+        is_active: true,
+      },
+    }),
+  ]);
+  console.log("✅ Created service packages:", servicePackages.length);
+
+  // ===========================================
+  // CREATE USER SUBSCRIPTIONS
+  // ===========================================
+  const subscriptions = await Promise.all([
+    prisma.userSubscription.create({
+      data: {
+        user_id: drivers[0].user_id,
+        package_id: servicePackages[0].package_id,
+        start_date: new Date(),
+        end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        remaining_swaps: null,
+        status: "active",
+        auto_renew: true,
+      },
+    }),
+    prisma.userSubscription.create({
+      data: {
+        user_id: drivers[1].user_id,
+        package_id: servicePackages[1].package_id,
+        start_date: new Date(),
+        end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        remaining_swaps: null,
+        status: "active",
+        auto_renew: false,
+      },
+    }),
+    prisma.userSubscription.create({
+      data: {
+        user_id: drivers[2].user_id,
+        package_id: servicePackages[2].package_id,
+        start_date: new Date(),
+        end_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        remaining_swaps: null,
+        status: "active",
+        auto_renew: false,
+      },
+    }),
+    prisma.userSubscription.create({
+      data: {
+        user_id: drivers[3].user_id,
+        package_id: servicePackages[3].package_id,
+        start_date: new Date(),
+        end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        remaining_swaps: 15,
+        status: "active",
+        auto_renew: false,
+      },
+    }),
+    prisma.userSubscription.create({
+      data: {
+        user_id: drivers[4].user_id,
+        package_id: servicePackages[4].package_id,
+        start_date: new Date(),
+        end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        remaining_swaps: 80,
+        status: "active",
+        auto_renew: true,
+      },
+    }),
+  ]);
+  console.log("✅ Created user subscriptions:", subscriptions.length);
+
+  // ===========================================
+  // CREATE BOOKINGS
+  // ===========================================
+  const bookings = await Promise.all([
+    prisma.booking.create({
+      data: {
+        booking_code: "BSS20250120001",
+        user_id: drivers[0].user_id,
+        vehicle_id: vehicles[0].vehicle_id,
+        station_id: stations[0].station_id,
+        battery_model: "VinFast VF8 Battery",
+        scheduled_at: new Date(Date.now() + 2 * 60 * 60 * 1000),
+        status: "pending",
+      },
+    }),
+    prisma.booking.create({
+      data: {
+        booking_code: "BSS20250120002",
+        user_id: drivers[1].user_id,
+        vehicle_id: vehicles[1].vehicle_id,
+        station_id: stations[0].station_id,
+        battery_model: "Tesla Model 3 Battery",
+        scheduled_at: new Date(Date.now() + 4 * 60 * 60 * 1000),
+        status: "confirmed",
+        checked_in_at: new Date(Date.now() + 3.5 * 60 * 60 * 1000),
+        checked_in_by_staff_id: staffs[0].user_id,
+      },
+    }),
+    prisma.booking.create({
+      data: {
+        booking_code: "BSS20250120003",
+        user_id: drivers[2].user_id,
+        vehicle_id: vehicles[2].vehicle_id,
+        station_id: stations[1].station_id,
+        battery_model: "BYD Atto 3 Battery",
+        scheduled_at: new Date(Date.now() - 2 * 60 * 60 * 1000),
+        status: "completed",
+        checked_in_at: new Date(Date.now() - 2.5 * 60 * 60 * 1000),
+        checked_in_by_staff_id: staffs[2].user_id,
+      },
+    }),
+    prisma.booking.create({
+      data: {
+        booking_code: "BSS20250120004",
+        user_id: drivers[3].user_id,
+        vehicle_id: vehicles[3].vehicle_id,
+        station_id: stations[2].station_id,
+        battery_model: "BMW iX3 Battery",
+        scheduled_at: new Date(Date.now() + 6 * 60 * 60 * 1000),
+        status: "pending",
+      },
+    }),
+    prisma.booking.create({
+      data: {
+        booking_code: "BSS20250120005",
+        user_id: drivers[4].user_id,
+        vehicle_id: vehicles[4].vehicle_id,
+        station_id: stations[1].station_id,
+        battery_model: "Hyundai IONIQ 5 Battery",
+        scheduled_at: new Date(Date.now() - 1 * 60 * 60 * 1000),
+        status: "cancelled",
+      },
+    }),
+  ]);
+  console.log("✅ Created bookings:", bookings.length);
+
+  // ===========================================
+  // CREATE TRANSACTIONS
+  // ===========================================
+  const createdBatteries = await Promise.all(batteries);
+  const transactions = await Promise.all([
+    prisma.transaction.create({
+      data: {
+        transaction_code: "TXN20250120001",
+        booking_id: bookings[2].booking_id,
+        user_id: drivers[2].user_id,
+        vehicle_id: vehicles[2].vehicle_id,
+        station_id: stations[1].station_id,
+        old_battery_id:
+          (
+            await prisma.battery.findFirst({
+              where: { station_id: stations[1].station_id, status: "in_use" },
+            })
+          )?.battery_id || createdBatteries[15].battery_id,
+        new_battery_id:
+          (
+            await prisma.battery.findFirst({
+              where: { station_id: stations[1].station_id, status: "full" },
+            })
+          )?.battery_id || createdBatteries[16].battery_id,
+        staff_id: staffs[2].user_id,
+        swap_at: new Date(Date.now() - 1.5 * 60 * 60 * 1000),
+        swap_started_at: new Date(Date.now() - 1.5 * 60 * 60 * 1000),
+        swap_completed_at: new Date(Date.now() - 1.4 * 60 * 60 * 1000),
+        swap_duration_minutes: 6,
+        payment_status: "completed",
+        amount: 150000,
+        notes: "Smooth battery swap process",
+      },
+    }),
+  ]);
+  console.log("✅ Created transactions:", transactions.length);
+
+  // ===========================================
+  // CREATE PAYMENTS
+  // ===========================================
+  const payments = await Promise.all([
+    prisma.payment.create({
+      data: {
+        transaction_id: transactions[0].transaction_id,
+        user_id: drivers[2].user_id,
+        amount: 150000,
+        payment_method: "vnpay",
+        payment_status: "completed",
+        payment_gateway_ref: "VNPAY20250120001",
+        paid_at: new Date(Date.now() - 1.4 * 60 * 60 * 1000),
+      },
+    }),
+    prisma.payment.create({
+      data: {
+        subscription_id: subscriptions[0].subscription_id,
+        user_id: drivers[0].user_id,
+        amount: 500000,
+        payment_method: "momo",
+        payment_status: "completed",
+        payment_gateway_ref: "MOMO20250120001",
+        paid_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      },
+    }),
+    prisma.payment.create({
+      data: {
+        subscription_id: subscriptions[1].subscription_id,
+        user_id: drivers[1].user_id,
+        amount: 800000,
+        payment_method: "credit_card",
+        payment_status: "completed",
+        payment_gateway_ref: "CC20250120001",
+        paid_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+      },
+    }),
+  ]);
+  console.log("✅ Created payments:", payments.length);
+
+  // ===========================================
+  // CREATE SUPPORT TICKETS
+  // ===========================================
+  const supportTickets = await Promise.all([
+    prisma.supportTicket.create({
+      data: {
+        ticket_number: "TKT20250120001",
+        user_id: drivers[0].user_id,
+        category: "battery_issue",
+        subject: "Battery not charging properly",
+        description:
+          "My vehicle battery is not charging to 100% even after leaving it overnight.",
+        priority: "medium",
+        status: "open",
+      },
+    }),
+    prisma.supportTicket.create({
+      data: {
+        ticket_number: "TKT20250120002",
+        user_id: drivers[1].user_id,
+        category: "station_issue",
+        subject: "Station machine not working",
+        description:
+          "The battery swap machine at District 1 station is showing error messages.",
+        priority: "high",
+        status: "in_progress",
+        assigned_to_staff_id: staffs[0].user_id,
+      },
+    }),
+    prisma.supportTicket.create({
+      data: {
+        ticket_number: "TKT20250120003",
+        user_id: drivers[2].user_id,
+        category: "payment_issue",
+        subject: "Payment not processed",
+        description:
+          "I was charged twice for the same battery swap transaction.",
+        priority: "urgent",
+        status: "resolved",
+        assigned_to_staff_id: staffs[1].user_id,
+        resolved_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+      },
+    }),
+    prisma.supportTicket.create({
+      data: {
+        ticket_number: "TKT20250120004",
+        user_id: drivers[3].user_id,
+        category: "service_complaint",
+        subject: "Poor customer service",
+        description: "Staff at Thu Duc station was not helpful and rude.",
+        priority: "medium",
+        status: "open",
+      },
+    }),
+  ]);
+  console.log("✅ Created support tickets:", supportTickets.length);
+
+  // ===========================================
+  // CREATE TICKET REPLIES
+  // ===========================================
+  const ticketReplies = await Promise.all([
+    prisma.ticketReply.create({
+      data: {
+        ticket_id: supportTickets[1].ticket_id,
+        user_id: staffs[0].user_id,
+        message:
+          "Thank you for reporting this issue. We have identified the problem and are working on a fix. The machine should be operational within 2 hours.",
+        is_staff: true,
+      },
+    }),
+    prisma.ticketReply.create({
+      data: {
+        ticket_id: supportTickets[1].ticket_id,
+        user_id: drivers[1].user_id,
+        message: "Thank you for the quick response. I will check back later.",
+        is_staff: false,
+      },
+    }),
+    prisma.ticketReply.create({
+      data: {
+        ticket_id: supportTickets[2].ticket_id,
+        user_id: staffs[1].user_id,
+        message:
+          "We have investigated your payment issue and found a duplicate charge. A refund of 150,000 VND has been processed to your account. The refund should appear within 3-5 business days.",
+        is_staff: true,
+      },
+    }),
+  ]);
+  console.log("✅ Created ticket replies:", ticketReplies.length);
+
+  // ===========================================
+  // CREATE STATION RATINGS
+  // ===========================================
+  const stationRatings = await Promise.all([
+    prisma.stationRating.create({
+      data: {
+        user_id: drivers[2].user_id,
+        station_id: stations[1].station_id,
+        transaction_id: transactions[0].transaction_id,
+        rating: 5,
+        comment:
+          "Excellent service! Fast and efficient battery swap. Staff was very helpful.",
+      },
+    }),
+  ]);
+  console.log("✅ Created station ratings:", stationRatings.length);
+
+  // ===========================================
+  // CREATE BATTERY TRANSFER LOGS
+  // ===========================================
+  const batteryTransferLogs = await Promise.all([
+    prisma.batteryTransferLog.create({
+      data: {
+        battery_id: createdBatteries[0].battery_id,
+        from_station_id: stations[0].station_id,
+        to_station_id: stations[1].station_id,
+        transfer_reason: "Inventory rebalancing",
+        transferred_by: admins[0].user_id,
+        notes: "Moving battery to balance inventory between stations",
+      },
+    }),
+    prisma.batteryTransferLog.create({
+      data: {
+        battery_id: createdBatteries[15].battery_id,
+        from_station_id: stations[1].station_id,
+        to_station_id: stations[2].station_id,
+        transfer_reason: "Maintenance",
+        transferred_by: admins[1].user_id,
+        notes: "Battery sent for routine maintenance check",
+      },
+    }),
+  ]);
+  console.log("✅ Created battery transfer logs:", batteryTransferLogs.length);
+
+  console.log("🎉 Comprehensive database seeding completed successfully!");
+  console.log("\n📊 Final Summary:");
+  console.log(
+    `- Users: ${admins.length + staffs.length + drivers.length} (${admins.length} Admin, ${staffs.length} Staff, ${drivers.length} Driver)`
+  );
+  console.log(`- Stations: ${stations.length}`);
+  console.log(`- Vehicles: ${vehicles.length}`);
+  console.log(`- Batteries: ${createdBatteries.length}`);
+  console.log(`- Service Packages: ${servicePackages.length}`);
+  console.log(`- Subscriptions: ${subscriptions.length}`);
+  console.log(`- Bookings: ${bookings.length}`);
+  console.log(`- Transactions: ${transactions.length}`);
+  console.log(`- Payments: ${payments.length}`);
+  console.log(`- Support Tickets: ${supportTickets.length}`);
+  console.log(`- Ticket Replies: ${ticketReplies.length}`);
+  console.log(`- Station Ratings: ${stationRatings.length}`);
+  console.log(`- Battery Transfer Logs: ${batteryTransferLogs.length}`);
+  console.log("\n🚀 Database is now ready for comprehensive testing!");
+}
+
+main()
+  .catch((e) => {
+    console.error("❌ Error during seeding:", e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

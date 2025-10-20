@@ -362,3 +362,5 @@ psql -U postgres -d ev_battery_swap_db    # Connect via CLI
 
 **Setup guide complete! Ready to start coding! 🎉**
 
+
+
