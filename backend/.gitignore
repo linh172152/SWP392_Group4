@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+
+# Build output
+dist/
+build/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Upload files
+uploads/*
+!uploads/.gitkeep
+
+# Testing
+coverage/
+
+# Prisma
+prisma/migrations/*_dev
+
+# Temporary files
+tmp/
+temp/
+
+# Documentation (keep roadmap for team)
+# IMPLEMENTATION_ROADMAP.md
+
+
