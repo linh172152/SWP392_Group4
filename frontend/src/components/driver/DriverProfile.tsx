@@ -28,8 +28,6 @@ const DriverProfile: React.FC = () => {
     phone: '+84 901 234 567',
     address: '123 Đường ABC, Quận 1, TP.HCM',
     dateOfBirth: '1990-05-15',
-    licenseNumber: 'B2-123456789',
-    joinDate: '2023-06-15',
     totalSwaps: 47,
     monthlySwaps: 12,
     monthlyCost: 340000
@@ -148,26 +146,6 @@ const DriverProfile: React.FC = () => {
                   className="glass border-slate-200/50 dark:border-slate-700/50"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="license" className="text-slate-700 dark:text-slate-300">Số bằng lái</Label>
-                <Input
-                  id="license"
-                  value={profile.licenseNumber}
-                  disabled={!isEditing}
-                  onChange={(e) => setProfile({...profile, licenseNumber: e.target.value})}
-                  className="glass border-slate-200/50 dark:border-slate-700/50"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="joinDate" className="text-slate-700 dark:text-slate-300">Ngày tham gia</Label>
-                <Input
-                  id="joinDate"
-                  type="date"
-                  value={profile.joinDate}
-                  disabled
-                  className="glass border-slate-200/50 dark:border-slate-700/50 bg-slate-50/50 dark:bg-slate-800/50"
-                />
-              </div>
             </div>
             
             <div className="space-y-2">
@@ -223,26 +201,6 @@ const DriverProfile: React.FC = () => {
           <CardDescription className="text-slate-600 dark:text-slate-400">Quản lý bảo mật và tùy chọn tài khoản</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between p-4 glass rounded-lg">
-            <div>
-              <h4 className="font-medium text-slate-900 dark:text-white">Thông báo Email</h4>
-              <p className="text-sm text-slate-600 dark:text-slate-400">Nhận thông báo về đặt chỗ và cập nhật</p>
-            </div>
-            <Button variant="outline" size="sm" className="glass border-blue-200/50 dark:border-purple-400/30">
-              Cấu hình
-            </Button>
-          </div>
-          
-          <div className="flex items-center justify-between p-4 glass rounded-lg">
-            <div>
-              <h4 className="font-medium text-slate-900 dark:text-white">Xác thực 2 bước</h4>
-              <p className="text-sm text-slate-600 dark:text-slate-400">Tăng cường bảo mật cho tài khoản</p>
-            </div>
-            <Button variant="outline" size="sm" className="glass border-green-200/50 dark:border-green-400/30">
-              Kích hoạt
-            </Button>
-          </div>
-          
           <div className="flex items-center justify-between p-4 glass rounded-lg">
             <div>
               <h4 className="font-medium text-slate-900 dark:text-white">Đổi mật khẩu</h4>
