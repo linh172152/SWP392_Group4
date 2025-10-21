@@ -8,8 +8,7 @@ import {
   Calendar, 
   Clock, 
   MapPin, 
-  Car, 
-  Battery,
+  Car,
   CheckCircle,
   XCircle,
   AlertCircle,
@@ -116,8 +115,6 @@ const BookingHistory: React.FC = () => {
 
   const totalBookings = bookings.length;
   const completedBookings = bookings.filter(b => b.status === 'completed').length;
-  const totalCost = bookings.filter(b => b.status === 'completed').reduce((sum, b) => sum + b.cost, 0);
-  const avgDuration = bookings.filter(b => b.duration).reduce((sum, b, _, arr) => sum + parseFloat(b.duration!), 0) / bookings.filter(b => b.duration).length;
 
   return (
     <div className="p-6 space-y-6">
@@ -134,7 +131,7 @@ const BookingHistory: React.FC = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="glass-card border-0 glow-hover group">
           <CardContent className="p-4">
             <div className="flex items-center space-x-3">
@@ -158,34 +155,6 @@ const BookingHistory: React.FC = () => {
               <div>
                 <p className="text-sm text-slate-600 dark:text-slate-400">Đã hoàn thành</p>
                 <p className="text-2xl font-bold text-slate-900 dark:text-white">{completedBookings}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-purple-500 to-violet-500 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <Clock className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Thời gian TB</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{avgDuration.toFixed(1)} phút</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-orange-500 to-yellow-500 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <Battery className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Tổng chi phí</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">${totalCost.toFixed(2)}</p>
               </div>
             </div>
           </CardContent>
