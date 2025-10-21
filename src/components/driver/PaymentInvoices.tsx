@@ -9,16 +9,13 @@ import { Progress } from '../ui/progress';
 import { 
   CreditCard, 
   Search, 
-  Download, 
-  Calendar,
+  Download,
   DollarSign,
   Receipt,
-  Zap,
   Plus,
   Settings,
   CheckCircle,
-  AlertCircle,
-  TrendingUp
+  AlertCircle
 } from 'lucide-react';
 
 // Mock payment data
@@ -149,7 +146,7 @@ const PaymentInvoices: React.FC = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-3">
@@ -187,20 +184,6 @@ const PaymentInvoices: React.FC = () => {
               <div>
                 <p className="text-sm text-gray-600">Overdue</p>
                 <p className="text-xl font-bold">{overdueInvoices.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <TrendingUp className="h-5 w-5 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Avg. Per Swap</p>
-                <p className="text-xl font-bold">${(totalSpent / mockInvoices.length).toFixed(2)}</p>
               </div>
             </div>
           </CardContent>
