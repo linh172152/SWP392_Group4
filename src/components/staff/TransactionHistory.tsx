@@ -13,7 +13,6 @@ import {
   Zap,
   Calendar,
   DollarSign,
-  TrendingUp,
   Battery
 } from 'lucide-react';
 
@@ -111,9 +110,6 @@ const TransactionHistory: React.FC = () => {
 
   const totalRevenue = filteredTransactions.reduce((sum, t) => sum + t.revenue, 0);
   const completedTransactions = filteredTransactions.filter(t => t.status === 'completed');
-  const avgDuration = completedTransactions.length > 0 
-    ? completedTransactions.reduce((sum, t) => sum + parseFloat(t.duration?.split(' ')[0] || '0'), 0) / completedTransactions.length
-    : 0;
 
   return (
     <div className="p-6 space-y-6">
@@ -132,7 +128,7 @@ const TransactionHistory: React.FC = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-3">
@@ -156,36 +152,6 @@ const TransactionHistory: React.FC = () => {
               <div>
                 <p className="text-sm text-gray-600">Revenue Today</p>
                 <p className="text-2xl font-bold">${totalRevenue.toFixed(2)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Clock className="h-5 w-5 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Avg Duration</p>
-                <p className="text-2xl font-bold">{avgDuration.toFixed(1)} min</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-orange-100 rounded-lg">
-                <TrendingUp className="h-5 w-5 text-orange-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Success Rate</p>
-                <p className="text-2xl font-bold">
-                  {Math.round((completedTransactions.length / filteredTransactions.length) * 100)}%
-                </p>
               </div>
             </div>
           </CardContent>
@@ -324,33 +290,6 @@ const TransactionHistory: React.FC = () => {
           </Card>
         ))}
       </div>
-
-      {/* Performance Analytics */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Performance Metrics</CardTitle>
-          <CardDescription>Station efficiency analysis for today</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-green-600">{completedTransactions.length}</div>
-              <div className="text-sm text-gray-600">Successful Swaps</div>
-              <div className="text-xs text-green-600 mt-1">↑ 12% from yesterday</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-blue-600">{avgDuration.toFixed(1)} min</div>
-              <div className="text-sm text-gray-600">Average Duration</div>
-              <div className="text-xs text-blue-600 mt-1">↓ 0.3 min improvement</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-purple-600">${totalRevenue.toFixed(0)}</div>
-              <div className="text-sm text-gray-600">Total Revenue</div>
-              <div className="text-xs text-purple-600 mt-1">↑ 8% from yesterday</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Empty State */}
       {filteredTransactions.length === 0 && (

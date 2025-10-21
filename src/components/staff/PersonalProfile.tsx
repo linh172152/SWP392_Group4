@@ -7,19 +7,10 @@ import { Textarea } from '../ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Badge } from '../ui/badge';
 import { 
-  User, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Calendar,
-  Clock,
-  Building,
   Shield,
-  Settings,
   Edit,
   Save,
-  Camera,
-  Badge as BadgeIcon
+  Camera
 } from 'lucide-react';
 
 const PersonalProfile: React.FC = () => {
@@ -216,65 +207,6 @@ const PersonalProfile: React.FC = () => {
         </Card>
       </div>
 
-      {/* Work Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <Clock className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Giờ làm tuần này</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">40h</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <Calendar className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Nghỉ phép còn lại</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">8 ngày</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-purple-500 to-violet-500 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <BadgeIcon className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Thưởng tháng này</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">2.5M</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-orange-500 to-yellow-500 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <Building className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Thời gian làm việc</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">1.4 năm</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Account Settings */}
       <Card className="glass-card border-0 glow">
         <CardHeader>
@@ -282,26 +214,6 @@ const PersonalProfile: React.FC = () => {
           <CardDescription className="text-slate-600 dark:text-slate-400">Quản lý bảo mật và tùy chọn cá nhân</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between p-4 glass rounded-lg">
-            <div>
-              <h4 className="font-medium text-slate-900 dark:text-white">Thông báo Ca làm việc</h4>
-              <p className="text-sm text-slate-600 dark:text-slate-400">Nhận thông báo về lịch làm việc và thay đổi ca</p>
-            </div>
-            <Button variant="outline" size="sm" className="glass border-green-200/50 dark:border-emerald-400/30">
-              Bật
-            </Button>
-          </div>
-          
-          <div className="flex items-center justify-between p-4 glass rounded-lg">
-            <div>
-              <h4 className="font-medium text-slate-900 dark:text-white">Xác thực 2 bước</h4>
-              <p className="text-sm text-slate-600 dark:text-slate-400">Tăng cường bảo mật cho tài khoản làm việc</p>
-            </div>
-            <Button variant="outline" size="sm" className="glass border-blue-200/50 dark:border-blue-400/30">
-              Kích hoạt
-            </Button>
-          </div>
-          
           <div className="flex items-center justify-between p-4 glass rounded-lg">
             <div>
               <h4 className="font-medium text-slate-900 dark:text-white">Đổi mật khẩu</h4>
