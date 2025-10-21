@@ -15,6 +15,7 @@ import driverRoutes from "./routes/driver.routes";
 import staffRoutes from "./routes/staff.routes";
 import adminRoutes from "./routes/admin.routes";
 import sharedRoutes from "./routes/shared.routes";
+import testRoutes from "./routes/test.routes";
 
 // Import middlewares
 import { errorHandler } from "./middlewares/error.middleware";
@@ -73,6 +74,7 @@ app.use("/api/driver", driverRoutes);
 app.use("/api/staff", staffRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api", sharedRoutes);
+app.use("/api/test", testRoutes);
 
 // Error handling middleware
 app.use(notFound);
