@@ -23,8 +23,6 @@ const stationStats = {
   chargingBatteries: 8,
   maintenanceBatteries: 3,
   damagedBatteries: 1,
-  swapsToday: 47,
-  avgSwapTime: '2.8 phút',
   uptime: 98.5,
   currentQueue: 3
 };
@@ -130,7 +128,7 @@ const StaffHome: React.FC = () => {
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="glass-card border-0 glow-hover group">
           <CardContent className="p-4">
             <div className="flex items-center space-x-3">
@@ -140,34 +138,6 @@ const StaffHome: React.FC = () => {
               <div>
                 <p className="text-sm text-slate-600 dark:text-slate-400">Pin khả dụng</p>
                 <p className="text-2xl font-bold text-slate-900 dark:text-white">{stationStats.availableBatteries}/{stationStats.totalBatteries}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <Zap className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Lần thay hôm nay</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{stationStats.swapsToday}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-purple-500 to-violet-500 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <Clock className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Thời gian thay TB</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{stationStats.avgSwapTime}</p>
               </div>
             </div>
           </CardContent>

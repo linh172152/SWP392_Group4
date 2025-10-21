@@ -24,6 +24,10 @@ export interface EmailOptions {
  */
 export const sendEmail = async (options: EmailOptions): Promise<void> => {
   try {
+    // Test connection first
+    await transporter.verify();
+    console.log("SMTP connection verified");
+
     const mailOptions = {
       from: process.env.EMAIL_FROM,
       to: options.to,
@@ -36,7 +40,7 @@ export const sendEmail = async (options: EmailOptions): Promise<void> => {
     console.log("Email sent successfully:", result.messageId);
   } catch (error) {
     console.error("Email sending failed:", error);
-    throw new CustomError("Failed to send email", 500);
+    throw new CustomError(`Failed to send email: ${error.message}`, 500);
   }
 };
 

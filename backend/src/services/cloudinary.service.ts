@@ -107,3 +107,5 @@ export const getImageInfo = async (publicId: string): Promise<any> => {
     throw new CustomError("Failed to get image info from Cloudinary", 500);
   }
 };
+
+

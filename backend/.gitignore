@@ -44,4 +44,7 @@ prisma/migrations/*_dev
 tmp/
 temp/
 
+# Documentation (keep roadmap for team)
+# IMPLEMENTATION_ROADMAP.md
+
 
