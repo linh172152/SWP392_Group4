@@ -15,7 +15,6 @@ import {
   CheckCircle,
   Clock,
   Wrench,
-  TrendingUp,
   RefreshCw
 } from 'lucide-react';
 
@@ -143,7 +142,6 @@ const BatteryInventory: React.FC = () => {
   const availableBatteries = batteries.filter(b => b.status === 'available').length;
   const chargingBatteries = batteries.filter(b => b.status === 'charging').length;
   const maintenanceBatteries = batteries.filter(b => b.status === 'maintenance').length;
-  const avgHealth = batteries.reduce((sum, b) => sum + b.health, 0) / batteries.length;
 
   return (
     <div className="p-6 space-y-6">
@@ -166,7 +164,7 @@ const BatteryInventory: React.FC = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="glass-card border-0 glow-hover group">
           <CardContent className="p-4">
             <div className="flex items-center space-x-3">
@@ -218,20 +216,6 @@ const BatteryInventory: React.FC = () => {
               <div>
                 <p className="text-sm text-slate-600 dark:text-slate-400">Bảo trì</p>
                 <p className="text-2xl font-bold text-slate-900 dark:text-white">{maintenanceBatteries}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-purple-500 to-violet-500 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <TrendingUp className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Sức khỏe TB</p>
-                <p className={`text-2xl font-bold ${getHealthColor(avgHealth)}`}>{avgHealth.toFixed(1)}%</p>
               </div>
             </div>
           </CardContent>
