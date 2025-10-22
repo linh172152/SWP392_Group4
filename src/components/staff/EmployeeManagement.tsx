@@ -19,8 +19,7 @@ import {
   Mail,
   Phone,
   MapPin,
-  Calendar,
-  Shield
+  Calendar
 } from 'lucide-react';
 
 // Dữ liệu nhân viên mẫu
@@ -121,7 +120,6 @@ const EmployeeManagement: React.FC = () => {
   const totalEmployees = mockEmployees.length;
   const activeEmployees = mockEmployees.filter(e => e.status === 'active').length;
   const onLeaveEmployees = mockEmployees.filter(e => e.status === 'on-leave').length;
-  const avgSalary = mockEmployees.reduce((sum, e) => sum + e.salary, 0) / mockEmployees.length;
 
   return (
     <div className="p-6 space-y-6">
@@ -188,7 +186,7 @@ const EmployeeManagement: React.FC = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="glass-card border-0 glow-hover group">
           <CardContent className="p-4">
             <div className="flex items-center space-x-3">
@@ -226,20 +224,6 @@ const EmployeeManagement: React.FC = () => {
               <div>
                 <p className="text-sm text-slate-600 dark:text-slate-400">Nghỉ phép</p>
                 <p className="text-2xl font-bold text-slate-900 dark:text-white">{onLeaveEmployees}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-purple-500 to-violet-500 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <Shield className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Lương trung bình</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{(avgSalary / 1000000).toFixed(1)}M</p>
               </div>
             </div>
           </CardContent>

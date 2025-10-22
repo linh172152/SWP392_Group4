@@ -15,8 +15,8 @@ export interface User {
   avatar?: string;
   department?: string;
   position?: string;
-  stationId?: string; // For staff - which station they work at
-  permissions?: string[]; // For future granular permissions
+  stationId?: string; 
+  permissions?: string[]; 
 }
 
 function App() {

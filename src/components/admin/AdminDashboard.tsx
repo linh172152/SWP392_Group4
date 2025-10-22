@@ -1,6 +1,6 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { User } from '../../App';
+import type { User } from '../../App';
 import AdminLayout from './AdminLayout';
 import AdminHome from './AdminHome';
 import StationManagement from './StationManagement';
