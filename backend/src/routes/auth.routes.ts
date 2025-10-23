@@ -10,6 +10,14 @@ import {
   verifyToken
 } from '../controllers/auth.controller';
 import { authenticateToken } from '../middlewares/auth.middleware';
+import { validateRequest } from '../middlewares/validation.middleware';
+import {
+  registerSchema,
+  loginSchema,
+  refreshTokenSchema,
+  updateProfileSchema,
+  changePasswordSchema
+} from '../validators/auth.validator';
 
 const router = Router();
 
@@ -96,7 +104,7 @@ const router = Router();
  *       409:
  *         description: User already exists
  */
-router.post('/register', register);
+router.post('/register', validateRequest(registerSchema), register);
 
 /**
  * @swagger
@@ -129,7 +137,7 @@ router.post('/register', register);
  *       401:
  *         description: Invalid credentials
  */
-router.post('/login', login);
+router.post('/login', validateRequest(loginSchema), login);
 
 /**
  * @swagger
@@ -158,7 +166,7 @@ router.post('/login', login);
  *       401:
  *         description: Invalid refresh token
  */
-router.post('/refresh', refresh);
+router.post('/refresh', validateRequest(refreshTokenSchema), refresh);
 
 /**
  * @swagger
@@ -217,7 +225,7 @@ router.get('/me', authenticateToken, getProfile);
  *       401:
  *         description: Unauthorized
  */
-router.put('/profile', authenticateToken, updateProfile);
+router.put('/profile', authenticateToken, validateRequest(updateProfileSchema), updateProfile);
 
 /**
  * @swagger
@@ -250,7 +258,7 @@ router.put('/profile', authenticateToken, updateProfile);
  *       400:
  *         description: Invalid current password
  */
-router.put('/change-password', authenticateToken, changeUserPassword);
+router.put('/change-password', authenticateToken, validateRequest(changePasswordSchema), changeUserPassword);
 
 /**
  * @swagger
