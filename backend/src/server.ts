@@ -1,10 +1,13 @@
+// Load environment variables FIRST before any other imports
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import rateLimit from "express-rate-limit";
 import cookieParser from "cookie-parser";
-import dotenv from "dotenv";
 import { PrismaClient } from "@prisma/client";
 import swaggerJsdoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
@@ -13,11 +16,11 @@ import swaggerUi from "swagger-ui-express";
 import authRoutes from "./routes/auth.routes";
 import googleOAuthRoutes from "./routes/google-oauth.routes";
 import vnpayRoutes from "./routes/vnpay.routes";
+import testRoutes from "./routes/test.routes";
 import driverRoutes from "./routes/driver.routes";
 import staffRoutes from "./routes/staff.routes";
 import adminRoutes from "./routes/admin.routes";
 import sharedRoutes from "./routes/shared.routes";
-import testRoutes from "./routes/test.routes";
 
 // Import new Driver API routes
 import vehicleRoutes from "./routes/vehicle.routes";
@@ -45,9 +48,6 @@ import reportRoutes from "./routes/report.routes";
 // Import middlewares
 import { errorHandler } from "./middlewares/error.middleware";
 import { notFound } from "./middlewares/notFound.middleware";
-
-// Load environment variables
-dotenv.config();
 
 // Initialize Prisma
 export const prisma = new PrismaClient();
@@ -155,17 +155,13 @@ app.get("/health", (_req, res) => {
   });
 });
 
-// API routes
+// API routes - Specific routes first
 app.use("/api/auth", authRoutes);
 app.use("/api/google", googleOAuthRoutes);
 app.use("/api/payments/vnpay", vnpayRoutes);
-app.use("/api/driver", driverRoutes);
-app.use("/api/staff", staffRoutes);
-app.use("/api/admin", adminRoutes);
-app.use("/api", sharedRoutes);
 app.use("/api/test", testRoutes);
 
-// New Driver API routes
+// New Driver API routes - Specific routes first
 app.use("/api/driver/vehicles", vehicleRoutes);
 app.use("/api/driver/stations", stationRoutes);
 app.use("/api/driver/bookings", bookingRoutes);
@@ -187,6 +183,12 @@ app.use("/api/packages", servicePackageRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/ratings", ratingRoutes);
 app.use("/api/reports", reportRoutes);
+
+// Placeholder routes - Must be after specific routes
+app.use("/api/driver", driverRoutes);
+app.use("/api/staff", staffRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api", sharedRoutes);
 
 // Error handling middleware
 app.use(notFound);

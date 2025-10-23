@@ -41,6 +41,15 @@ const router = Router();
  */
 router.post("/email", testEmail);
 
+// Debug JWT secret
+router.get("/jwt-secret", (_req, res) => {
+  res.json({
+    JWT_SECRET: process.env.JWT_SECRET ? "LOADED" : "NOT_LOADED",
+    JWT_SECRET_LENGTH: process.env.JWT_SECRET?.length || 0,
+    NODE_ENV: process.env.NODE_ENV,
+  });
+});
+
 /**
  * @swagger
  * /api/test/welcome-email:
@@ -74,9 +83,47 @@ router.post("/welcome-email", testWelcomeEmail);
  *   get:
  *     summary: Test Track-Asia maps service
  *     tags: [Test]
+ *     parameters:
+ *       - in: query
+ *         name: lat
+ *         required: true
+ *         schema:
+ *           type: number
+ *         description: Latitude coordinate
+ *       - in: query
+ *         name: lng
+ *         required: true
+ *         schema:
+ *           type: number
+ *         description: Longitude coordinate
  *     responses:
  *       200:
  *         description: Maps service working
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     coordinates:
+ *                       type: object
+ *                       properties:
+ *                         lat:
+ *                           type: number
+ *                         lng:
+ *                           type: number
+ *                     geocoding:
+ *                       type: object
+ *                     token:
+ *                       type: string
+ *       400:
+ *         description: Missing required parameters
  *       500:
  *         description: Maps service error
  */
@@ -96,17 +143,17 @@ router.get("/maps", testMaps);
  *             type: object
  *             required:
  *               - lat1
- *               - lon1
+ *               - lng1
  *               - lat2
- *               - lon2
+ *               - lng2
  *             properties:
  *               lat1:
  *                 type: number
- *               lon1:
+ *               lng1:
  *                 type: number
  *               lat2:
  *                 type: number
- *               lon2:
+ *               lng2:
  *                 type: number
  *     responses:
  *       200:
