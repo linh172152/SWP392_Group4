@@ -6,6 +6,8 @@ import rateLimit from "express-rate-limit";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import { PrismaClient } from "@prisma/client";
+import swaggerJsdoc from "swagger-jsdoc";
+import swaggerUi from "swagger-ui-express";
 
 // Import routes
 import authRoutes from "./routes/auth.routes";
@@ -50,6 +52,42 @@ dotenv.config();
 // Initialize Prisma
 export const prisma = new PrismaClient();
 
+// Swagger configuration
+const swaggerOptions = {
+  definition: {
+    openapi: "3.0.0",
+    info: {
+      title: "EV Battery Swap Station API",
+      version: "1.0.0",
+      description: "API for EV Battery Swap Station Management System",
+      contact: {
+        name: "SWP392 Group 4",
+        email: "thanhldse170144@fpt.edu.vn"
+      }
+    },
+    servers: [
+      {
+        url: process.env.NODE_ENV === "production" 
+          ? "https://ev-battery-backend.onrender.com" 
+          : "http://localhost:3000",
+        description: process.env.NODE_ENV === "production" ? "Production server" : "Development server"
+      }
+    ],
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT"
+        }
+      }
+    }
+  },
+  apis: ["./src/routes/*.ts", "./src/controllers/*.ts"]
+};
+
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
+
 // Create Express app
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -88,6 +126,7 @@ app.get("/", (_req, res) => {
     timestamp: new Date().toISOString(),
     endpoints: {
       health: "/health",
+      docs: "/api-docs",
       auth: "/api/auth",
       google: "/api/google",
       payments: "/api/payments/vnpay",
@@ -98,6 +137,9 @@ app.get("/", (_req, res) => {
     }
   });
 });
+
+// Swagger documentation
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Health check endpoint
 app.get("/health", (_req, res) => {
