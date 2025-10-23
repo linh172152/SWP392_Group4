@@ -17,6 +17,29 @@ import adminRoutes from "./routes/admin.routes";
 import sharedRoutes from "./routes/shared.routes";
 import testRoutes from "./routes/test.routes";
 
+// Import new Driver API routes
+import vehicleRoutes from "./routes/vehicle.routes";
+import stationRoutes from "./routes/station.routes";
+import bookingRoutes from "./routes/booking.routes";
+import transactionRoutes from "./routes/transaction.routes";
+
+// Import new Staff API routes
+import batteryRoutes from "./routes/battery.routes";
+import staffBookingRoutes from "./routes/staff-booking.routes";
+
+// Import new Admin API routes
+import adminUserRoutes from "./routes/admin-user.routes";
+
+// Import new Shared API routes
+import publicStationRoutes from "./routes/public-station.routes";
+import supportRoutes from "./routes/support.routes";
+
+// Import new Service Package routes
+import servicePackageRoutes from "./routes/service-package.routes";
+import subscriptionRoutes from "./routes/subscription.routes";
+import ratingRoutes from "./routes/rating.routes";
+import reportRoutes from "./routes/report.routes";
+
 // Import middlewares
 import { errorHandler } from "./middlewares/error.middleware";
 import { notFound } from "./middlewares/notFound.middleware";
@@ -75,6 +98,29 @@ app.use("/api/staff", staffRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api", sharedRoutes);
 app.use("/api/test", testRoutes);
+
+// New Driver API routes
+app.use("/api/driver/vehicles", vehicleRoutes);
+app.use("/api/driver/stations", stationRoutes);
+app.use("/api/driver/bookings", bookingRoutes);
+app.use("/api/driver/transactions", transactionRoutes);
+
+// New Staff API routes
+app.use("/api/staff/batteries", batteryRoutes);
+app.use("/api/staff/bookings", staffBookingRoutes);
+
+// New Admin API routes
+app.use("/api/admin/users", adminUserRoutes);
+
+// New Shared API routes
+app.use("/api/stations/public", publicStationRoutes);
+app.use("/api/support", supportRoutes);
+
+// New Service Package routes
+app.use("/api/packages", servicePackageRoutes);
+app.use("/api/subscriptions", subscriptionRoutes);
+app.use("/api/ratings", ratingRoutes);
+app.use("/api/reports", reportRoutes);
 
 // Error handling middleware
 app.use(notFound);

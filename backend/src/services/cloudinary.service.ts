@@ -54,29 +54,36 @@ export const uploadImageFromBuffer = async (
   folder?: string
 ): Promise<UploadResult> => {
   try {
-    const result = await cloudinary.uploader
-      .upload_stream(
-        {
-          folder: folder || "ev-battery-swap",
-          resource_type: "auto",
-          quality: "auto",
-          fetch_format: "auto",
-        },
-        (error, result) => {
-          if (error) throw error;
-          return result;
-        }
-      )
-      .end(buffer);
-
-    return {
-      public_id: result.public_id,
-      secure_url: result.secure_url,
-      width: result.width,
-      height: result.height,
-      format: result.format,
-      bytes: result.bytes,
-    };
+    return new Promise((resolve, reject) => {
+      cloudinary.uploader
+        .upload_stream(
+          {
+            folder: folder || "ev-battery-swap",
+            resource_type: "auto",
+            quality: "auto",
+            fetch_format: "auto",
+          },
+          (error, result) => {
+            if (error) {
+              reject(error);
+              return;
+            }
+            if (!result) {
+              reject(new Error("No result from Cloudinary"));
+              return;
+            }
+            resolve({
+              public_id: result.public_id,
+              secure_url: result.secure_url,
+              width: result.width,
+              height: result.height,
+              format: result.format,
+              bytes: result.bytes,
+            });
+          }
+        )
+        .end(buffer);
+    });
   } catch (error) {
     console.error("Cloudinary upload error:", error);
     throw new CustomError("Failed to upload image to Cloudinary", 500);
@@ -107,5 +114,3 @@ export const getImageInfo = async (publicId: string): Promise<any> => {
     throw new CustomError("Failed to get image info from Cloudinary", 500);
   }
 };
-
-

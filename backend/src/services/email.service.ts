@@ -40,7 +40,10 @@ export const sendEmail = async (options: EmailOptions): Promise<void> => {
     console.log("Email sent successfully:", result.messageId);
   } catch (error) {
     console.error("Email sending failed:", error);
-    throw new CustomError(`Failed to send email: ${error.message}`, 500);
+    throw new CustomError(
+      `Failed to send email: ${error instanceof Error ? error.message : "Unknown error"}`,
+      500
+    );
   }
 };
 
