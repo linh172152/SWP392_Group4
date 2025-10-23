@@ -14,6 +14,10 @@ import {
 
 const router = Router();
 
+// All routes require authentication and staff role
+router.use(authenticateToken);
+router.use(authorizeRole("STAFF"));
+
 /**
  * @swagger
  * components:

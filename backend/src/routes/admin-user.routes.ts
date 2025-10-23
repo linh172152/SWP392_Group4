@@ -15,6 +15,10 @@ import {
 
 const router = Router();
 
+// All routes require authentication and admin role
+router.use(authenticateToken);
+router.use(authorizeRole("ADMIN"));
+
 /**
  * @swagger
  * /api/admin/users:

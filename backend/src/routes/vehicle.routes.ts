@@ -10,6 +10,9 @@ import { authenticateToken } from "../middlewares/auth.middleware";
 
 const router = Router();
 
+// All routes require authentication
+router.use(authenticateToken);
+
 /**
  * @swagger
  * components:

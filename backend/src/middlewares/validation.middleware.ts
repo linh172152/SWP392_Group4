@@ -4,12 +4,12 @@ import { Request, Response, NextFunction } from 'express';
  * Validation middleware for request body
  */
 export const validateRequest = (schema: any) => {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
     try {
       const { error, value } = schema.validate(req.body);
       
       if (error) {
-        return res.status(400).json({
+        res.status(400).json({
           success: false,
           message: 'Validation error',
           errors: error.details.map((detail: any) => ({
@@ -17,12 +17,13 @@ export const validateRequest = (schema: any) => {
             message: detail.message
           }))
         });
+        return;
       }
       
       req.body = value;
       next();
     } catch (err) {
-      return res.status(500).json({
+      res.status(500).json({
         success: false,
         message: 'Validation middleware error'
       });
@@ -34,12 +35,12 @@ export const validateRequest = (schema: any) => {
  * Validation middleware for query parameters
  */
 export const validateQuery = (schema: any) => {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
     try {
       const { error, value } = schema.validate(req.query);
       
       if (error) {
-        return res.status(400).json({
+        res.status(400).json({
           success: false,
           message: 'Query validation error',
           errors: error.details.map((detail: any) => ({
@@ -47,12 +48,13 @@ export const validateQuery = (schema: any) => {
             message: detail.message
           }))
         });
+        return;
       }
       
       req.query = value;
       next();
     } catch (err) {
-      return res.status(500).json({
+      res.status(500).json({
         success: false,
         message: 'Query validation middleware error'
       });
@@ -64,12 +66,12 @@ export const validateQuery = (schema: any) => {
  * Validation middleware for URL parameters
  */
 export const validateParams = (schema: any) => {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
     try {
       const { error, value } = schema.validate(req.params);
       
       if (error) {
-        return res.status(400).json({
+        res.status(400).json({
           success: false,
           message: 'Parameter validation error',
           errors: error.details.map((detail: any) => ({
@@ -77,12 +79,13 @@ export const validateParams = (schema: any) => {
             message: detail.message
           }))
         });
+        return;
       }
       
       req.params = value;
       next();
     } catch (err) {
-      return res.status(500).json({
+      res.status(500).json({
         success: false,
         message: 'Parameter validation middleware error'
       });
