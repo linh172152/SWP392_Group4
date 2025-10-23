@@ -62,28 +62,32 @@ const swaggerOptions = {
       description: "API for EV Battery Swap Station Management System",
       contact: {
         name: "SWP392 Group 4",
-        email: "thanhldse170144@fpt.edu.vn"
-      }
+        email: "thanhldse170144@fpt.edu.vn",
+      },
     },
     servers: [
       {
-        url: process.env.NODE_ENV === "production" 
-          ? "https://ev-battery-backend.onrender.com" 
-          : "http://localhost:3000",
-        description: process.env.NODE_ENV === "production" ? "Production server" : "Development server"
-      }
+        url:
+          process.env.NODE_ENV === "production"
+            ? "https://ev-battery-backend.onrender.com"
+            : "http://localhost:3000",
+        description:
+          process.env.NODE_ENV === "production"
+            ? "Production server"
+            : "Development server",
+      },
     ],
     components: {
       securitySchemes: {
         bearerAuth: {
           type: "http",
           scheme: "bearer",
-          bearerFormat: "JWT"
-        }
-      }
-    }
+          bearerFormat: "JWT",
+        },
+      },
+    },
   },
-  apis: ["./src/routes/*.ts", "./src/controllers/*.ts"]
+  apis: ["./src/routes/*.ts", "./src/controllers/*.ts"],
 };
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
@@ -133,8 +137,8 @@ app.get("/", (_req, res) => {
       driver: "/api/driver",
       staff: "/api/staff",
       admin: "/api/admin",
-      test: "/api/test"
-    }
+      test: "/api/test",
+    },
   });
 });
 
