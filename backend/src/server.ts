@@ -79,6 +79,26 @@ app.use(cookieParser());
 // Logging middleware
 app.use(morgan("combined"));
 
+// Root endpoint
+app.get("/", (_req, res) => {
+  res.status(200).json({
+    message: "🚀 EV Battery Swap Station API",
+    version: "1.0.0",
+    status: "OK",
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      health: "/health",
+      auth: "/api/auth",
+      google: "/api/google",
+      payments: "/api/payments/vnpay",
+      driver: "/api/driver",
+      staff: "/api/staff",
+      admin: "/api/admin",
+      test: "/api/test"
+    }
+  });
+});
+
 // Health check endpoint
 app.get("/health", (_req, res) => {
   res.status(200).json({
