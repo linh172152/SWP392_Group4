@@ -126,3 +126,4 @@ export const vehicleIdSchema = Joi.object({
       'any.required': 'Vehicle ID is required'
     })
 });
+

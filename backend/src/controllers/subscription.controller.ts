@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
+import { notificationService } from "../server";
 
 const prisma = new PrismaClient();
 
@@ -267,10 +268,98 @@ export const cancelSubscription = asyncHandler(
       },
     });
 
+    // Send subscription expiry notification
+    try {
+      await notificationService.sendNotification({
+        type: "subscription_expired",
+        userId: userId,
+        title: "Subscription Cancelled",
+        message: `Your subscription has been cancelled. You will be charged for future battery swaps.`,
+        data: {
+          subscriptionId: updatedSubscription.subscription_id,
+          packageName: updatedSubscription.package?.name,
+          cancelledAt: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      console.error(
+        "Failed to send subscription cancellation notification:",
+        error
+      );
+    }
+
     res.status(200).json({
       success: true,
       message: "Subscription cancelled successfully",
       data: updatedSubscription,
+    });
+  }
+);
+
+/**
+ * Check and notify about expiring subscriptions
+ */
+export const checkExpiringSubscriptions = asyncHandler(
+  async (_req: Request, res: Response) => {
+    // Find subscriptions expiring in 3 days
+    const threeDaysFromNow = new Date();
+    threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
+
+    const expiringSubscriptions = await prisma.userSubscription.findMany({
+      where: {
+        status: "active",
+        end_date: {
+          lte: threeDaysFromNow,
+          gte: new Date(),
+        },
+      },
+      include: {
+        user: {
+          select: {
+            user_id: true,
+            full_name: true,
+            email: true,
+          },
+        },
+        package: {
+          select: {
+            name: true,
+            price: true,
+          },
+        },
+      },
+    });
+
+    // Send notifications for expiring subscriptions
+    for (const subscription of expiringSubscriptions) {
+      try {
+        await notificationService.sendNotification({
+          type: "subscription_expiring",
+          userId: subscription.user_id,
+          title: "Subscription Expiring Soon",
+          message: `Your ${subscription.package?.name} subscription expires in 3 days. Renew now to continue enjoying free battery swaps!`,
+          data: {
+            subscriptionId: subscription.subscription_id,
+            packageName: subscription.package?.name,
+            expiryDate: subscription.end_date.toISOString(),
+            remainingSwaps: subscription.remaining_swaps,
+          },
+        });
+      } catch (error) {
+        console.error(
+          "Failed to send subscription expiry notification:",
+          error
+        );
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Expiring subscriptions checked",
+      data: {
+        count: expiringSubscriptions.length,
+        subscriptions: expiringSubscriptions,
+      },
     });
   }
 );

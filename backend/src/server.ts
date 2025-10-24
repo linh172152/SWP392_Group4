@@ -11,12 +11,13 @@ import cookieParser from "cookie-parser";
 import { PrismaClient } from "@prisma/client";
 import swaggerJsdoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
+import { createServer } from "http";
+import { NotificationService } from "./services/notification.service";
 
 // Import routes
 import authRoutes from "./routes/auth.routes";
 import googleOAuthRoutes from "./routes/google-oauth.routes";
 import vnpayRoutes from "./routes/vnpay.routes";
-import testRoutes from "./routes/test.routes";
 import driverRoutes from "./routes/driver.routes";
 import staffRoutes from "./routes/staff.routes";
 import adminRoutes from "./routes/admin.routes";
@@ -47,7 +48,7 @@ import reportRoutes from "./routes/report.routes";
 
 // Import middlewares
 import { errorHandler } from "./middlewares/error.middleware";
-import { notFound } from "./middlewares/notFound.middleware";
+// import { notFound } from "./middlewares/notFound.middleware";
 
 // Initialize Prisma
 export const prisma = new PrismaClient();
@@ -94,7 +95,11 @@ const swaggerSpec = swaggerJsdoc(swaggerOptions);
 
 // Create Express app
 const app = express();
+const server = createServer(app);
 const PORT = process.env.PORT || 3000;
+
+// Initialize Notification Service
+export const notificationService = new NotificationService(server);
 
 // Security middleware
 app.use(helmet());
@@ -102,6 +107,8 @@ app.use(
   cors({
     origin: process.env.FRONTEND_URL || "http://localhost:5173",
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
@@ -137,7 +144,6 @@ app.get("/", (_req, res) => {
       driver: "/api/driver",
       staff: "/api/staff",
       admin: "/api/admin",
-      test: "/api/test",
     },
   });
 });
@@ -159,39 +165,38 @@ app.get("/health", (_req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/google", googleOAuthRoutes);
 app.use("/api/payments/vnpay", vnpayRoutes);
-app.use("/api/test", testRoutes);
 
-// New Driver API routes - Specific routes first
+// Driver API routes - Specific routes first to avoid conflicts
 app.use("/api/driver/vehicles", vehicleRoutes);
 app.use("/api/driver/stations", stationRoutes);
 app.use("/api/driver/bookings", bookingRoutes);
 app.use("/api/driver/transactions", transactionRoutes);
+app.use("/api/driver", driverRoutes); // Placeholder routes last
 
-// New Staff API routes
+// Staff API routes - Specific routes first to avoid conflicts
 app.use("/api/staff/batteries", batteryRoutes);
 app.use("/api/staff/bookings", staffBookingRoutes);
+app.use("/api/staff", staffRoutes); // Placeholder routes last
 
-// New Admin API routes
+// Admin API routes - Specific routes first to avoid conflicts
 app.use("/api/admin/users", adminUserRoutes);
+app.use("/api/admin", adminRoutes); // Placeholder routes last
 
-// New Shared API routes
+// Public API routes
 app.use("/api/stations/public", publicStationRoutes);
-app.use("/api/support", supportRoutes);
 
-// New Service Package routes
+// User API routes
+app.use("/api/support", supportRoutes);
 app.use("/api/packages", servicePackageRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/ratings", ratingRoutes);
 app.use("/api/reports", reportRoutes);
 
-// Placeholder routes - Must be after specific routes
-app.use("/api/driver", driverRoutes);
-app.use("/api/staff", staffRoutes);
-app.use("/api/admin", adminRoutes);
+// Shared routes
 app.use("/api", sharedRoutes);
 
 // Error handling middleware
-app.use(notFound);
+// app.use(notFound);
 app.use(errorHandler);
 
 // Graceful shutdown
@@ -208,10 +213,11 @@ process.on("SIGTERM", async () => {
 });
 
 // Start server
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || "development"}`);
   console.log(`🔗 Health check: http://localhost:${PORT}/health`);
+  console.log(`🔌 WebSocket enabled for real-time notifications`);
 });
 
 export default app;

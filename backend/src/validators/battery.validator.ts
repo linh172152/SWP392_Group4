@@ -121,3 +121,4 @@ export const batteryIdSchema = Joi.object({
       'any.required': 'Battery ID is required'
     })
 });
+

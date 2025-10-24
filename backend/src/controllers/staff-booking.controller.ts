@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
+import { notificationService } from "../server";
 
 const prisma = new PrismaClient();
 
@@ -225,13 +226,17 @@ export const confirmBooking = asyncHandler(
       throw new CustomError("Booking cannot be confirmed", 400);
     }
 
+    // Generate PIN code for user
+    const pinCode = Math.floor(100000 + Math.random() * 900000).toString();
+
     const updatedBooking = await prisma.booking.update({
       where: { booking_id: id },
       data: {
         status: "confirmed",
         checked_in_at: new Date(),
         checked_in_by_staff_id: staffId,
-      },
+        pin_code: pinCode,
+      } as any,
       include: {
         user: {
           select: {
@@ -266,10 +271,151 @@ export const confirmBooking = asyncHandler(
       },
     });
 
+    // Send PIN code notification to user
+    try {
+      await notificationService.sendNotification({
+        type: "pin_code",
+        userId: booking.user_id,
+        title: "Mã PIN xác nhận",
+        message: `Mã PIN của bạn: ${pinCode}. Vui lòng sử dụng mã này khi đến trạm.`,
+        data: {
+          email: (updatedBooking as any).user.email,
+          userName: (updatedBooking as any).user.full_name,
+          bookingId: booking.booking_code,
+          stationName: (updatedBooking as any).station.name,
+          stationAddress: (updatedBooking as any).station.address,
+          bookingTime: booking.scheduled_at,
+          pinCode: pinCode,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to send PIN code notification:", error);
+    }
+
     res.status(200).json({
       success: true,
       message: "Booking confirmed successfully",
-      data: updatedBooking,
+      data: {
+        ...updatedBooking,
+        pin_code: pinCode,
+      },
+    });
+  }
+);
+
+/**
+ * Verify PIN code for booking
+ */
+export const verifyPinCode = asyncHandler(
+  async (req: Request, res: Response) => {
+    const staffId = req.user?.userId;
+    const { id } = req.params;
+    const { pin_code } = req.body;
+
+    if (!staffId) {
+      throw new CustomError("Staff not authenticated", 401);
+    }
+
+    if (!pin_code) {
+      throw new CustomError("PIN code is required", 400);
+    }
+
+    // Get staff's station
+    const staff = await prisma.user.findUnique({
+      where: { user_id: staffId },
+      select: { station_id: true },
+    });
+
+    if (!staff?.station_id) {
+      throw new CustomError("Staff not assigned to any station", 400);
+    }
+
+    const booking = await prisma.booking.findFirst({
+      where: {
+        booking_id: id,
+        station_id: staff.station_id,
+        status: "confirmed",
+      },
+      include: {
+        user: {
+          select: {
+            user_id: true,
+            full_name: true,
+            email: true,
+            phone: true,
+          },
+        },
+        vehicle: {
+          select: {
+            vehicle_id: true,
+            license_plate: true,
+            vehicle_type: true,
+            model: true,
+          },
+        },
+        station: {
+          select: {
+            station_id: true,
+            name: true,
+            address: true,
+          },
+        },
+      },
+    });
+
+    if (!booking) {
+      throw new CustomError("Booking not found or not confirmed", 404);
+    }
+
+    // Verify PIN code
+    if ((booking as any).pin_code !== pin_code) {
+      throw new CustomError("Invalid PIN code", 400);
+    }
+
+    // Check if PIN has already been verified
+    if ((booking as any).pin_verified_at) {
+      throw new CustomError("PIN code has already been verified", 400);
+    }
+
+    // Update booking with PIN verification
+    const updatedBooking = await prisma.booking.update({
+      where: { booking_id: id },
+      data: {
+        pin_verified_at: new Date(),
+      } as any,
+      include: {
+        user: {
+          select: {
+            user_id: true,
+            full_name: true,
+            email: true,
+            phone: true,
+          },
+        },
+        vehicle: {
+          select: {
+            vehicle_id: true,
+            license_plate: true,
+            vehicle_type: true,
+            model: true,
+          },
+        },
+        station: {
+          select: {
+            station_id: true,
+            name: true,
+            address: true,
+          },
+        },
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "PIN code verified successfully",
+      data: {
+        booking: updatedBooking,
+      },
     });
   }
 );
@@ -301,7 +447,7 @@ export const completeBooking = asyncHandler(
           select: { station_id: true },
         },
       },
-    });
+    }) as any;
 
     if (!booking) {
       throw new CustomError("Booking not found", 404);
@@ -309,6 +455,14 @@ export const completeBooking = asyncHandler(
 
     if (booking.status !== "confirmed") {
       throw new CustomError("Booking must be confirmed before completion", 400);
+    }
+
+    // Check if PIN has been verified
+    if (!booking.pin_verified_at) {
+      throw new CustomError(
+        "PIN code must be verified before completing booking",
+        400
+      );
     }
 
     // Check if batteries exist and are available
@@ -339,6 +493,36 @@ export const completeBooking = asyncHandler(
         data: { status: "completed" },
       });
 
+      // Check if user has active subscription (not expired)
+      const activeSubscription = await tx.userSubscription.findFirst({
+        where: {
+          user_id: booking.user_id,
+          status: "active",
+          end_date: { gte: new Date() },
+          remaining_swaps: { gt: 0 },
+        },
+      });
+
+      let transactionAmount = 0;
+      let paymentStatus: "pending" | "completed" = "pending";
+
+      if (activeSubscription && activeSubscription.remaining_swaps && activeSubscription.remaining_swaps > 0) {
+        // User has subscription - free swap
+        transactionAmount = 0;
+        paymentStatus = "completed";
+        
+        // Update remaining swaps
+        await tx.userSubscription.update({
+          where: { subscription_id: activeSubscription.subscription_id },
+          data: { remaining_swaps: (activeSubscription.remaining_swaps || 0) - 1 },
+        });
+      } else {
+        // No subscription - calculate payment amount
+        // TODO: Implement pricing logic based on battery model, station, etc.
+        transactionAmount = 50000; // Default 50k VND
+        paymentStatus = "pending";
+      }
+
       // Create transaction record
       const transaction = await tx.transaction.create({
         data: {
@@ -354,8 +538,8 @@ export const completeBooking = asyncHandler(
           swap_started_at: new Date(),
           swap_completed_at: new Date(),
           swap_duration_minutes: 0, // Will be calculated by frontend
-          payment_status: "pending",
-          amount: 0, // Will be calculated based on subscription
+          payment_status: paymentStatus,
+          amount: transactionAmount,
           notes,
         },
       });

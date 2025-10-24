@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
+import { notificationService } from "../server";
 
 const prisma = new PrismaClient();
 
@@ -120,6 +121,14 @@ export const createBooking = asyncHandler(
       throw new CustomError("Station not found or not active", 404);
     }
 
+    // Check if battery model is compatible with vehicle
+    if (vehicle.battery_model !== battery_model) {
+      throw new CustomError(
+        "Battery model is not compatible with your vehicle",
+        400
+      );
+    }
+
     // Check if there are available batteries
     const availableBatteries = await prisma.battery.count({
       where: {
@@ -170,6 +179,33 @@ export const createBooking = asyncHandler(
         },
       },
     });
+
+    // Send notification to user
+    try {
+      // Get user info for notification
+      const user = await prisma.user.findUnique({
+        where: { user_id: userId },
+        select: { email: true, full_name: true },
+      });
+
+      await notificationService.sendNotification({
+        type: "booking_confirmed",
+        userId: userId,
+        title: "Đặt chỗ thành công!",
+        message: `Đặt chỗ của bạn đã được xác nhận. Mã đặt chỗ: ${bookingCode}`,
+        data: {
+          email: user?.email || "",
+          userName: user?.full_name || "User",
+          bookingId: bookingCode,
+          stationName: station.name,
+          stationAddress: station.address,
+          bookingTime: scheduled_at,
+          batteryType: battery_model,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to send booking notification:", error);
+    }
 
     res.status(201).json({
       success: true,

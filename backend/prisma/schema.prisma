@@ -112,6 +112,8 @@ model Booking {
   status                 BookingStatus @default(pending)
   checked_in_at          DateTime?
   checked_in_by_staff_id String?       @db.Uuid
+  pin_code               String?       @db.VarChar(6)
+  pin_verified_at        DateTime?
   notes                  String?
   created_at             DateTime      @default(now())
   checked_in_by_staff    User?         @relation("CheckedInByStaff", fields: [checked_in_by_staff_id], references: [user_id])

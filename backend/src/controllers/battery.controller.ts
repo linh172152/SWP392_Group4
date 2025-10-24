@@ -198,6 +198,36 @@ export const updateBatteryStatus = asyncHandler(
       updateData.last_charged_at = new Date();
     }
 
+    // Auto charge logic for low battery
+    if (status === "low" && current_charge < 20) {
+      // Simulate charging process
+      setTimeout(async () => {
+        try {
+          await prisma.battery.update({
+            where: { battery_id: id },
+            data: {
+              status: "charging",
+              current_charge: Math.min(current_charge + 20, 100),
+            },
+          });
+
+          // If fully charged, update status
+          if (current_charge + 20 >= 100) {
+            await prisma.battery.update({
+              where: { battery_id: id },
+              data: {
+                status: "full",
+                current_charge: 100,
+                last_charged_at: new Date(),
+              },
+            });
+          }
+        } catch (error) {
+          console.error("Auto charge failed:", error);
+        }
+      }, 5000); // 5 seconds delay to simulate charging
+    }
+
     const updatedBattery = await prisma.battery.update({
       where: { battery_id: id },
       data: updateData,

@@ -4,6 +4,7 @@ import {
   createSubscription,
   getSubscriptionDetails,
   cancelSubscription,
+  checkExpiringSubscriptions,
 } from "../controllers/subscription.controller";
 import { authenticateToken } from "../middlewares/auth.middleware";
 
@@ -166,5 +167,21 @@ router.get("/:id", getSubscriptionDetails);
  *         description: Subscription not found
  */
 router.put("/:id/cancel", cancelSubscription);
+
+/**
+ * @swagger
+ * /api/subscriptions/check-expiring:
+ *   get:
+ *     summary: Check and notify about expiring subscriptions
+ *     tags: [Subscriptions]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Expiring subscriptions checked
+ *       401:
+ *         description: Unauthorized
+ */
+router.get("/check-expiring", checkExpiringSubscriptions);
 
 export default router;

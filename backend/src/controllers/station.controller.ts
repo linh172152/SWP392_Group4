@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
+// import { calculateDistance } from "../controllers/maps.controller";
 
 const prisma = new PrismaClient();
 
@@ -54,18 +55,39 @@ export const findNearbyStations = asyncHandler(
       },
     });
 
-    // Calculate average rating for each station
-    const stationsWithRating = stations.map(station => {
+    // Calculate average rating and distance for each station
+    const stationsWithRating = await Promise.all(stations.map(async (station) => {
       const avgRating = station.station_ratings.length > 0
         ? station.station_ratings.reduce((sum, r) => sum + r.rating, 0) / station.station_ratings.length
         : 0;
+
+      // Calculate distance using Haversine formula
+      const R = 6371; // Earth's radius in kilometers
+      const stationLat = Number(station.latitude) || 0;
+      const stationLng = Number(station.longitude) || 0;
+      const userLat = Number(lat);
+      const userLng = Number(lng);
+      const dLat = ((stationLat - userLat) * Math.PI) / 180;
+      const dLng = ((stationLng - userLng) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos((userLat * Math.PI) / 180) *
+          Math.cos((stationLat * Math.PI) / 180) *
+          Math.sin(dLng / 2) *
+          Math.sin(dLng / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const distance = R * c;
 
       return {
         ...station,
         average_rating: avgRating,
         available_batteries: station.batteries.length,
+        distance_km: distance,
       };
-    });
+    }));
+
+    // Sort by distance
+    stationsWithRating.sort((a, b) => a.distance_km - b.distance_km);
 
     res.status(200).json({
       success: true,

@@ -3,14 +3,20 @@ import {
   getUserTransactions,
   getTransactionDetails,
   getTransactionStats,
+  getPendingTransactions,
+  payTransaction,
   createRefundRequest,
 } from "../controllers/transaction.controller";
-import { authenticateToken } from "../middlewares/auth.middleware";
+import {
+  authenticateToken,
+  authorizeRole,
+} from "../middlewares/auth.middleware";
 
 const router = Router();
 
-// All routes require authentication
+// All routes require authentication and driver role
 router.use(authenticateToken);
+router.use(authorizeRole("DRIVER"));
 
 /**
  * @swagger
@@ -85,6 +91,22 @@ router.use(authenticateToken);
  *         description: Unauthorized
  */
 router.get("/", getUserTransactions);
+
+/**
+ * @swagger
+ * /api/driver/transactions/pending:
+ *   get:
+ *     summary: Get pending transactions (need payment)
+ *     tags: [Driver - Transactions]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Pending transactions retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ */
+router.get("/pending", getPendingTransactions);
 
 /**
  * @swagger
@@ -199,6 +221,41 @@ router.get("/:id", getTransactionDetails);
  *       400:
  *         description: Bad request
  */
+/**
+ * @swagger
+ * /api/driver/transactions/{id}/pay:
+ *   post:
+ *     summary: Pay for transaction
+ *     tags: [Driver - Transactions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               payment_method:
+ *                 type: string
+ *                 enum: [vnpay, cash, momo]
+ *                 default: vnpay
+ *     responses:
+ *       200:
+ *         description: Payment processed successfully
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Transaction not found
+ */
+router.post("/:id/pay", payTransaction);
+
 router.post("/refund", createRefundRequest);
 
 export default router;

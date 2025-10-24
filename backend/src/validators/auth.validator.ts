@@ -116,3 +116,4 @@ export const changePasswordSchema = Joi.object({
       'any.required': 'New password is required'
     })
 });
+

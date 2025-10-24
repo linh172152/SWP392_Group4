@@ -7,7 +7,8 @@ import {
   getProfile,
   updateProfile,
   changeUserPassword,
-  verifyToken
+  verifyToken,
+  uploadProfileImage
 } from '../controllers/auth.controller';
 import { authenticateToken } from '../middlewares/auth.middleware';
 import { validateRequest } from '../middlewares/validation.middleware';
@@ -18,8 +19,24 @@ import {
   updateProfileSchema,
   changePasswordSchema
 } from '../validators/auth.validator';
+import multer from 'multer';
 
 const router = Router();
+
+// Configure multer for image upload
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  },
+});
 
 /**
  * @swagger
@@ -259,6 +276,34 @@ router.put('/profile', authenticateToken, validateRequest(updateProfileSchema), 
  *         description: Invalid current password
  */
 router.put('/change-password', authenticateToken, validateRequest(changePasswordSchema), changeUserPassword);
+
+/**
+ * @swagger
+ * /api/auth/upload-avatar:
+ *   post:
+ *     summary: Upload profile image
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Profile image uploaded successfully
+ *       401:
+ *         description: Unauthorized
+ *       400:
+ *         description: No image file provided
+ */
+router.post('/upload-avatar', authenticateToken, upload.single('image'), uploadProfileImage);
 
 /**
  * @swagger

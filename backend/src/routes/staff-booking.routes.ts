@@ -3,6 +3,7 @@ import {
   getStationBookings,
   getBookingDetails,
   confirmBooking,
+  verifyPinCode,
   completeBooking,
   cancelBooking,
 } from "../controllers/staff-booking.controller";
@@ -147,6 +148,46 @@ router.put("/:id/confirm", confirmBooking);
  *         description: Booking not found
  */
 router.put("/:id/complete", completeBooking);
+
+/**
+ * @swagger
+ * /api/staff/bookings/{id}/verify-pin:
+ *   post:
+ *     summary: Verify PIN code for booking
+ *     tags: [Staff - Bookings]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               pin_code:
+ *                 type: string
+ *                 description: PIN code provided by user
+ *             required:
+ *               - pin_code
+ *     responses:
+ *       200:
+ *         description: PIN code verified successfully
+ *       400:
+ *         description: Invalid PIN code
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - Staff role required
+ *       404:
+ *         description: Booking not found
+ */
+router.post("/:id/verify-pin", verifyPinCode);
 
 /**
  * @swagger

@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
+import { notificationService } from "../server";
 
 const prisma = new PrismaClient();
 
@@ -287,6 +288,154 @@ export const getTransactionStats = asyncHandler(
         average_duration: stats._avg.swap_duration_minutes || 0,
         status_breakdown: statusCounts,
         monthly_breakdown: monthlyStats,
+      },
+    });
+  }
+);
+
+/**
+ * Get pending transactions (need payment)
+ */
+export const getPendingTransactions = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      throw new CustomError("User not authenticated", 401);
+    }
+
+    const transactions = await prisma.transaction.findMany({
+      where: {
+        user_id: userId,
+        payment_status: "pending",
+        amount: { gt: 0 }, // Only transactions that need payment
+      },
+      include: {
+        station: {
+          select: {
+            station_id: true,
+            name: true,
+            address: true,
+          },
+        },
+        booking: {
+          select: {
+            booking_code: true,
+            scheduled_at: true,
+          },
+        },
+      },
+      orderBy: { created_at: "desc" },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Pending transactions retrieved successfully",
+      data: transactions,
+    });
+  }
+);
+
+/**
+ * Pay for transaction
+ */
+export const payTransaction = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = req.user?.userId;
+    const { id } = req.params;
+    const { payment_method = "vnpay" } = req.body;
+
+    if (!userId) {
+      throw new CustomError("User not authenticated", 401);
+    }
+
+    // Get transaction
+    const transaction = await prisma.transaction.findFirst({
+      where: {
+        transaction_id: id,
+        user_id: userId,
+        payment_status: "pending",
+      },
+      include: {
+        user: {
+          select: {
+            user_id: true,
+            full_name: true,
+            email: true,
+          },
+        },
+        station: {
+          select: {
+            station_id: true,
+            name: true,
+            address: true,
+          },
+        },
+      },
+    });
+
+    if (!transaction) {
+      throw new CustomError("Transaction not found or already paid", 404);
+    }
+
+    if (transaction.amount.toNumber() === 0) {
+      throw new CustomError("Transaction is free, no payment required", 400);
+    }
+
+    // Create payment record
+    const payment = await prisma.payment.create({
+      data: {
+        transaction_id: id,
+        user_id: userId,
+        amount: transaction.amount,
+        payment_method,
+        payment_status: "pending",
+      },
+    });
+
+    // If VNPay, redirect to payment gateway
+    if (payment_method === "vnpay") {
+      // TODO: Implement VNPay payment creation
+      // For now, simulate payment success
+      await prisma.payment.update({
+        where: { payment_id: payment.payment_id },
+        data: {
+          payment_status: "completed",
+          paid_at: new Date(),
+        },
+      });
+
+      await prisma.transaction.update({
+        where: { transaction_id: id },
+        data: { payment_status: "completed" },
+      });
+
+      // Send payment success notification
+      try {
+        await notificationService.sendNotification({
+          type: "payment_success",
+          userId: userId,
+          title: "Thanh toán thành công!",
+          message: `Giao dịch ${transaction.transaction_code} đã được thanh toán thành công. Số tiền: ${transaction.amount} VND`,
+          data: {
+            email: transaction.user.email,
+            userName: transaction.user.full_name,
+            amount: transaction.amount,
+            transactionId: transaction.transaction_code,
+            paymentTime: new Date().toISOString(),
+          },
+        });
+      } catch (error) {
+        console.error("Failed to send payment success notification:", error);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Payment processed successfully",
+      data: {
+        payment,
+        transaction,
       },
     });
   }

@@ -6,12 +6,13 @@ import {
   updateVehicle,
   deleteVehicle,
 } from "../controllers/vehicle.controller";
-import { authenticateToken } from "../middlewares/auth.middleware";
+import { authenticateToken, authorizeRole } from "../middlewares/auth.middleware";
 
 const router = Router();
 
-// All routes require authentication
+// All routes require authentication and driver role
 router.use(authenticateToken);
+router.use(authorizeRole("DRIVER"));
 
 /**
  * @swagger

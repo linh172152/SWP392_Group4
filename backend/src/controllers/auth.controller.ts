@@ -10,6 +10,7 @@ import {
   LoginData
 } from '../services/auth.service';
 import { asyncHandler } from '../middlewares/error.middleware';
+import { uploadImage } from '../services/cloudinary.service';
 
 /**
  * Register a new user
@@ -198,6 +199,52 @@ export const changeUserPassword = asyncHandler(async (req: Request, res: Respons
     success: true,
     message: 'Password changed successfully'
   });
+});
+
+/**
+ * Upload profile image
+ */
+export const uploadProfileImage = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user?.userId;
+
+  if (!userId) {
+    return res.status(401).json({
+      success: false,
+      message: 'User not authenticated'
+    });
+  }
+
+  if (!req.file) {
+    return res.status(400).json({
+      success: false,
+      message: 'No image file provided'
+    });
+  }
+
+  try {
+    // Upload image to Cloudinary
+    const result = await uploadImage(req.file.buffer.toString('base64'), 'user-profiles');
+
+    // Update user profile with new avatar URL
+    const user = await updateUserProfile(userId, {
+      avatar: result.secure_url
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Profile image uploaded successfully',
+      data: {
+        user,
+        image_url: result.secure_url
+      }
+    });
+  } catch (error) {
+    console.error('Image upload error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to upload image'
+    });
+  }
 });
 
 /**
