@@ -21,20 +21,17 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuth }) => {
               <div className="p-2 gradient-primary rounded-lg glow">
                 <Zap className="h-6 w-6 text-white" />
               </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">EVSwap</span>
+              <span className="text-xl font-bold bg-gradient-to-r from-lime-500 to-green-600 bg-clip-text text-transparent">EVSwap</span>
             </div>
             <nav className="hidden md:flex space-x-8">
-              <a href="#features" className="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-purple-400 transition-colors">Tính năng</a>
-              <a href="#how-it-works" className="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-purple-400 transition-colors">Cách hoạt động</a>
-              <a href="#contact" className="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-purple-400 transition-colors">Liên hệ</a>
+              <a href="#features" className="text-slate-600 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 transition-colors">Tính năng</a>
+              <a href="#how-it-works" className="text-slate-600 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 transition-colors">Cách hoạt động</a>
+              <a href="#contact" className="text-slate-600 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 transition-colors">Liên hệ</a>
             </nav>
             <div className="flex items-center space-x-4">
               <ThemeToggle />
-              <Button variant="outline" onClick={() => onAuth('login')} className="glass border-blue-200/50 dark:border-purple-400/30 hover:bg-blue-50/50 dark:hover:bg-purple-500/10">
+              <Button variant="outline" onClick={() => onAuth('login')} className="glass border-lime-200/50 dark:border-lime-400/30 hover:bg-lime-50/50 dark:hover:bg-lime-500/10">
                 Đăng nhập
-              </Button>
-              <Button onClick={() => onAuth('register')} className="gradient-primary text-white shadow-lg hover:shadow-blue-500/25 dark:hover:shadow-purple-500/25 transition-all duration-300">
-                Bắt đầu
               </Button>
             </div>
           </div>
@@ -44,12 +41,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuth }) => {
       {/* Hero Section */}
       <section className="relative py-20 overflow-hidden">
         <div className="absolute inset-0 animated-bg opacity-5 dark:opacity-10"></div>
-        <div className="absolute inset-0 bg-gradient-to-br from-transparent via-blue-500/5 to-purple-500/10 dark:from-transparent dark:via-blue-500/10 dark:to-purple-500/20"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-transparent via-lime-500/5 to-amber-600/10 dark:from-transparent dark:via-lime-500/10 dark:to-amber-700/20"></div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div className="float">
               <Badge className="mb-4 glass-card border-0 gradient-primary text-white shadow-lg">Công nghệ EV Cách mạng</Badge>
-              <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-slate-900 via-blue-900 to-purple-900 dark:from-white dark:via-blue-100 dark:to-purple-100 bg-clip-text text-transparent leading-tight">
+              <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-slate-900 via-green-800 to-amber-900 dark:from-white dark:via-lime-100 dark:to-amber-100 bg-clip-text text-transparent leading-tight">
                 Thay Pin Tức thì cho Xe Điện
               </h1>
               <p className="text-xl text-slate-600 dark:text-slate-300 mb-8 leading-relaxed">
@@ -57,11 +54,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuth }) => {
                 Tiếp tục lái xe trong khi người khác vẫn đang sạc.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
-                <Button size="lg" onClick={() => onAuth('register')} className="gradient-primary text-white shadow-xl hover:shadow-2xl hover:shadow-blue-500/25 dark:hover:shadow-purple-500/25 transition-all duration-300 transform hover:scale-105">
+                <Button size="lg" onClick={() => onAuth('register')} className="gradient-primary text-white shadow-xl hover:shadow-2xl hover:shadow-lime-500/25 dark:hover:shadow-amber-600/25 transition-all duration-300 transform hover:scale-105">
                   <Zap className="mr-2 h-5 w-5" />
                   Bắt đầu Thay Pin
                 </Button>
-                <Button variant="outline" size="lg" className="glass border-blue-200/50 dark:border-purple-400/30 hover:bg-blue-50/50 dark:hover:bg-purple-500/10 transition-all duration-300">
+                <Button variant="outline" size="lg" className="glass border-lime-200/50 dark:border-amber-400/30 hover:bg-lime-50/50 dark:hover:bg-amber-500/10 transition-all duration-300">
                   Tìm Trạm
                 </Button>
               </div>
@@ -80,10 +77,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuth }) => {
 
       {/* Features Section */}
       <section id="features" className="py-20 relative">
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-50/30 to-transparent dark:via-blue-900/20"></div>
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-lime-50/30 to-transparent dark:via-lime-900/20"></div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-slate-900 to-blue-900 dark:from-white dark:to-blue-100 bg-clip-text text-transparent">
+            <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-slate-900 to-green-800 dark:from-white dark:to-lime-100 bg-clip-text text-transparent">
               Tại sao chọn EVSwap?
             </h2>
             <p className="text-xl text-slate-600 dark:text-slate-300 max-w-3xl mx-auto">
@@ -106,7 +103,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuth }) => {
 
             <Card className="glass-card border-0 glow-hover group">
               <CardHeader>
-                <div className="p-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg w-fit mb-4 group-hover:scale-110 transition-transform duration-300">
+                <div className="p-3 gradient-secondary rounded-lg w-fit mb-4 group-hover:scale-110 transition-transform duration-300">
                   <MapPin className="h-6 w-6 text-white" />
                 </div>
                 <CardTitle className="text-slate-900 dark:text-white">Mạng lưới Toàn quốc</CardTitle>
@@ -118,7 +115,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuth }) => {
 
             <Card className="glass-card border-0 glow-hover group">
               <CardHeader>
-                <div className="p-3 bg-gradient-to-r from-purple-500 to-violet-500 rounded-lg w-fit mb-4 group-hover:scale-110 transition-transform duration-300">
+                <div className="p-3 bg-gradient-to-r from-lime-600 to-green-600 rounded-lg w-fit mb-4 group-hover:scale-110 transition-transform duration-300">
                   <Battery className="h-6 w-6 text-white" />
                 </div>
                 <CardTitle className="text-slate-900 dark:text-white">Quản lý Pin Thông minh</CardTitle>
@@ -130,7 +127,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuth }) => {
 
             <Card className="glass-card border-0 glow-hover group">
               <CardHeader>
-                <div className="p-3 bg-gradient-to-r from-red-500 to-pink-500 rounded-lg w-fit mb-4 group-hover:scale-110 transition-transform duration-300">
+                <div className="p-3 bg-gradient-to-r from-amber-600 to-orange-700 rounded-lg w-fit mb-4 group-hover:scale-110 transition-transform duration-300">
                   <Shield className="h-6 w-6 text-white" />
                 </div>
                 <CardTitle className="text-slate-900 dark:text-white">Bảo mật & An toàn</CardTitle>
@@ -142,7 +139,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuth }) => {
 
             <Card className="glass-card border-0 glow-hover group">
               <CardHeader>
-                <div className="p-3 bg-gradient-to-r from-orange-500 to-yellow-500 rounded-lg w-fit mb-4 group-hover:scale-110 transition-transform duration-300">
+                <div className="p-3 bg-gradient-to-r from-yellow-600 to-amber-600 rounded-lg w-fit mb-4 group-hover:scale-110 transition-transform duration-300">
                   <Users className="h-6 w-6 text-white" />
                 </div>
                 <CardTitle className="text-slate-900 dark:text-white">Đa dạng Người dùng</CardTitle>
@@ -154,7 +151,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuth }) => {
 
             <Card className="glass-card border-0 glow-hover group">
               <CardHeader>
-                <div className="p-3 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-lg w-fit mb-4 group-hover:scale-110 transition-transform duration-300">
+                <div className="p-3 bg-gradient-to-r from-green-600 to-lime-600 rounded-lg w-fit mb-4 group-hover:scale-110 transition-transform duration-300">
                   <Zap className="h-6 w-6 text-white" />
                 </div>
                 <CardTitle className="text-slate-900 dark:text-white">Theo dõi Thời gian thực</CardTitle>
@@ -169,10 +166,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuth }) => {
 
       {/* How It Works Section */}
       <section id="how-it-works" className="py-20 relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-purple-50/30 to-indigo-50/50 dark:from-blue-900/20 dark:via-purple-900/10 dark:to-indigo-900/20"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-lime-50/50 via-amber-50/30 to-green-50/50 dark:from-lime-900/20 dark:via-amber-900/10 dark:to-green-900/20"></div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-slate-900 to-blue-900 dark:from-white dark:to-blue-100 bg-clip-text text-transparent">
+            <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-slate-900 to-green-800 dark:from-white dark:to-lime-100 bg-clip-text text-transparent">
               Cách thức hoạt động
             </h2>
             <p className="text-xl text-slate-600 dark:text-slate-300">
@@ -192,7 +189,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuth }) => {
             </div>
 
             <div className="text-center group">
-              <div className="bg-gradient-to-r from-green-500 to-emerald-500 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300 glow">
+              <div className="gradient-secondary rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300 glow">
                 <span className="text-2xl font-bold text-white">2</span>
               </div>
               <h3 className="text-xl font-semibold mb-4 text-slate-900 dark:text-white">Lái xe & Thay pin</h3>
@@ -202,7 +199,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuth }) => {
             </div>
 
             <div className="text-center group">
-              <div className="bg-gradient-to-r from-purple-500 to-violet-500 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300 glow">
+              <div className="bg-gradient-to-r from-lime-600 to-green-600 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300 glow">
                 <span className="text-2xl font-bold text-white">3</span>
               </div>
               <h3 className="text-xl font-semibold mb-4 text-slate-900 dark:text-white">Thanh toán & Đi</h3>
@@ -226,11 +223,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuth }) => {
             Tham gia cùng hàng nghìn tài xế đã chuyển sang thay pin tức thì.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" variant="secondary" onClick={() => onAuth('register')} className="glass-card border-0 text-slate-900 hover:text-blue-600 shadow-xl hover:scale-105 transition-all duration-300">
+            <Button size="lg" variant="secondary" onClick={() => onAuth('register')} className="glass-card border-0 text-slate-900 hover:text-lime-700 shadow-xl hover:scale-105 transition-all duration-300">
               Đăng ký Tài xế
-            </Button>
-            <Button size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/20 glass backdrop-blur-xl shadow-xl hover:scale-105 transition-all duration-300">
-              Trở thành Đối tác Trạm
             </Button>
           </div>
         </div>
@@ -245,7 +239,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuth }) => {
                 <div className="p-2 gradient-primary rounded-lg">
                   <Zap className="h-4 w-4 text-white" />
                 </div>
-                <span className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">EVSwap</span>
+                <span className="text-lg font-bold bg-gradient-to-r from-lime-500 to-green-600 bg-clip-text text-transparent">EVSwap</span>
               </div>
               <p className="text-slate-600 dark:text-slate-400">
                 Cách mạng hóa quản lý năng lượng xe điện với công nghệ thay pin tức thì.
@@ -255,29 +249,29 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuth }) => {
             <div>
               <h3 className="font-semibold mb-4 text-slate-900 dark:text-white">Sản phẩm</h3>
               <ul className="space-y-2 text-slate-600 dark:text-slate-400">
-                <li><a href="#" className="hover:text-blue-600 dark:hover:text-purple-400 transition-colors">Tính năng</a></li>
-                <li><a href="#" className="hover:text-blue-600 dark:hover:text-purple-400 transition-colors">Giá cả</a></li>
-                <li><a href="#" className="hover:text-blue-600 dark:hover:text-purple-400 transition-colors">Trạm</a></li>
-                <li><a href="#" className="hover:text-blue-600 dark:hover:text-purple-400 transition-colors">Hỗ trợ</a></li>
+                <li><a href="#" className="hover:text-lime-600 dark:hover:text-lime-400 transition-colors">Tính năng</a></li>
+                <li><a href="#" className="hover:text-lime-600 dark:hover:text-lime-400 transition-colors">Giá cả</a></li>
+                <li><a href="#" className="hover:text-lime-600 dark:hover:text-lime-400 transition-colors">Trạm</a></li>
+                <li><a href="#" className="hover:text-lime-600 dark:hover:text-lime-400 transition-colors">Hỗ trợ</a></li>
               </ul>
             </div>
             
             <div>
               <h3 className="font-semibold mb-4 text-slate-900 dark:text-white">Công ty</h3>
               <ul className="space-y-2 text-slate-600 dark:text-slate-400">
-                <li><a href="#" className="hover:text-blue-600 dark:hover:text-purple-400 transition-colors">Về chúng tôi</a></li>
-                <li><a href="#" className="hover:text-blue-600 dark:hover:text-purple-400 transition-colors">Tuyển dụng</a></li>
-                <li><a href="#" className="hover:text-blue-600 dark:hover:text-purple-400 transition-colors">Tin tức</a></li>
-                <li><a href="#" className="hover:text-blue-600 dark:hover:text-purple-400 transition-colors">Liên hệ</a></li>
+                <li><a href="#" className="hover:text-lime-600 dark:hover:text-lime-400 transition-colors">Về chúng tôi</a></li>
+                <li><a href="#" className="hover:text-lime-600 dark:hover:text-lime-400 transition-colors">Tuyển dụng</a></li>
+                <li><a href="#" className="hover:text-lime-600 dark:hover:text-lime-400 transition-colors">Tin tức</a></li>
+                <li><a href="#" className="hover:text-lime-600 dark:hover:text-lime-400 transition-colors">Liên hệ</a></li>
               </ul>
             </div>
             
             <div>
               <h3 className="font-semibold mb-4 text-slate-900 dark:text-white">Pháp lý</h3>
               <ul className="space-y-2 text-slate-600 dark:text-slate-400">
-                <li><a href="#" className="hover:text-blue-600 dark:hover:text-purple-400 transition-colors">Quyền riêng tư</a></li>
-                <li><a href="#" className="hover:text-blue-600 dark:hover:text-purple-400 transition-colors">Điều khoản</a></li>
-                <li><a href="#" className="hover:text-blue-600 dark:hover:text-purple-400 transition-colors">Bảo mật</a></li>
+                <li><a href="#" className="hover:text-lime-600 dark:hover:text-lime-400 transition-colors">Quyền riêng tư</a></li>
+                <li><a href="#" className="hover:text-lime-600 dark:hover:text-lime-400 transition-colors">Điều khoản</a></li>
+                <li><a href="#" className="hover:text-lime-600 dark:hover:text-lime-400 transition-colors">Bảo mật</a></li>
               </ul>
             </div>
           </div>

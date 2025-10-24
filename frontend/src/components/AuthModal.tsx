@@ -5,7 +5,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import type { User } from '../App';
+import { User } from '../App';
 import { Zap, X } from 'lucide-react';
 
 interface AuthModalProps {
@@ -107,13 +107,13 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onLogin, onSwitchM
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md glass-card border-0 shadow-2xl">
-        <DialogHeader className="flex flex-row items-center justify-between">
+        <DialogHeader>
           <div className="flex items-center space-x-2">
             <div className="p-2 gradient-primary rounded-lg glow">
               <Zap className="h-5 w-5 text-white" />
             </div>
             <div>
-              <DialogTitle className="bg-gradient-to-r from-slate-900 to-blue-900 dark:from-white dark:to-blue-100 bg-clip-text text-transparent">
+              <DialogTitle className="bg-gradient-to-r from-slate-900 to-green-800 dark:from-white dark:to-lime-100 bg-clip-text text-transparent">
                 {mode === 'login' ? 'Chào mừng trở lại' : 'Tạo tài khoản'}
               </DialogTitle>
               <DialogDescription className="text-slate-600 dark:text-slate-400">
@@ -121,9 +121,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onLogin, onSwitchM
               </DialogDescription>
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose} className="hover:bg-red-50 dark:hover:bg-red-500/10">
-            <X className="h-4 w-4" />
-          </Button>
         </DialogHeader>
 
         <Tabs value={mode} className="w-full">
@@ -143,7 +140,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onLogin, onSwitchM
                   variant="outline"
                   size="sm"
                   onClick={() => handleDemoLogin('driver')}
-                  className="text-xs glass border-blue-200/50 dark:border-purple-400/30 hover:bg-blue-50/50 dark:hover:bg-purple-500/10"
+                  className="text-xs glass border-lime-200/50 dark:border-lime-400/30 hover:bg-lime-50/50 dark:hover:bg-lime-500/10"
                 >
                   Demo Tài xế
                 </Button>
@@ -151,7 +148,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onLogin, onSwitchM
                   variant="outline"
                   size="sm"
                   onClick={() => handleDemoLogin('staff')}
-                  className="text-xs glass border-green-200/50 dark:border-green-400/30 hover:bg-green-50/50 dark:hover:bg-green-500/10"
+                  className="text-xs glass border-amber-200/50 dark:border-amber-400/30 hover:bg-amber-50/50 dark:hover:bg-amber-500/10"
                 >
                   Demo NV
                 </Button>
@@ -159,7 +156,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onLogin, onSwitchM
                   variant="outline"
                   size="sm"
                   onClick={() => handleDemoLogin('admin')}
-                  className="text-xs glass border-purple-200/50 dark:border-purple-400/30 hover:bg-purple-50/50 dark:hover:bg-purple-500/10"
+                  className="text-xs glass border-green-200/50 dark:border-green-400/30 hover:bg-green-50/50 dark:hover:bg-green-500/10"
                 >
                   Demo Admin
                 </Button>
@@ -185,7 +182,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onLogin, onSwitchM
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="glass border-slate-200/50 dark:border-slate-700/50 focus:border-blue-400 dark:focus:border-purple-400"
+                  className="glass border-slate-200/50 dark:border-slate-700/50 focus:border-lime-400 dark:focus:border-lime-400"
                 />
               </div>
               <div className="space-y-2">
@@ -197,7 +194,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onLogin, onSwitchM
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="glass border-slate-200/50 dark:border-slate-700/50 focus:border-blue-400 dark:focus:border-purple-400"
+                  className="glass border-slate-200/50 dark:border-slate-700/50 focus:border-lime-400 dark:focus:border-lime-400"
                 />
               </div>
               {error && (
@@ -222,7 +219,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onLogin, onSwitchM
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
-                  className="glass border-slate-200/50 dark:border-slate-700/50 focus:border-blue-400 dark:focus:border-purple-400"
+                  className="glass border-slate-200/50 dark:border-slate-700/50 focus:border-lime-400 dark:focus:border-lime-400"
                 />
               </div>
               <div className="space-y-2">
@@ -234,7 +231,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onLogin, onSwitchM
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="glass border-slate-200/50 dark:border-slate-700/50 focus:border-blue-400 dark:focus:border-purple-400"
+                  className="glass border-slate-200/50 dark:border-slate-700/50 focus:border-lime-400 dark:focus:border-lime-400"
                 />
               </div>
               <div className="space-y-2">
@@ -246,7 +243,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onLogin, onSwitchM
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="glass border-slate-200/50 dark:border-slate-700/50 focus:border-blue-400 dark:focus:border-purple-400"
+                  className="glass border-slate-200/50 dark:border-slate-700/50 focus:border-lime-400 dark:focus:border-lime-400"
                 />
               </div>
               <div className="space-y-2">
