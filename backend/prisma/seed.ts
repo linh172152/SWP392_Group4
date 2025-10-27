@@ -1,9 +1,15 @@
 import { PrismaClient } from "@prisma/client";
+import { hashPassword } from "../src/utils/bcrypt.util";
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log("🌱 Starting comprehensive database seeding...");
+
+  // Generate simple password hashes for existing users
+  const adminPasswordHash = await hashPassword("admin123");
+  const staffPasswordHash = await hashPassword("staff123");
+  const driverPasswordHash = await hashPassword("driver123");
 
   // ===========================================
   // CREATE ADMIN USERS
@@ -13,7 +19,7 @@ async function main() {
       data: {
         full_name: "Nguyen Van Admin",
         email: "admin@evbattery.com",
-        password_hash: "$2b$10$example.hash.for.admin.password",
+        password_hash: adminPasswordHash,
         phone: "0123456789",
         role: "ADMIN",
         status: "ACTIVE",
@@ -23,7 +29,7 @@ async function main() {
       data: {
         full_name: "Tran Thi Manager",
         email: "manager@evbattery.com",
-        password_hash: "$2b$10$example.hash.for.manager.password",
+        password_hash: adminPasswordHash,
         phone: "0123456790",
         role: "ADMIN",
         status: "ACTIVE",
@@ -106,7 +112,7 @@ async function main() {
       data: {
         full_name: "Le Van Staff 1",
         email: "staff1@evbattery.com",
-        password_hash: "$2b$10$example.hash.for.staff1.password",
+        password_hash: staffPasswordHash,
         phone: "0987654321",
         role: "STAFF",
         station_id: stations[0].station_id,
@@ -117,7 +123,7 @@ async function main() {
       data: {
         full_name: "Pham Thi Staff 2",
         email: "staff2@evbattery.com",
-        password_hash: "$2b$10$example.hash.for.staff2.password",
+        password_hash: staffPasswordHash,
         phone: "0987654322",
         role: "STAFF",
         station_id: stations[0].station_id,
@@ -128,7 +134,7 @@ async function main() {
       data: {
         full_name: "Hoang Van Staff 3",
         email: "staff3@evbattery.com",
-        password_hash: "$2b$10$example.hash.for.staff3.password",
+        password_hash: staffPasswordHash,
         phone: "0987654323",
         role: "STAFF",
         station_id: stations[1].station_id,
@@ -139,7 +145,7 @@ async function main() {
       data: {
         full_name: "Vu Thi Staff 4",
         email: "staff4@evbattery.com",
-        password_hash: "$2b$10$example.hash.for.staff4.password",
+        password_hash: staffPasswordHash,
         phone: "0987654324",
         role: "STAFF",
         station_id: stations[2].station_id,
@@ -157,7 +163,7 @@ async function main() {
       data: {
         full_name: "Tran Van Driver 1",
         email: "driver1@evbattery.com",
-        password_hash: "$2b$10$example.hash.for.driver1.password",
+        password_hash: driverPasswordHash,
         phone: "0912345678",
         role: "DRIVER",
         status: "ACTIVE",
@@ -167,7 +173,7 @@ async function main() {
       data: {
         full_name: "Nguyen Thi Driver 2",
         email: "driver2@evbattery.com",
-        password_hash: "$2b$10$example.hash.for.driver2.password",
+        password_hash: driverPasswordHash,
         phone: "0912345679",
         role: "DRIVER",
         status: "ACTIVE",
@@ -177,7 +183,7 @@ async function main() {
       data: {
         full_name: "Le Van Driver 3",
         email: "driver3@evbattery.com",
-        password_hash: "$2b$10$example.hash.for.driver3.password",
+        password_hash: driverPasswordHash,
         phone: "0912345680",
         role: "DRIVER",
         status: "ACTIVE",
@@ -187,7 +193,7 @@ async function main() {
       data: {
         full_name: "Pham Thi Driver 4",
         email: "driver4@evbattery.com",
-        password_hash: "$2b$10$example.hash.for.driver4.password",
+        password_hash: driverPasswordHash,
         phone: "0912345681",
         role: "DRIVER",
         status: "ACTIVE",
@@ -197,7 +203,7 @@ async function main() {
       data: {
         full_name: "Hoang Van Driver 5",
         email: "driver5@evbattery.com",
-        password_hash: "$2b$10$example.hash.for.driver5.password",
+        password_hash: driverPasswordHash,
         phone: "0912345682",
         role: "DRIVER",
         status: "ACTIVE",
@@ -207,7 +213,7 @@ async function main() {
       data: {
         full_name: "Vu Thi Driver 6",
         email: "driver6@evbattery.com",
-        password_hash: "$2b$10$example.hash.for.driver6.password",
+        password_hash: driverPasswordHash,
         phone: "0912345683",
         role: "DRIVER",
         status: "INACTIVE",
@@ -292,11 +298,11 @@ async function main() {
   // ===========================================
   // CREATE BATTERIES
   // ===========================================
-  const batteries = [];
+  const batteryPromises: Promise<any>[] = [];
 
   // Station 1 - District 1 (50 capacity)
   for (let i = 1; i <= 15; i++) {
-    batteries.push(
+    batteryPromises.push(
       prisma.battery.create({
         data: {
           battery_code: `BAT-D1-${i.toString().padStart(3, "0")}`,
@@ -321,7 +327,7 @@ async function main() {
 
   // Station 2 - District 7 (40 capacity)
   for (let i = 1; i <= 12; i++) {
-    batteries.push(
+    batteryPromises.push(
       prisma.battery.create({
         data: {
           battery_code: `BAT-D7-${i.toString().padStart(3, "0")}`,
@@ -346,7 +352,7 @@ async function main() {
 
   // Station 3 - Thu Duc (60 capacity)
   for (let i = 1; i <= 18; i++) {
-    batteries.push(
+    batteryPromises.push(
       prisma.battery.create({
         data: {
           battery_code: `BAT-TD-${i.toString().padStart(3, "0")}`,
@@ -371,8 +377,8 @@ async function main() {
     );
   }
 
-  await Promise.all(batteries);
-  console.log("✅ Created batteries:", batteries.length);
+  const createdBatteries = await Promise.all(batteryPromises);
+  console.log("✅ Created batteries:", createdBatteries.length);
 
   // ===========================================
   // CREATE SERVICE PACKAGES
@@ -588,7 +594,6 @@ async function main() {
   // ===========================================
   // CREATE TRANSACTIONS
   // ===========================================
-  const createdBatteries = await Promise.all(batteries);
   const transactions = await Promise.all([
     prisma.transaction.create({
       data: {
