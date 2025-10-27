@@ -1,15 +1,28 @@
-import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { User } from '../App';
-import { Zap, X } from 'lucide-react';
+import React, { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { User } from "../App";
+import { Zap, X } from "lucide-react";
+import { API_ENDPOINTS } from "../config/api";
 
 interface AuthModalProps {
-  mode: 'login' | 'register';
+  mode: "login" | "register";
   onClose: () => void;
   onLogin: (user: User) => void;
   onSwitchMode: () => void;
@@ -17,89 +30,192 @@ interface AuthModalProps {
 
 // Mock users for demo
 const mockUsers = [
-  { 
-    id: '1', 
-    email: 'taixe@demo.com', 
-    password: 'demo123', 
-    name: 'Nguyễn Văn Tài Xế', 
-    role: 'driver' as const,
-    department: 'Khách hàng',
-    position: 'Tài xế'
+  {
+    id: "1",
+    email: "taixe@demo.com",
+    password: "demo123",
+    name: "Nguyễn Văn Tài Xế",
+    role: "driver" as const,
+    department: "Khách hàng",
+    position: "Tài xế",
   },
-  { 
-    id: '2', 
-    email: 'nhanvien@demo.com', 
-    password: 'demo123', 
-    name: 'Trần Thị Nhân Viên', 
-    role: 'staff' as const,
-    department: 'Vận hành',
-    position: 'Nhân viên Vận hành',
-    stationId: 'ST001'
+  {
+    id: "2",
+    email: "nhanvien@demo.com",
+    password: "demo123",
+    name: "Trần Thị Nhân Viên",
+    role: "staff" as const,
+    department: "Vận hành",
+    position: "Nhân viên Vận hành",
+    stationId: "ST001",
   },
-  { 
-    id: '3', 
-    email: 'admin@demo.com', 
-    password: 'demo123', 
-    name: 'Lê Văn Quản Trị', 
-    role: 'admin' as const,
-    department: 'Quản lý',
-    position: 'Quản trị viên Hệ thống',
-    permissions: ['manage_all', 'view_reports', 'manage_employees', 'manage_stations']
+  {
+    id: "3",
+    email: "admin@demo.com",
+    password: "demo123",
+    name: "Lê Văn Quản Trị",
+    role: "admin" as const,
+    department: "Quản lý",
+    position: "Quản trị viên Hệ thống",
+    permissions: [
+      "manage_all",
+      "view_reports",
+      "manage_employees",
+      "manage_stations",
+    ],
   },
 ];
 
-const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onLogin, onSwitchMode }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [role, setRole] = useState<'driver' | 'staff' | 'admin'>('driver');
-  const [error, setError] = useState('');
+const AuthModal: React.FC<AuthModalProps> = ({
+  mode,
+  onClose,
+  onLogin,
+  onSwitchMode,
+}) => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [role, setRole] = useState<"driver" | "staff" | "admin">("driver");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const validatePassword = (password: string): string[] => {
+    const errors: string[] = [];
+
+    if (password.length < 8) {
+      errors.push("Mật khẩu phải có ít nhất 8 ký tự");
+    }
+
+    if (!/[A-Z]/.test(password)) {
+      errors.push("Mật khẩu phải có ít nhất 1 chữ hoa");
+    }
+
+    if (!/[a-z]/.test(password)) {
+      errors.push("Mật khẩu phải có ít nhất 1 chữ thường");
+    }
+
+    if (!/[0-9]/.test(password)) {
+      errors.push("Mật khẩu phải có ít nhất 1 số");
+    }
+
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+      errors.push("Mật khẩu phải có ít nhất 1 ký tự đặc biệt");
+    }
+
+    return errors;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
 
     try {
-      if (mode === 'login') {
-        // Mock login
-        const user = mockUsers.find(u => u.email === email && u.password === password);
-        if (user) {
+      if (mode === "login") {
+        // Real API login
+        const response = await fetch(API_ENDPOINTS.AUTH.LOGIN, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            email,
+            password,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
           onLogin({
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            role: user.role
+            id: data.data.user.user_id,
+            email: data.data.user.email,
+            name: data.data.user.full_name,
+            role: data.data.user.role.toLowerCase(),
           });
         } else {
-          setError('Thông tin đăng nhập không hợp lệ. Thử thông tin demo hoặc tạo tài khoản mới.');
+          setError(data.message || "Thông tin đăng nhập không hợp lệ.");
         }
       } else {
-        // Mock registration
-        const newUser: User = {
-          id: Math.random().toString(36).substr(2, 9),
+        // Validate password for registration
+        const passwordErrors = validatePassword(password);
+        if (passwordErrors.length > 0) {
+          setError(passwordErrors.join(", "));
+          setLoading(false);
+          return;
+        }
+
+        // Validate other fields
+        if (!email || !email.includes("@")) {
+          setError("Email không hợp lệ");
+          setLoading(false);
+          return;
+        }
+
+        if (!name || name.length > 100) {
+          setError("Tên phải có từ 1-100 ký tự");
+          setLoading(false);
+          return;
+        }
+
+        if (!phone || phone.length < 10) {
+          setError("Số điện thoại phải có ít nhất 10 số");
+          setLoading(false);
+          return;
+        }
+
+        // Real API registration
+        const requestData = {
           email,
-          name,
-          role
+          password,
+          full_name: name,
+          phone: phone,
+          role: role.toUpperCase(),
         };
-        onLogin(newUser);
+
+        console.log("Sending registration data:", requestData);
+
+        const response = await fetch(API_ENDPOINTS.AUTH.REGISTER, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestData),
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          onLogin({
+            id: data.data.user.user_id,
+            email: data.data.user.email,
+            name: data.data.user.full_name,
+            role: data.data.user.role.toLowerCase(),
+          });
+        } else {
+          console.error("Registration error:", data);
+          console.error("Detailed errors:", data.errors);
+          setError(data.message || "Đăng ký thất bại. Vui lòng thử lại.");
+        }
       }
-    } catch {
-      setError('Có lỗi xảy ra. Vui lòng thử lại.');
+    } catch (error) {
+      console.error("Auth error:", error);
+      setError("Có lỗi xảy ra. Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDemoLogin = (demoRole: 'driver' | 'staff' | 'admin') => {
-    const demoUser = mockUsers.find(u => u.role === demoRole);
+  const handleDemoLogin = (demoRole: "driver" | "staff" | "admin") => {
+    const demoUser = mockUsers.find((u) => u.role === demoRole);
     if (demoUser) {
       onLogin({
         id: demoUser.id,
         email: demoUser.email,
         name: demoUser.name,
-        role: demoUser.role
+        role: demoUser.role,
       });
     }
   };
@@ -114,24 +230,39 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onLogin, onSwitchM
             </div>
             <div>
               <DialogTitle className="bg-gradient-to-r from-slate-900 to-blue-900 dark:from-white dark:to-blue-100 bg-clip-text text-transparent">
-                {mode === 'login' ? 'Chào mừng trở lại' : 'Tạo tài khoản'}
+                {mode === "login" ? "Chào mừng trở lại" : "Tạo tài khoản"}
               </DialogTitle>
               <DialogDescription className="text-slate-600 dark:text-slate-400">
-                {mode === 'login' ? 'Đăng nhập vào tài khoản EVSwap của bạn' : 'Tạo tài khoản EVSwap mới'}
+                {mode === "login"
+                  ? "Đăng nhập vào tài khoản EVSwap của bạn"
+                  : "Tạo tài khoản EVSwap mới"}
               </DialogDescription>
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose} className="hover:bg-red-50 dark:hover:bg-red-500/10">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className="hover:bg-red-50 dark:hover:bg-red-500/10"
+          >
             <X className="h-4 w-4" />
           </Button>
         </DialogHeader>
 
         <Tabs value={mode} className="w-full">
           <TabsList className="grid w-full grid-cols-2 glass border-0">
-            <TabsTrigger value="login" onClick={() => mode !== 'login' && onSwitchMode()} className="data-[state=active]:gradient-primary data-[state=active]:text-white">
+            <TabsTrigger
+              value="login"
+              onClick={() => mode !== "login" && onSwitchMode()}
+              className="data-[state=active]:gradient-primary data-[state=active]:text-white"
+            >
               Đăng nhập
             </TabsTrigger>
-            <TabsTrigger value="register" onClick={() => mode !== 'register' && onSwitchMode()} className="data-[state=active]:gradient-primary data-[state=active]:text-white">
+            <TabsTrigger
+              value="register"
+              onClick={() => mode !== "register" && onSwitchMode()}
+              className="data-[state=active]:gradient-primary data-[state=active]:text-white"
+            >
               Đăng ký
             </TabsTrigger>
           </TabsList>
@@ -142,7 +273,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onLogin, onSwitchM
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => handleDemoLogin('driver')}
+                  onClick={() => handleDemoLogin("driver")}
                   className="text-xs glass border-blue-200/50 dark:border-purple-400/30 hover:bg-blue-50/50 dark:hover:bg-purple-500/10"
                 >
                   Demo Tài xế
@@ -150,7 +281,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onLogin, onSwitchM
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => handleDemoLogin('staff')}
+                  onClick={() => handleDemoLogin("staff")}
                   className="text-xs glass border-green-200/50 dark:border-green-400/30 hover:bg-green-50/50 dark:hover:bg-green-500/10"
                 >
                   Demo NV
@@ -158,26 +289,33 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onLogin, onSwitchM
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => handleDemoLogin('admin')}
+                  onClick={() => handleDemoLogin("admin")}
                   className="text-xs glass border-purple-200/50 dark:border-purple-400/30 hover:bg-purple-50/50 dark:hover:bg-purple-500/10"
                 >
                   Demo Admin
                 </Button>
               </div>
-              
+
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
                   <span className="w-full border-t border-slate-200/50 dark:border-slate-700/50" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground">Hoặc tiếp tục với</span>
+                  <span className="bg-card px-2 text-muted-foreground">
+                    Hoặc tiếp tục với
+                  </span>
                 </div>
               </div>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-slate-700 dark:text-slate-300">Email</Label>
+                <Label
+                  htmlFor="email"
+                  className="text-slate-700 dark:text-slate-300"
+                >
+                  Email
+                </Label>
                 <Input
                   id="email"
                   type="email"
@@ -189,7 +327,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onLogin, onSwitchM
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-slate-700 dark:text-slate-300">Mật khẩu</Label>
+                <Label
+                  htmlFor="password"
+                  className="text-slate-700 dark:text-slate-300"
+                >
+                  Mật khẩu
+                </Label>
                 <Input
                   id="password"
                   type="password"
@@ -205,8 +348,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onLogin, onSwitchM
                   {error}
                 </div>
               )}
-              <Button type="submit" className="w-full gradient-primary text-white shadow-lg hover:shadow-xl transition-all duration-300" disabled={loading}>
-                {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
+              <Button
+                type="submit"
+                className="w-full gradient-primary text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                disabled={loading}
+              >
+                {loading ? "Đang đăng nhập..." : "Đăng nhập"}
               </Button>
             </form>
           </TabsContent>
@@ -214,7 +361,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onLogin, onSwitchM
           <TabsContent value="register" className="space-y-4">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="reg-name" className="text-slate-700 dark:text-slate-300">Họ và tên</Label>
+                <Label
+                  htmlFor="reg-name"
+                  className="text-slate-700 dark:text-slate-300"
+                >
+                  Họ và tên
+                </Label>
                 <Input
                   id="reg-name"
                   type="text"
@@ -226,7 +378,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onLogin, onSwitchM
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="reg-email" className="text-slate-700 dark:text-slate-300">Email</Label>
+                <Label
+                  htmlFor="reg-email"
+                  className="text-slate-700 dark:text-slate-300"
+                >
+                  Email
+                </Label>
                 <Input
                   id="reg-email"
                   type="email"
@@ -238,11 +395,16 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onLogin, onSwitchM
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="reg-password" className="text-slate-700 dark:text-slate-300">Mật khẩu</Label>
+                <Label
+                  htmlFor="reg-password"
+                  className="text-slate-700 dark:text-slate-300"
+                >
+                  Mật khẩu
+                </Label>
                 <Input
                   id="reg-password"
                   type="password"
-                  placeholder="Tạo mật khẩu"
+                  placeholder="Tạo mật khẩu (8+ ký tự, có chữ hoa, thường, số và ký tự đặc biệt)"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -250,8 +412,35 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onLogin, onSwitchM
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="role" className="text-slate-700 dark:text-slate-300">Loại tài khoản</Label>
-                <Select value={role} onValueChange={(value: 'driver' | 'staff' | 'admin') => setRole(value)}>
+                <Label
+                  htmlFor="reg-phone"
+                  className="text-slate-700 dark:text-slate-300"
+                >
+                  Số điện thoại
+                </Label>
+                <Input
+                  id="reg-phone"
+                  type="tel"
+                  placeholder="Nhập số điện thoại (ít nhất 10 số)"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  required
+                  className="glass border-slate-200/50 dark:border-slate-700/50 focus:border-blue-400 dark:focus:border-purple-400"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label
+                  htmlFor="role"
+                  className="text-slate-700 dark:text-slate-300"
+                >
+                  Loại tài khoản
+                </Label>
+                <Select
+                  value={role}
+                  onValueChange={(value: "driver" | "staff" | "admin") =>
+                    setRole(value)
+                  }
+                >
                   <SelectTrigger className="glass border-slate-200/50 dark:border-slate-700/50">
                     <SelectValue />
                   </SelectTrigger>
@@ -267,8 +456,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, onClose, onLogin, onSwitchM
                   {error}
                 </div>
               )}
-              <Button type="submit" className="w-full gradient-primary text-white shadow-lg hover:shadow-xl transition-all duration-300" disabled={loading}>
-                {loading ? 'Đang tạo tài khoản...' : 'Tạo tài khoản'}
+              <Button
+                type="submit"
+                className="w-full gradient-primary text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                disabled={loading}
+              >
+                {loading ? "Đang tạo tài khoản..." : "Tạo tài khoản"}
               </Button>
             </form>
           </TabsContent>

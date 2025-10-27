@@ -2,7 +2,6 @@ import { Request, Response } from "express";
 import {
   uploadImageFromBuffer,
   deleteImage,
-  getImageInfo,
 } from "../services/cloudinary.service";
 import { CustomError } from "../middlewares/error.middleware";
 
@@ -10,7 +9,7 @@ import { CustomError } from "../middlewares/error.middleware";
  * Test Cloudinary connection
  */
 export const testCloudinary = async (
-  req: Request,
+  _req: Request,
   res: Response
 ): Promise<void> => {
   try {
@@ -51,7 +50,7 @@ export const testCloudinary = async (
  * Upload test image
  */
 export const uploadTestImage = async (
-  req: Request,
+  _req: Request,
   res: Response
 ): Promise<void> => {
   try {

@@ -67,14 +67,14 @@ app.get("/health", (_req, res) => {
 });
 
 // API routes
-app.use("/api/auth", authRoutes);
-app.use("/api/google", googleOAuthRoutes);
-app.use("/api/payments/vnpay", vnpayRoutes);
-app.use("/api/driver", driverRoutes);
-app.use("/api/staff", staffRoutes);
-app.use("/api/admin", adminRoutes);
-app.use("/api", sharedRoutes);
-app.use("/api/test", testRoutes);
+app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/google", googleOAuthRoutes);
+app.use("/api/v1/payments/vnpay", vnpayRoutes);
+app.use("/api/v1/driver", driverRoutes);
+app.use("/api/v1/staff", staffRoutes);
+app.use("/api/v1/admin", adminRoutes);
+app.use("/api/v1", sharedRoutes);
+app.use("/api/v1/test", testRoutes);
 
 // Error handling middleware
 app.use(notFound);

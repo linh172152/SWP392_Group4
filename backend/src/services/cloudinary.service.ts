@@ -33,12 +33,12 @@ export const uploadImage = async (
     });
 
     return {
-      public_id: result.public_id,
-      secure_url: result.secure_url,
-      width: result.width,
-      height: result.height,
-      format: result.format,
-      bytes: result.bytes,
+      public_id: (result as any).public_id,
+      secure_url: (result as any).secure_url,
+      width: (result as any).width,
+      height: (result as any).height,
+      format: (result as any).format,
+      bytes: (result as any).bytes,
     };
   } catch (error) {
     console.error("Cloudinary upload error:", error);
@@ -70,12 +70,12 @@ export const uploadImageFromBuffer = async (
       .end(buffer);
 
     return {
-      public_id: result.public_id,
-      secure_url: result.secure_url,
-      width: result.width,
-      height: result.height,
-      format: result.format,
-      bytes: result.bytes,
+      public_id: (result as any).public_id,
+      secure_url: (result as any).secure_url,
+      width: (result as any).width,
+      height: (result as any).height,
+      format: (result as any).format,
+      bytes: (result as any).bytes,
     };
   } catch (error) {
     console.error("Cloudinary upload error:", error);
