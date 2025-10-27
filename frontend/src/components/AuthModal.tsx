@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import type { FormEvent, ChangeEvent } from "react";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +20,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import type { User } from "../App";
 import { Zap } from "lucide-react";
+import { API_ENDPOINTS } from "../config/api";
 
 interface AuthModalProps {
   mode: "login" | "register";
@@ -27,43 +29,43 @@ interface AuthModalProps {
   onSwitchMode: () => void;
 }
 
-// Mock users for demo
-const mockUsers = [
-  {
-    id: "1",
-    email: "taixe@demo.com",
-    password: "demo123",
-    name: "Nguyễn Văn Tài Xế",
-    role: "driver" as const,
-    department: "Khách hàng",
-    position: "Tài xế",
-  },
-  {
-    id: "2",
-    email: "nhanvien@demo.com",
-    password: "demo123",
-    name: "Trần Thị Nhân Viên",
-    role: "staff" as const,
-    department: "Vận hành",
-    position: "Nhân viên Vận hành",
-    stationId: "ST001",
-  },
-  {
-    id: "3",
-    email: "admin@demo.com",
-    password: "demo123",
-    name: "Lê Văn Quản Trị",
-    role: "admin" as const,
-    department: "Quản lý",
-    position: "Quản trị viên Hệ thống",
-    permissions: [
-      "manage_all",
-      "view_reports",
-      "manage_employees",
-      "manage_stations",
-    ],
-  },
-];
+// Mock users for demo (kept for reference but not used in real API calls)
+// const mockUsers = [
+//   {
+//     id: "1",
+//     email: "taixe@demo.com",
+//     password: "demo123",
+//     name: "Nguyễn Văn Tài Xế",
+//     role: "driver" as const,
+//     department: "Khách hàng",
+//     position: "Tài xế",
+//   },
+//   {
+//     id: "2",
+//     email: "nhanvien@demo.com",
+//     password: "demo123",
+//     name: "Trần Thị Nhân Viên",
+//     role: "staff" as const,
+//     department: "Vận hành",
+//     position: "Nhân viên Vận hành",
+//     stationId: "ST001",
+//   },
+//   {
+//     id: "3",
+//     email: "admin@demo.com",
+//     password: "demo123",
+//     name: "Lê Văn Quản Trị",
+//     role: "admin" as const,
+//     department: "Quản lý",
+//     position: "Quản trị viên Hệ thống",
+//     permissions: [
+//       "manage_all",
+//       "view_reports",
+//       "manage_employees",
+//       "manage_stations",
+//     ],
+//   },
+// ];
 
 const AuthModal: React.FC<AuthModalProps> = ({
   mode,
@@ -74,11 +76,33 @@ const AuthModal: React.FC<AuthModalProps> = ({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [role, setRole] = useState<"driver" | "staff" | "admin">("driver");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Password validation function
+  const validatePassword = (password: string): string[] => {
+    const errors: string[] = [];
+    if (password.length < 8) {
+      errors.push("Mật khẩu phải có ít nhất 8 ký tự");
+    }
+    if (!/[A-Z]/.test(password)) {
+      errors.push("Mật khẩu phải có ít nhất 1 chữ hoa");
+    }
+    if (!/[a-z]/.test(password)) {
+      errors.push("Mật khẩu phải có ít nhất 1 chữ thường");
+    }
+    if (!/[0-9]/.test(password)) {
+      errors.push("Mật khẩu phải có ít nhất 1 số");
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+      errors.push("Mật khẩu phải có ít nhất 1 ký tự đặc biệt");
+    }
+    return errors;
+  };
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
     setLoading(true);
@@ -86,7 +110,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
     try {
       if (mode === "login") {
         // Real API login
-        const response = await fetch("http://localhost:3000/api/auth/login", {
+        const response = await fetch(API_ENDPOINTS.AUTH.LOGIN, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -114,27 +138,55 @@ const AuthModal: React.FC<AuthModalProps> = ({
           setError(data.message || "Đăng nhập thất bại");
         }
       } else {
+        // Validate password for registration
+        const passwordErrors = validatePassword(password);
+        if (passwordErrors.length > 0) {
+          setError(passwordErrors.join(", "));
+          setLoading(false);
+          return;
+        }
+
+        // Validate other fields
+        if (!email || !email.includes("@")) {
+          setError("Email không hợp lệ");
+          setLoading(false);
+          return;
+        }
+
+        if (!name || name.length > 100) {
+          setError("Tên phải có từ 1-100 ký tự");
+          setLoading(false);
+          return;
+        }
+
+        if (!phone || phone.length < 10) {
+          setError("Số điện thoại phải có ít nhất 10 số");
+          setLoading(false);
+          return;
+        }
+
         // Real API registration
-        const response = await fetch(
-          "http://localhost:3000/api/auth/register",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              email,
-              password,
-              full_name: name,
-              phone: "0123456789", // Default phone
-              role: role.toUpperCase(),
-            }),
-          }
-        );
+        const requestData = {
+          email,
+          password,
+          full_name: name,
+          phone: phone,
+          role: role.toUpperCase(),
+        };
+
+        console.log("Sending registration data:", requestData);
+
+        const response = await fetch(API_ENDPOINTS.AUTH.REGISTER, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestData),
+        });
 
         const data = await response.json();
 
-        if (data.success) {
+        if (response.ok && data.success) {
           // Store token in localStorage
           localStorage.setItem("accessToken", data.data.accessToken);
           localStorage.setItem("refreshToken", data.data.refreshToken);
@@ -146,7 +198,9 @@ const AuthModal: React.FC<AuthModalProps> = ({
             role: data.data.user.role.toLowerCase(),
           });
         } else {
-          setError(data.message || "Đăng ký thất bại");
+          console.error("Registration error:", data);
+          console.error("Detailed errors:", data.errors);
+          setError(data.message || "Đăng ký thất bại. Vui lòng thử lại.");
         }
       }
     } catch (error) {
@@ -171,7 +225,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
 
       const credentials = demoCredentials[demoRole];
 
-      const response = await fetch("http://localhost:3000/api/auth/login", {
+      const response = await fetch(API_ENDPOINTS.AUTH.LOGIN, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -296,7 +350,9 @@ const AuthModal: React.FC<AuthModalProps> = ({
                   type="email"
                   placeholder="taixe@demo.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    setEmail(e.target.value)
+                  }
                   required
                   className="glass border-slate-200/50 dark:border-slate-700/50 focus:border-lime-400 dark:focus:border-lime-400"
                 />
@@ -313,7 +369,9 @@ const AuthModal: React.FC<AuthModalProps> = ({
                   type="password"
                   placeholder="demo123"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    setPassword(e.target.value)
+                  }
                   required
                   className="glass border-slate-200/50 dark:border-slate-700/50 focus:border-lime-400 dark:focus:border-lime-400"
                 />
@@ -347,7 +405,9 @@ const AuthModal: React.FC<AuthModalProps> = ({
                   type="text"
                   placeholder="Nhập họ và tên của bạn"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    setName(e.target.value)
+                  }
                   required
                   className="glass border-slate-200/50 dark:border-slate-700/50 focus:border-lime-400 dark:focus:border-lime-400"
                 />
@@ -364,7 +424,28 @@ const AuthModal: React.FC<AuthModalProps> = ({
                   type="email"
                   placeholder="email@example.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    setEmail(e.target.value)
+                  }
+                  required
+                  className="glass border-slate-200/50 dark:border-slate-700/50 focus:border-lime-400 dark:focus:border-lime-400"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label
+                  htmlFor="reg-phone"
+                  className="text-slate-700 dark:text-slate-300"
+                >
+                  Số điện thoại
+                </Label>
+                <Input
+                  id="reg-phone"
+                  type="tel"
+                  placeholder="Nhập số điện thoại (ít nhất 10 số)"
+                  value={phone}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    setPhone(e.target.value)
+                  }
                   required
                   className="glass border-slate-200/50 dark:border-slate-700/50 focus:border-lime-400 dark:focus:border-lime-400"
                 />
@@ -379,9 +460,11 @@ const AuthModal: React.FC<AuthModalProps> = ({
                 <Input
                   id="reg-password"
                   type="password"
-                  placeholder="Tạo mật khẩu"
+                  placeholder="Tạo mật khẩu (ít nhất 8 ký tự, có chữ hoa, thường, số và ký tự đặc biệt)"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    setPassword(e.target.value)
+                  }
                   required
                   className="glass border-slate-200/50 dark:border-slate-700/50 focus:border-lime-400 dark:focus:border-lime-400"
                 />
