@@ -81,23 +81,11 @@ const AuthModal: React.FC<AuthModalProps> = ({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Password validation function
+  // Simple password validation function
   const validatePassword = (password: string): string[] => {
     const errors: string[] = [];
-    if (password.length < 8) {
-      errors.push("Mật khẩu phải có ít nhất 8 ký tự");
-    }
-    if (!/[A-Z]/.test(password)) {
-      errors.push("Mật khẩu phải có ít nhất 1 chữ hoa");
-    }
-    if (!/[a-z]/.test(password)) {
-      errors.push("Mật khẩu phải có ít nhất 1 chữ thường");
-    }
-    if (!/[0-9]/.test(password)) {
-      errors.push("Mật khẩu phải có ít nhất 1 số");
-    }
-    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
-      errors.push("Mật khẩu phải có ít nhất 1 ký tự đặc biệt");
+    if (password.length < 6) {
+      errors.push("Mật khẩu phải có ít nhất 6 ký tự");
     }
     return errors;
   };
@@ -460,7 +448,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
                 <Input
                   id="reg-password"
                   type="password"
-                  placeholder="Tạo mật khẩu (ít nhất 8 ký tự, có chữ hoa, thường, số và ký tự đặc biệt)"
+                  placeholder="Tạo mật khẩu (ít nhất 6 ký tự)"
                   value={password}
                   onChange={(e: ChangeEvent<HTMLInputElement>) =>
                     setPassword(e.target.value)

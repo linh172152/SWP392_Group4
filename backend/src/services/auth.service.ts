@@ -10,7 +10,6 @@ import {
   verifyRefreshToken,
 } from "../utils/jwt.util";
 import { CustomError } from "../middlewares/error.middleware";
-import { sendWelcomeEmail } from "./email.service";
 
 const prisma = new PrismaClient();
 
@@ -44,13 +43,9 @@ export const registerUser = async (
   data: RegisterData
 ): Promise<AuthResponse> => {
   try {
-    // Validate password strength
-    const passwordValidation = validatePasswordStrength(data.password);
-    if (!passwordValidation.isValid) {
-      throw new CustomError(
-        `Password validation failed: ${passwordValidation.errors.join(", ")}`,
-        400
-      );
+    // Simple password validation (6+ characters)
+    if (data.password.length < 6) {
+      throw new CustomError("Password must be at least 6 characters long", 400);
     }
 
     // Check if user already exists
@@ -62,14 +57,14 @@ export const registerUser = async (
       throw new CustomError("User with this email already exists", 409);
     }
 
-    // Store password as plain text (for testing only)
-    // const hashedPassword = await hashPassword(data.password);
+    // Hash password for security
+    const hashedPassword = await hashPassword(data.password);
 
     // Create user
     const user = await prisma.user.create({
       data: {
         email: data.email,
-        password_hash: data.password, // Store plain text
+        password_hash: hashedPassword,
         full_name: data.full_name,
         phone: data.phone,
         role: data.role || "DRIVER",
@@ -81,13 +76,7 @@ export const registerUser = async (
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user.user_id);
 
-    // Send welcome email (async, don't wait for it)
-    try {
-      await sendWelcomeEmail(user.email, user.full_name);
-    } catch (error) {
-      console.error("Failed to send welcome email:", error);
-      // Don't throw error, just log it
-    }
+    // Welcome email removed for simplicity
 
     // Remove password from response
     const { password_hash, ...userWithoutPassword } = user;
@@ -124,11 +113,14 @@ export const loginUser = async (data: LoginData): Promise<AuthResponse> => {
       throw new CustomError("Account is inactive or banned", 401);
     }
 
-    // Verify password (plain text comparison)
+    // Verify password (hash comparison)
     if (!user.password_hash) {
       throw new CustomError("Invalid email or password", 401);
     }
-    const isPasswordValid = data.password === user.password_hash; // Plain text comparison
+    const isPasswordValid = await comparePassword(
+      data.password,
+      user.password_hash
+    );
     if (!isPasswordValid) {
       throw new CustomError("Invalid email or password", 401);
     }
