@@ -66,8 +66,8 @@ export const registerUser = async (
         email: data.email,
         password_hash: hashedPassword,
         full_name: data.full_name,
-        phone: data.phone,
-        role: data.role || "DRIVER",
+        phone: data.phone || null,
+        role: (data.role as "DRIVER" | "STAFF" | "ADMIN") || "DRIVER",
         status: "ACTIVE",
       },
     });
@@ -87,10 +87,13 @@ export const registerUser = async (
       refreshToken,
     };
   } catch (error) {
+    console.error("Registration error:", error);
     if (error instanceof CustomError) {
       throw error;
     }
-    throw new CustomError("Registration failed", 500);
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    throw new CustomError(`Registration failed: ${errorMessage}`, 500);
   }
 };
 
