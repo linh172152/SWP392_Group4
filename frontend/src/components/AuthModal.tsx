@@ -10,13 +10,6 @@ import {
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import type { User } from "../App";
 import { Zap } from "lucide-react";
@@ -77,7 +70,6 @@ const AuthModal: React.FC<AuthModalProps> = ({
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [role, setRole] = useState<"driver" | "staff" | "admin">("driver");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -197,7 +189,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
           password,
           full_name: name,
           phone: phone,
-          role: role.toUpperCase(),
+          role: "DRIVER",
         };
 
         console.log("Sending registration data:", requestData);
@@ -271,84 +263,6 @@ const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  const handleDemoLogin = async (demoRole: "driver" | "staff" | "admin") => {
-    setLoading(true);
-    setError("");
-
-    try {
-      // Use demo credentials to login via API
-      const demoCredentials = {
-        driver: { email: "taixe@demo.com", password: "demo123" },
-        staff: { email: "nhanvien@demo.com", password: "demo123" },
-        admin: { email: "admin@demo.com", password: "demo123" },
-      };
-
-      const credentials = demoCredentials[demoRole];
-
-      const response = await fetch(API_ENDPOINTS.AUTH.LOGIN, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(credentials),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        const accessToken = data.data.accessToken;
-        localStorage.setItem("accessToken", accessToken);
-
-        try {
-          const profileRes = await fetch(API_ENDPOINTS.AUTH.PROFILE, {
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${accessToken}`,
-            },
-          });
-          const profileData = await profileRes.json();
-
-          if (profileRes.ok && profileData.success) {
-            const u = profileData.data.user;
-            onLogin({
-              id: u.user_id,
-              email: u.email,
-              name: u.full_name,
-              role: u.role.toLowerCase(),
-            });
-          } else if (data.data.user) {
-            onLogin({
-              id: data.data.user.user_id,
-              email: data.data.user.email,
-              name: data.data.user.full_name,
-              role: data.data.user.role.toLowerCase(),
-            });
-          } else {
-            setError(profileData.message || "Demo login thành công nhưng không thể lấy profile");
-          }
-        } catch (err) {
-          console.error("Failed to fetch profile after demo login:", err);
-          if (data.data.user) {
-            onLogin({
-              id: data.data.user.user_id,
-              email: data.data.user.email,
-              name: data.data.user.full_name,
-              role: data.data.user.role.toLowerCase(),
-            });
-          } else {
-            setError("Demo login thành công nhưng không thể lấy profile");
-          }
-        }
-      } else {
-        setError("Demo login failed. Please try manual login.");
-      }
-    } catch (error) {
-      setError("Demo login failed. Please try manual login.");
-      console.error("Demo login error:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
@@ -390,46 +304,6 @@ const AuthModal: React.FC<AuthModalProps> = ({
           </TabsList>
 
           <TabsContent value="login" className="space-y-4">
-            <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDemoLogin("driver")}
-                  className="text-xs glass border-lime-200/50 dark:border-lime-400/30 hover:bg-lime-50/50 dark:hover:bg-lime-500/10"
-                >
-                  Demo Tài xế
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDemoLogin("staff")}
-                  className="text-xs glass border-amber-200/50 dark:border-amber-400/30 hover:bg-amber-50/50 dark:hover:bg-amber-500/10"
-                >
-                  Demo NV
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDemoLogin("admin")}
-                  className="text-xs glass border-green-200/50 dark:border-green-400/30 hover:bg-green-50/50 dark:hover:bg-green-500/10"
-                >
-                  Demo Admin
-                </Button>
-              </div>
-
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-slate-200/50 dark:border-slate-700/50" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground">
-                    Hoặc tiếp tục với
-                  </span>
-                </div>
-              </div>
-            </div>
-
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label
@@ -561,29 +435,6 @@ const AuthModal: React.FC<AuthModalProps> = ({
                   required
                   className="glass border-slate-200/50 dark:border-slate-700/50 focus:border-lime-400 dark:focus:border-lime-400"
                 />
-              </div>
-              <div className="space-y-2">
-                <Label
-                  htmlFor="role"
-                  className="text-slate-700 dark:text-slate-300"
-                >
-                  Loại tài khoản
-                </Label>
-                <Select
-                  value={role}
-                  onValueChange={(value: "driver" | "staff" | "admin") =>
-                    setRole(value)
-                  }
-                >
-                  <SelectTrigger className="glass border-slate-200/50 dark:border-slate-700/50">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="glass-card border-0">
-                    <SelectItem value="driver">Tài xế</SelectItem>
-                    <SelectItem value="staff">Nhân viên trạm</SelectItem>
-                    <SelectItem value="admin">Quản trị viên</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
               {error && (
                 <div className="text-sm text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-500/10 p-3 rounded-lg border border-red-200/50 dark:border-red-500/20">
