@@ -1,6 +1,5 @@
 // API Configuration
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "https://ev-battery-backend.onrender.com/api";
+export const API_BASE_URL = import.meta.env.VITE_API_URL || "https://ev-battery-backend.onrender.com/api";
 
 export const API_ENDPOINTS = {
   AUTH: {
@@ -11,8 +10,11 @@ export const API_ENDPOINTS = {
     PROFILE: `${API_BASE_URL}/auth/me`,
     VERIFY: `${API_BASE_URL}/auth/verify`,
   },
+  ADMIN: {
+    USERS: `${API_BASE_URL}/admin/users`,
+    // other admin endpoints can be added here (stations, reports...)
+  },
   HEALTH: `${API_BASE_URL}/health`,
-  // Add other endpoints as needed
 };
 
 export default API_ENDPOINTS;
