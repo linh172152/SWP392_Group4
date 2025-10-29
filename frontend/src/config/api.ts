@@ -14,6 +14,9 @@ export const API_ENDPOINTS = {
     USERS: `${API_BASE_URL}/admin/users`,
     // other admin endpoints can be added here (stations, reports...)
   },
+  DRIVER: {
+    VEHICLES: `${API_BASE_URL}/driver/vehicles`,
+  },
   HEALTH: `${API_BASE_URL}/health`,
 };
 
