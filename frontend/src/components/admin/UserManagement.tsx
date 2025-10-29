@@ -25,6 +25,35 @@ const CreateUserModal = ({ isOpen, onClose, onSubmit }: CreateUserModalProps) =>
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Basic client-side validation to avoid backend Joi validation errors
+    const emailValid = /\S+@\S+\.\S+/.test(email);
+    if (!emailValid) {
+      toast.error('Email không hợp lệ');
+      return;
+    }
+
+    if (String(password).length < 6) {
+      toast.error('Mật khẩu phải có ít nhất 6 ký tự');
+      return;
+    }
+
+    if (fullName.trim().length < 2) {
+      toast.error('Họ và tên phải có ít nhất 2 ký tự');
+      return;
+    }
+
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length < 10 || digits.length > 15) {
+      toast.error('Số điện thoại phải có từ 10 đến 15 chữ số');
+      return;
+    }
+
+    const allowedRoles = ['DRIVER', 'STAFF', 'ADMIN'];
+    if (!allowedRoles.includes(role.toUpperCase())) {
+      toast.error('Vai trò không hợp lệ');
+      return;
+    }
+
     onSubmit({ email, fullName, password, role, phone });
     setEmail('');
     setFullName('');
