@@ -112,16 +112,54 @@ const AuthModal: React.FC<AuthModalProps> = ({
         const data = await response.json();
 
         if (data.success) {
-          // Store token in localStorage
-          localStorage.setItem("accessToken", data.data.accessToken);
-          localStorage.setItem("refreshToken", data.data.refreshToken);
+          // Store access token in localStorage (refresh token is set as httpOnly cookie by backend)
+          const accessToken = data.data.accessToken;
+          localStorage.setItem("accessToken", accessToken);
 
-          onLogin({
-            id: data.data.user.user_id,
-            email: data.data.user.email,
-            name: data.data.user.full_name,
-            role: data.data.user.role.toLowerCase(),
-          });
+          // Fetch protected profile endpoint using the access token to get authoritative user info
+          try {
+            const profileRes = await fetch(API_ENDPOINTS.AUTH.PROFILE, {
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${accessToken}`,
+              },
+            });
+
+            const profileData = await profileRes.json();
+
+            if (profileRes.ok && profileData.success) {
+              const u = profileData.data.user;
+              onLogin({
+                id: u.user_id,
+                email: u.email,
+                name: u.full_name,
+                role: u.role.toLowerCase(),
+              });
+            } else if (data.data.user) {
+              // Fallback to user returned from login response
+              onLogin({
+                id: data.data.user.user_id,
+                email: data.data.user.email,
+                name: data.data.user.full_name,
+                role: data.data.user.role.toLowerCase(),
+              });
+            } else {
+              setError(profileData.message || "Không thể lấy thông tin người dùng");
+            }
+          } catch (err) {
+            console.error("Failed to fetch profile after login:", err);
+            // Fallback to provided user if available
+            if (data.data.user) {
+              onLogin({
+                id: data.data.user.user_id,
+                email: data.data.user.email,
+                name: data.data.user.full_name,
+                role: data.data.user.role.toLowerCase(),
+              });
+            } else {
+              setError("Đăng nhập thành công nhưng không thể lấy profile");
+            }
+          }
         } else {
           setError(data.message || "Đăng nhập thất bại");
         }
@@ -175,16 +213,50 @@ const AuthModal: React.FC<AuthModalProps> = ({
         const data = await response.json();
 
         if (response.ok && data.success) {
-          // Store token in localStorage
-          localStorage.setItem("accessToken", data.data.accessToken);
-          localStorage.setItem("refreshToken", data.data.refreshToken);
+          const accessToken = data.data.accessToken;
+          localStorage.setItem("accessToken", accessToken);
 
-          onLogin({
-            id: data.data.user.user_id,
-            email: data.data.user.email,
-            name: data.data.user.full_name,
-            role: data.data.user.role.toLowerCase(),
-          });
+          // Fetch profile after register to sign the user into the app state
+          try {
+            const profileRes = await fetch(API_ENDPOINTS.AUTH.PROFILE, {
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${accessToken}`,
+              },
+            });
+            const profileData = await profileRes.json();
+
+            if (profileRes.ok && profileData.success) {
+              const u = profileData.data.user;
+              onLogin({
+                id: u.user_id,
+                email: u.email,
+                name: u.full_name,
+                role: u.role.toLowerCase(),
+              });
+            } else if (data.data.user) {
+              onLogin({
+                id: data.data.user.user_id,
+                email: data.data.user.email,
+                name: data.data.user.full_name,
+                role: data.data.user.role.toLowerCase(),
+              });
+            } else {
+              setError(profileData.message || "Đăng ký thành công nhưng không thể lấy profile");
+            }
+          } catch (err) {
+            console.error("Failed to fetch profile after register:", err);
+            if (data.data.user) {
+              onLogin({
+                id: data.data.user.user_id,
+                email: data.data.user.email,
+                name: data.data.user.full_name,
+                role: data.data.user.role.toLowerCase(),
+              });
+            } else {
+              setError("Đăng ký thành công nhưng không thể lấy profile");
+            }
+          }
         } else {
           console.error("Registration error:", data);
           console.error("Detailed errors:", data.errors);
@@ -224,16 +296,49 @@ const AuthModal: React.FC<AuthModalProps> = ({
       const data = await response.json();
 
       if (data.success) {
-        // Store token in localStorage
-        localStorage.setItem("accessToken", data.data.accessToken);
-        localStorage.setItem("refreshToken", data.data.refreshToken);
+        const accessToken = data.data.accessToken;
+        localStorage.setItem("accessToken", accessToken);
 
-        onLogin({
-          id: data.data.user.user_id,
-          email: data.data.user.email,
-          name: data.data.user.full_name,
-          role: data.data.user.role.toLowerCase(),
-        });
+        try {
+          const profileRes = await fetch(API_ENDPOINTS.AUTH.PROFILE, {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${accessToken}`,
+            },
+          });
+          const profileData = await profileRes.json();
+
+          if (profileRes.ok && profileData.success) {
+            const u = profileData.data.user;
+            onLogin({
+              id: u.user_id,
+              email: u.email,
+              name: u.full_name,
+              role: u.role.toLowerCase(),
+            });
+          } else if (data.data.user) {
+            onLogin({
+              id: data.data.user.user_id,
+              email: data.data.user.email,
+              name: data.data.user.full_name,
+              role: data.data.user.role.toLowerCase(),
+            });
+          } else {
+            setError(profileData.message || "Demo login thành công nhưng không thể lấy profile");
+          }
+        } catch (err) {
+          console.error("Failed to fetch profile after demo login:", err);
+          if (data.data.user) {
+            onLogin({
+              id: data.data.user.user_id,
+              email: data.data.user.email,
+              name: data.data.user.full_name,
+              role: data.data.user.role.toLowerCase(),
+            });
+          } else {
+            setError("Demo login thành công nhưng không thể lấy profile");
+          }
+        }
       } else {
         setError("Demo login failed. Please try manual login.");
       }
