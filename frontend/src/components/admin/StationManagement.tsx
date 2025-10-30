@@ -1,106 +1,155 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Progress } from '../ui/progress';
+import { toast } from 'sonner';
 import { 
   Building, 
   Plus, 
   Search, 
   MapPin,
   Activity,
-  Battery,
-  Users,
   DollarSign,
-  TrendingUp,
-  TrendingDown,
   AlertTriangle,
   CheckCircle,
   Clock,
-  Settings,
   Edit,
   Trash2
 } from 'lucide-react';
-
-// Dữ liệu trạm mẫu
-const mockStations = [
-  {
-    id: 'ST001',
-    name: 'Trung tâm EV Thành phố',
-    address: '123 Đường Chính, Quận 1, TP.HCM',
-    coordinates: { lat: 10.762622, lng: 106.660172 },
-    status: 'online',
-    capacity: 12,
-    available: 8,
-    charging: 3,
-    maintenance: 1,
-    dailySwaps: 47,
-    dailyRevenue: 1247.50,
-    uptime: 99.2,
-    manager: 'Nguyễn Văn Quản lý',
-    phone: '+84 901 234 567',
-    operatingHours: '24/7'
-  },
-  {
-    id: 'ST002',
-    name: 'Trạm Trung tâm Thương mại',
-    address: '456 Đại lộ Mua sắm, Quận 3, TP.HCM',
-    coordinates: { lat: 10.786785, lng: 106.700471 },
-    status: 'online',
-    capacity: 20,
-    available: 15,
-    charging: 4,
-    maintenance: 1,
-    dailySwaps: 68,
-    dailyRevenue: 1876.25,
-    uptime: 97.8,
-    manager: 'Trần Thị Quản lý',
-    phone: '+84 902 345 678',
-    operatingHours: '6 AM - 11 PM'
-  },
-  {
-    id: 'ST003',
-    name: 'Trạm Nghỉ Cao tốc A1',
-    address: 'Cao tốc A1 hướng Bắc Km 42',
-    coordinates: { lat: 10.950000, lng: 106.800000 },
-    status: 'maintenance',
-    capacity: 16,
-    available: 6,
-    charging: 8,
-    maintenance: 2,
-    dailySwaps: 34,
-    dailyRevenue: 892.75,
-    uptime: 89.5,
-    manager: 'Lê Hoàng Quản lý',
-    phone: '+84 903 456 789',
-    operatingHours: '24/7'
-  },
-  {
-    id: 'ST004',
-    name: 'Nhà ga Sân bay Tân Sơn Nhất',
-    address: 'Sân bay Tân Sơn Nhất, Quận Tân Bình, TP.HCM',
-    coordinates: { lat: 10.815509, lng: 106.658611 },
-    status: 'offline',
-    capacity: 24,
-    available: 0,
-    charging: 0,
-    maintenance: 0,
-    dailySwaps: 0,
-    dailyRevenue: 0,
-    uptime: 0,
-    manager: 'Phạm Minh Quản lý',
-    phone: '+84 904 567 890',
-    operatingHours: '24/7'
-  }
-];
+import type { Station } from '../../services/station.service';
+import { deleteStation } from '../../services/station.service';
 
 const StationManagement: React.FC = () => {
-  const [stations, setStations] = useState(mockStations);
+  const [stations, setStations] = useState<Station[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
+  // Mock data for development
+  const mockStations: Station[] = [
+    {
+      station_id: 'ST001',
+      name: 'Trạm Thành phố',
+      address: '123 Đường Chính, Quận 1, TP.HCM',
+      coordinates: { lat: 10.762622, lng: 106.660172 },
+      status: 'online',
+      capacity: 12,
+      available_batteries: 8,
+      charging_batteries: 3,
+      maintenance_batteries: 1,
+      daily_swaps: 47,
+      daily_revenue: 1247.50,
+      uptime: 99.2,
+      operating_hours: '24/7',
+      manager: {
+        user_id: 'USER001',
+        full_name: 'Nguyễn Văn Quản lý',
+        phone: '+84 901 234 567'
+      }
+    },
+    {
+      station_id: 'ST002',
+      name: 'Trạm Trung tâm Thương mại',
+      address: '456 Đại lộ Mua sắm, Quận 3, TP.HCM',
+      coordinates: { lat: 10.786785, lng: 106.700471 },
+      status: 'online',
+      capacity: 20,
+      available_batteries: 15,
+      charging_batteries: 4,
+      maintenance_batteries: 1,
+      daily_swaps: 68,
+      daily_revenue: 1876.25,
+      uptime: 97.8,
+      operating_hours: '6 AM - 11 PM',
+      manager: {
+        user_id: 'USER002',
+        full_name: 'Trần Thị Quản lý',
+        phone: '+84 902 345 678'
+      }
+    },
+    {
+      station_id: 'ST003',
+      name: 'Trạm Nghỉ Cao tốc A1',
+      address: 'Cao tốc A1 hướng Bắc Km 42',
+      coordinates: { lat: 10.950000, lng: 106.800000 },
+      status: 'maintenance',
+      capacity: 16,
+      available_batteries: 6,
+      charging_batteries: 8,
+      maintenance_batteries: 2,
+      daily_swaps: 34,
+      daily_revenue: 892.75,
+      uptime: 89.5,
+      operating_hours: '24/7',
+      manager: {
+        user_id: 'USER003',
+        full_name: 'Lê Hoàng Quản lý',
+        phone: '+84 903 456 789'
+      }
+    }
+  ];
+
+  // Fetch stations from API (temporarily using mock data)
+  const fetchStations = async () => {
+    try {
+      // Simulating API call for development
+      setTimeout(() => {
+        // Filter mock data based on search and status
+        const filtered = mockStations.filter(station => {
+          const matchesSearch = searchTerm === '' || 
+            station.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            station.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            station.station_id.toLowerCase().includes(searchTerm.toLowerCase());
+          
+          const matchesStatus = statusFilter === 'all' || station.status === statusFilter;
+          
+          return matchesSearch && matchesStatus;
+        });
+        setStations(filtered);
+      }, 500); // Simulate network delay
+
+      // TODO: Uncomment when API is ready
+      // const res = await getAllStations({
+      //   search: searchTerm,
+      //   status: statusFilter === 'all' ? undefined : statusFilter
+      // });
+      // if (res.success) {
+      //   setStations(res.data?.stations || []);
+      // } else {
+      //   throw new Error(res.message || 'Failed to load stations');
+      // }
+    } catch (err: any) {
+      console.error('Load stations error:', err);
+      toast.error('API đang được phát triển. Tạm thời hiển thị dữ liệu mẫu.');
+    }
+  };
+
+  // Load stations on mount and when filters change
+  useEffect(() => {
+    fetchStations();
+  }, [searchTerm, statusFilter]);
+
+
+
+  // Handle station deletion
+  const handleDeleteStation = async (stationId: string) => {
+    if (window.confirm('Bạn có chắc chắn muốn xóa trạm này?')) {
+      try {
+        const res = await deleteStation(stationId);
+        if (res.success) {
+          toast.success('Xóa trạm thành công');
+          fetchStations();
+        } else {
+          throw new Error(res.message || 'Failed to delete station');
+        }
+      } catch (error: any) {
+        console.error('Error deleting station:', error);
+        toast.error(error.message || 'Lỗi khi xóa trạm');
+      }
+    }
+  };
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'online': return <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />;
@@ -134,19 +183,20 @@ const StationManagement: React.FC = () => {
     return 'text-green-600 dark:text-green-400';
   };
 
+  // Filter stations by search term and status
   const filteredStations = stations.filter(station => {
     const matchesSearch = station.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           station.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          station.id.toLowerCase().includes(searchTerm.toLowerCase());
+                          station.station_id.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || station.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
   const totalStations = stations.length;
   const onlineStations = stations.filter(s => s.status === 'online').length;
-  const totalRevenue = stations.reduce((sum, s) => sum + s.dailyRevenue, 0);
-  const totalSwaps = stations.reduce((sum, s) => sum + s.dailySwaps, 0);
-  const avgUptime = stations.reduce((sum, s) => sum + s.uptime, 0) / stations.length;
+  const totalRevenue = stations.reduce((sum, s) => sum + (s.daily_revenue || 0), 0);
+  const totalSwaps = stations.reduce((sum, s) => sum + (s.daily_swaps || 0), 0);
+
 
   return (
     <div className="p-6 space-y-6">
@@ -220,19 +270,7 @@ const StationManagement: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <TrendingUp className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Uptime TB</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{avgUptime.toFixed(1)}%</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+
       </div>
 
       {/* Filters */}
@@ -266,10 +304,11 @@ const StationManagement: React.FC = () => {
       {/* Station List */}
       <div className="space-y-4">
         {filteredStations.map((station) => {
-          const utilization = Math.round(((station.capacity - station.available) / station.capacity) * 100);
+          const utilization = station.capacity ? 
+            Math.round(((station.capacity - (station.available_batteries || 0)) / station.capacity) * 100) : 0;
           
           return (
-            <Card key={station.id} className="glass-card border-0 glow-hover">
+            <Card key={station.station_id} className="glass-card border-0 glow-hover">
               <CardContent className="p-6">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                   {/* Station Info */}
@@ -287,22 +326,22 @@ const StationManagement: React.FC = () => {
                           <MapPin className="h-4 w-4 mr-1" />
                           {station.address}
                         </p>
-                        <p className="text-sm text-slate-600 dark:text-slate-400">ID: {station.id}</p>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">ID: {station.station_id}</p>
                       </div>
                     </div>
                     
                     <div className="text-sm space-y-1">
                       <div className="flex justify-between">
                         <span className="text-slate-600 dark:text-slate-400">Quản lý:</span>
-                        <span className="text-slate-900 dark:text-white">{station.manager}</span>
+                        <span className="text-slate-900 dark:text-white">{station.manager?.full_name}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-600 dark:text-slate-400">Điện thoại:</span>
-                        <span className="text-slate-900 dark:text-white">{station.phone}</span>
+                        <span className="text-slate-900 dark:text-white">{station.manager?.phone || 'N/A'}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-600 dark:text-slate-400">Giờ hoạt động:</span>
-                        <span className="text-slate-900 dark:text-white">{station.operatingHours}</span>
+                        <span className="text-slate-900 dark:text-white">{station.operating_hours}</span>
                       </div>
                     </div>
                   </div>
@@ -313,15 +352,15 @@ const StationManagement: React.FC = () => {
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
                         <span className="text-slate-600 dark:text-slate-400">Khả dụng</span>
-                        <span className="font-medium text-green-600 dark:text-green-400">{station.available}</span>
+                        <span className="font-medium text-green-600 dark:text-green-400">{station.available_batteries}</span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-slate-600 dark:text-slate-400">Đang sạc</span>
-                        <span className="font-medium text-blue-600 dark:text-blue-400">{station.charging}</span>
+                        <span className="font-medium text-blue-600 dark:text-blue-400">{station.charging_batteries}</span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-slate-600 dark:text-slate-400">Bảo trì</span>
-                        <span className="font-medium text-yellow-600 dark:text-yellow-400">{station.maintenance}</span>
+                        <span className="font-medium text-yellow-600 dark:text-yellow-400">{station.maintenance_batteries}</span>
                       </div>
                       <div className="pt-2 border-t border-slate-200/50 dark:border-slate-700/50">
                         <div className="flex justify-between text-sm mb-1">
@@ -339,11 +378,11 @@ const StationManagement: React.FC = () => {
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-slate-600 dark:text-slate-400">Lần thay:</span>
-                        <span className="font-medium text-slate-900 dark:text-white">{station.dailySwaps}</span>
+                        <span className="font-medium text-slate-900 dark:text-white">{station.daily_swaps}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-600 dark:text-slate-400">Doanh thu:</span>
-                        <span className="font-medium text-slate-900 dark:text-white">${station.dailyRevenue.toLocaleString()}</span>
+                        <span className="font-medium text-slate-900 dark:text-white">${station.daily_revenue?.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-600 dark:text-slate-400">Uptime:</span>
@@ -364,9 +403,14 @@ const StationManagement: React.FC = () => {
                       <Edit className="mr-1 h-3 w-3" />
                       Chỉnh sửa
                     </Button>
-                    <Button variant="outline" size="sm" className="glass border-slate-200/50 dark:border-slate-700/50">
-                      <Settings className="mr-1 h-3 w-3" />
-                      Cài đặt
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="glass border-red-200/50 dark:border-red-400/30"
+                      onClick={() => handleDeleteStation(station.station_id)}
+                    >
+                      <Trash2 className="mr-1 h-3 w-3" />
+                      Xóa
                     </Button>
                   </div>
                 </div>
