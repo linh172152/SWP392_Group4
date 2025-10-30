@@ -22,7 +22,7 @@ export const API_ENDPOINTS = {
   },
   STATION: {
     LIST: `${API_BASE_URL}/stations`,
-    PUBLIC: `${API_BASE_URL}/public/stations`,
+    PUBLIC: `${API_BASE_URL}/stations/public`,
   },
   BATTERY: {
     LIST: `${API_BASE_URL}/batteries`,
@@ -57,6 +57,8 @@ export const API_ENDPOINTS = {
   },
   DRIVER: {
     VEHICLES: `${API_BASE_URL}/driver/vehicles`,
+    STATIONS: `${API_BASE_URL}/driver/stations`,
+    BOOKINGS: `${API_BASE_URL}/driver/bookings`,
   },
   HEALTH: `${API_BASE_URL}/health`,
 };

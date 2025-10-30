@@ -2,7 +2,7 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { User } from '../../App';
 import DriverLayout from './DriverLayout';
-import DriverHome from './DriverHome';
+import DriverHome from './StationFinding';
 import VehicleManagement from './VehicleManagement';
 import StationDetail from './StationDetail';
 import BookingHistory from './BookingHistory';
