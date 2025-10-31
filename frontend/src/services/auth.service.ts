@@ -88,12 +88,43 @@ export const authService = {
     const response = await fetch(`${API_ENDPOINTS.AUTH.PROFILE.replace('/me', '/change-password')}`, {
       method: "PUT",
       headers: getAuthHeaders(),
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        currentPassword: data.current_password,
+        newPassword: data.new_password
+      }),
     });
 
     if (!response.ok) {
       const errorData = await response.json();
       const error: any = new Error(errorData.message || "Không thể đổi mật khẩu");
+      error.status = response.status;
+      throw error;
+    }
+
+    return await response.json();
+  },
+
+  /**
+   * Upload avatar
+   */
+  async uploadAvatar(file: File): Promise<{ success: boolean; message: string; data: { image_url: string } }> {
+    const token = localStorage.getItem("accessToken");
+    
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const response = await fetch(`${API_ENDPOINTS.AUTH.PROFILE.replace('/me', '/upload-avatar')}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        // Don't set Content-Type, browser will set it with boundary for FormData
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      const error: any = new Error(errorData.message || "Không thể upload avatar");
       error.status = response.status;
       throw error;
     }
