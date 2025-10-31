@@ -38,6 +38,35 @@ const upload = multer({
   },
 });
 
+// Multer error handler middleware
+const handleMulterError = (err: any, _req: any, res: any, next: any) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({
+        success: false,
+        message: 'File size too large. Maximum size is 5MB'
+      });
+    }
+    if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+      return res.status(400).json({
+        success: false,
+        message: 'Unexpected file field. Use "image" as the field name'
+      });
+    }
+    return res.status(400).json({
+      success: false,
+      message: `Upload error: ${err.message}`
+    });
+  }
+  if (err instanceof Error && err.message === 'Only image files are allowed') {
+    return res.status(400).json({
+      success: false,
+      message: 'Only image files are allowed'
+    });
+  }
+  next(err);
+};
+
 /**
  * @swagger
  * components:
@@ -303,7 +332,7 @@ router.put('/change-password', authenticateToken, validateRequest(changePassword
  *       400:
  *         description: No image file provided
  */
-router.post('/upload-avatar', authenticateToken, upload.single('image'), uploadProfileImage);
+router.post('/upload-avatar', authenticateToken, upload.single('image'), handleMulterError, uploadProfileImage);
 
 /**
  * @swagger

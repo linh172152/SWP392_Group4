@@ -8,6 +8,11 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+// Validate Cloudinary configuration
+if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+  console.warn('⚠️  Cloudinary configuration missing. Image upload will fail.');
+}
+
 export interface UploadResult {
   public_id: string;
   secure_url: string;
@@ -53,6 +58,16 @@ export const uploadImageFromBuffer = async (
   buffer: Buffer,
   folder?: string
 ): Promise<UploadResult> => {
+  // Validate buffer
+  if (!buffer || buffer.length === 0) {
+    throw new CustomError("Invalid image buffer: buffer is empty", 400);
+  }
+
+  // Validate Cloudinary configuration
+  if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+    throw new CustomError("Cloudinary configuration missing. Please check environment variables.", 500);
+  }
+
   try {
     return new Promise((resolve, reject) => {
       cloudinary.uploader
@@ -65,11 +80,16 @@ export const uploadImageFromBuffer = async (
           },
           (error, result) => {
             if (error) {
-              reject(error);
+              console.error("Cloudinary upload error:", error);
+              reject(new CustomError(`Failed to upload image: ${error.message}`, 500));
               return;
             }
             if (!result) {
-              reject(new Error("No result from Cloudinary"));
+              reject(new CustomError("No result from Cloudinary upload", 500));
+              return;
+            }
+            if (!result.secure_url) {
+              reject(new CustomError("Cloudinary upload succeeded but no URL returned", 500));
               return;
             }
             resolve({
@@ -86,7 +106,10 @@ export const uploadImageFromBuffer = async (
     });
   } catch (error) {
     console.error("Cloudinary upload error:", error);
-    throw new CustomError("Failed to upload image to Cloudinary", 500);
+    if (error instanceof CustomError) {
+      throw error;
+    }
+    throw new CustomError(`Failed to upload image to Cloudinary: ${error instanceof Error ? error.message : 'Unknown error'}`, 500);
   }
 };
 
