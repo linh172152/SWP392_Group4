@@ -2,7 +2,8 @@ import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
-import { notificationService } from "../server";
+// ❌ Subscription notifications removed (subsystem not in use)
+// import { notificationService } from "../server";
 
 const prisma = new PrismaClient();
 
@@ -268,25 +269,8 @@ export const cancelSubscription = asyncHandler(
       },
     });
 
-    // Send subscription expiry notification
-    try {
-      await notificationService.sendNotification({
-        type: "subscription_expired",
-        userId: userId,
-        title: "Subscription Cancelled",
-        message: `Your subscription has been cancelled. You will be charged for future battery swaps.`,
-        data: {
-          subscriptionId: updatedSubscription.subscription_id,
-          packageName: updatedSubscription.package?.name,
-          cancelledAt: new Date().toISOString(),
-        },
-      });
-    } catch (error) {
-      console.error(
-        "Failed to send subscription cancellation notification:",
-        error
-      );
-    }
+    // ❌ Subscription notifications removed (subsystem not in use)
+    // In-App notifications for subscriptions are no longer used
 
     res.status(200).json({
       success: true,
@@ -330,28 +314,12 @@ export const checkExpiringSubscriptions = asyncHandler(
       },
     });
 
-    // Send notifications for expiring subscriptions
-    for (const subscription of expiringSubscriptions) {
-      try {
-        await notificationService.sendNotification({
-          type: "subscription_expiring",
-          userId: subscription.user_id,
-          title: "Subscription Expiring Soon",
-          message: `Your ${subscription.package?.name} subscription expires in 3 days. Renew now to continue enjoying free battery swaps!`,
-          data: {
-            subscriptionId: subscription.subscription_id,
-            packageName: subscription.package?.name,
-            expiryDate: subscription.end_date.toISOString(),
-            remainingSwaps: subscription.remaining_swaps,
-          },
-        });
-      } catch (error) {
-        console.error(
-          "Failed to send subscription expiry notification:",
-          error
-        );
-      }
-    }
+    // ❌ Subscription notifications removed (subsystem not in use)
+    // In-App notifications for subscriptions are no longer used
+    // Expiring subscriptions data is returned but no notifications sent
+    // for (const subscription of expiringSubscriptions) {
+    //   await notificationService.sendNotification({...});
+    // }
 
     res.status(200).json({
       success: true,

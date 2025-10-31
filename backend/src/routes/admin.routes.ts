@@ -3,12 +3,24 @@ import {
   authenticateToken,
   authorizeRole,
 } from "../middlewares/auth.middleware";
+import batteryPricingRoutes from "./battery-pricing.routes";
+import topupPackageRoutes from "./topup-package.routes";
+import reportRoutes from "./report.routes";
 
 const router = Router();
 
 // All admin routes require authentication and admin role
 router.use(authenticateToken);
 router.use(authorizeRole("ADMIN"));
+
+// Battery Pricing routes
+router.use("/pricing", batteryPricingRoutes);
+
+// Top-up Package routes
+router.use("/topup-packages", topupPackageRoutes);
+
+// Dashboard/Reports routes
+router.use("/dashboard", reportRoutes);
 
 /**
  * @swagger
@@ -37,59 +49,9 @@ router.get("/users", (_req, res) => {
   res.json({ message: "Admin users endpoint - coming soon" });
 });
 
-/**
- * @swagger
- * /api/admin/stations:
- *   get:
- *     summary: Get admin stations management
- *     tags: [Admin]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Admin stations endpoint
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden - Admin role required
- */
-router.get("/stations", (_req, res) => {
-  res.json({ message: "Admin stations endpoint - coming soon" });
-});
+// ✅ Stations routes đã mount ở /api/admin/stations (use adminStationRoutes)
 
-/**
- * @swagger
- * /api/admin/reports:
- *   get:
- *     summary: Get admin reports management
- *     tags: [Admin]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Admin reports endpoint
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden - Admin role required
- */
-router.get("/reports", (_req, res) => {
-  res.json({ message: "Admin reports endpoint - coming soon" });
-});
+// ✅ Reports/Dashboard routes đã mount ở /dashboard (use reportRoutes)
 
 // Placeholder routes - will be implemented later
 

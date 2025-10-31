@@ -11,7 +11,10 @@ const prisma = new PrismaClient();
  */
 export const findNearbyStations = asyncHandler(
   async (req: Request, res: Response) => {
-    const { latitude, longitude, radius = 10 } = req.query;
+    // Support both lat/lng and latitude/longitude
+    const latitude = req.query.latitude || req.query.lat;
+    const longitude = req.query.longitude || req.query.lng;
+    const radius = req.query.radius || 10;
 
     if (!latitude || !longitude) {
       throw new CustomError("Latitude and longitude are required", 400);

@@ -43,7 +43,7 @@ export const getUserVehicles = asyncHandler(
  */
 export const addVehicle = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user?.userId;
-  const { license_plate, vehicle_type, make, model, year, battery_model } =
+  const { license_plate, vehicle_type, make, brand, model, year, battery_model } =
     req.body;
 
   if (!userId) {
@@ -56,6 +56,21 @@ export const addVehicle = asyncHandler(async (req: Request, res: Response) => {
       400
     );
   }
+
+  // Normalize vehicle_type: support both backend (car/motorbike) and frontend (CAR/MOTORBIKE/TRUCK)
+  let normalizedVehicleType = vehicle_type?.toLowerCase();
+  if (normalizedVehicleType === 'truck') {
+    normalizedVehicleType = 'car';
+  }
+  if (normalizedVehicleType !== 'car' && normalizedVehicleType !== 'motorbike') {
+    throw new CustomError(
+      "Vehicle type must be 'car' or 'motorbike'",
+      400
+    );
+  }
+
+  // Handle make/brand: support both field names
+  const vehicleMake = make || brand;
 
   // Check if license plate already exists
   const existingVehicle = await prisma.vehicle.findFirst({
@@ -72,8 +87,8 @@ export const addVehicle = asyncHandler(async (req: Request, res: Response) => {
   const vehicle = await prisma.vehicle.create({
     data: {
       license_plate,
-      vehicle_type,
-      make,
+      vehicle_type: normalizedVehicleType as any,
+      make: vehicleMake,
       model,
       year,
       battery_model,
@@ -144,7 +159,7 @@ export const updateVehicle = asyncHandler(
   async (req: Request, res: Response) => {
     const userId = req.user?.userId;
     const { id } = req.params;
-    const { license_plate, vehicle_type, make, model, year, battery_model } =
+    const { license_plate, vehicle_type, make, brand, model, year, battery_model } =
       req.body;
 
     if (!userId) {
@@ -161,6 +176,24 @@ export const updateVehicle = asyncHandler(
     if (!vehicle) {
       throw new CustomError("Vehicle not found", 404);
     }
+
+    // Normalize vehicle_type if provided
+    let normalizedVehicleType = vehicle_type;
+    if (vehicle_type) {
+      normalizedVehicleType = vehicle_type.toLowerCase();
+      if (normalizedVehicleType === 'truck') {
+        normalizedVehicleType = 'car';
+      }
+      if (normalizedVehicleType !== 'car' && normalizedVehicleType !== 'motorbike') {
+        throw new CustomError(
+          "Vehicle type must be 'car' or 'motorbike'",
+          400
+        );
+      }
+    }
+
+    // Handle make/brand: support both field names
+    const vehicleMake = make || brand;
 
     // Check if new license plate already exists (if changed)
     if (license_plate && license_plate !== vehicle.license_plate) {
@@ -182,12 +215,12 @@ export const updateVehicle = asyncHandler(
     const updatedVehicle = await prisma.vehicle.update({
       where: { vehicle_id: id },
       data: {
-        license_plate,
-        vehicle_type,
-        make,
-        model,
-        year,
-        battery_model,
+        ...(license_plate && { license_plate }),
+        ...(normalizedVehicleType && { vehicle_type: normalizedVehicleType as any }),
+        ...(vehicleMake !== undefined && { make: vehicleMake }),
+        ...(model !== undefined && { model }),
+        ...(year !== undefined && { year }),
+        ...(battery_model !== undefined && { battery_model }),
       },
       include: {
         user: {

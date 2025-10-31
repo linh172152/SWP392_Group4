@@ -3,12 +3,20 @@ import {
   authenticateToken,
   authorizeRole,
 } from "../middlewares/auth.middleware";
+import walletRoutes from "./wallet.routes";
+import notificationRoutes from "./notification.routes";
 
 const router = Router();
 
 // All driver routes require authentication and driver role
 router.use(authenticateToken);
 router.use(authorizeRole("DRIVER"));
+
+// Wallet routes
+router.use("/wallet", walletRoutes);
+
+// Notification routes
+router.use("/notifications", notificationRoutes);
 
 /**
  * @swagger

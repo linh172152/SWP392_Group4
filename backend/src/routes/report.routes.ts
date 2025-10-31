@@ -5,6 +5,7 @@ import {
   getUsageStatistics,
   getBatteryReports,
 } from "../controllers/report.controller";
+import { getDashboardStats } from "../controllers/dashboard.controller";
 import { authenticateToken } from "../middlewares/auth.middleware";
 import { authorizeRole } from "../middlewares/auth.middleware";
 
@@ -13,6 +14,31 @@ const router = Router();
 // All routes require admin authentication
 router.use(authenticateToken);
 router.use(authorizeRole("ADMIN"));
+
+/**
+ * @swagger
+ * /api/admin/dashboard/stats:
+ *   get:
+ *     summary: Get Admin Dashboard Stats (Tổng hợp báo cáo)
+ *     tags: [Admin - Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: period
+ *         schema:
+ *           type: string
+ *           enum: [day, week, month]
+ *           default: month
+ *     responses:
+ *       200:
+ *         description: Dashboard stats retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - Admin role required
+ */
+router.get("/stats", getDashboardStats);
 
 /**
  * @swagger

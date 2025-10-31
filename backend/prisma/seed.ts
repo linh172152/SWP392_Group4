@@ -4,6 +4,28 @@ import { hashPassword } from "../src/utils/bcrypt.util";
 const prisma = new PrismaClient();
 
 async function main() {
+  // Safety check: Only seed if explicitly requested or if database is empty
+  const existingUsersCount = await prisma.user.count();
+  const existingStationsCount = await prisma.station.count();
+  const forceSeed = process.env.FORCE_SEED === "true";
+  const isProduction = process.env.NODE_ENV === "production";
+
+  // In production, require explicit FORCE_SEED=true to prevent accidental seeding
+  if (isProduction && !forceSeed) {
+    console.log("⚠️  Production environment detected. Seed skipped for safety.");
+    console.log("   To seed in production, set FORCE_SEED=true");
+    console.log(`   Current data: ${existingUsersCount} users, ${existingStationsCount} stations`);
+    return;
+  }
+
+  // If database already has data, skip seeding unless FORCE_SEED=true
+  if (!forceSeed && (existingUsersCount > 0 || existingStationsCount > 0)) {
+    console.log("⚠️  Database already contains data. Seed skipped to prevent data loss.");
+    console.log(`   Current data: ${existingUsersCount} users, ${existingStationsCount} stations`);
+    console.log("   To force seed, set FORCE_SEED=true");
+    return;
+  }
+
   console.log("🌱 Starting comprehensive database seeding...");
 
   // Generate simple password hashes for existing users
@@ -12,11 +34,19 @@ async function main() {
   const driverPasswordHash = await hashPassword("driver123");
 
   // ===========================================
-  // CREATE ADMIN USERS
+  // CREATE ADMIN USERS (using upsert to avoid duplicates)
   // ===========================================
   const admins = await Promise.all([
-    prisma.user.create({
-      data: {
+    prisma.user.upsert({
+      where: { email: "admin@evbattery.com" },
+      update: {
+        full_name: "Nguyen Van Admin",
+        password_hash: adminPasswordHash,
+        phone: "0123456789",
+        role: "ADMIN",
+        status: "ACTIVE",
+      },
+      create: {
         full_name: "Nguyen Van Admin",
         email: "admin@evbattery.com",
         password_hash: adminPasswordHash,
@@ -25,8 +55,16 @@ async function main() {
         status: "ACTIVE",
       },
     }),
-    prisma.user.create({
-      data: {
+    prisma.user.upsert({
+      where: { email: "manager@evbattery.com" },
+      update: {
+        full_name: "Tran Thi Manager",
+        password_hash: adminPasswordHash,
+        phone: "0123456790",
+        role: "ADMIN",
+        status: "ACTIVE",
+      },
+      create: {
         full_name: "Tran Thi Manager",
         email: "manager@evbattery.com",
         password_hash: adminPasswordHash,
@@ -105,11 +143,20 @@ async function main() {
   console.log("✅ Created stations:", stations.length);
 
   // ===========================================
-  // CREATE STAFF USERS
+  // CREATE STAFF USERS (using upsert to avoid duplicates)
   // ===========================================
   const staffs = await Promise.all([
-    prisma.user.create({
-      data: {
+    prisma.user.upsert({
+      where: { email: "staff1@evbattery.com" },
+      update: {
+        full_name: "Le Van Staff 1",
+        password_hash: staffPasswordHash,
+        phone: "0987654321",
+        role: "STAFF",
+        station_id: stations[0].station_id,
+        status: "ACTIVE",
+      },
+      create: {
         full_name: "Le Van Staff 1",
         email: "staff1@evbattery.com",
         password_hash: staffPasswordHash,
@@ -119,8 +166,17 @@ async function main() {
         status: "ACTIVE",
       },
     }),
-    prisma.user.create({
-      data: {
+    prisma.user.upsert({
+      where: { email: "staff2@evbattery.com" },
+      update: {
+        full_name: "Pham Thi Staff 2",
+        password_hash: staffPasswordHash,
+        phone: "0987654322",
+        role: "STAFF",
+        station_id: stations[0].station_id,
+        status: "ACTIVE",
+      },
+      create: {
         full_name: "Pham Thi Staff 2",
         email: "staff2@evbattery.com",
         password_hash: staffPasswordHash,
@@ -130,8 +186,17 @@ async function main() {
         status: "ACTIVE",
       },
     }),
-    prisma.user.create({
-      data: {
+    prisma.user.upsert({
+      where: { email: "staff3@evbattery.com" },
+      update: {
+        full_name: "Hoang Van Staff 3",
+        password_hash: staffPasswordHash,
+        phone: "0987654323",
+        role: "STAFF",
+        station_id: stations[1].station_id,
+        status: "ACTIVE",
+      },
+      create: {
         full_name: "Hoang Van Staff 3",
         email: "staff3@evbattery.com",
         password_hash: staffPasswordHash,
@@ -141,8 +206,17 @@ async function main() {
         status: "ACTIVE",
       },
     }),
-    prisma.user.create({
-      data: {
+    prisma.user.upsert({
+      where: { email: "staff4@evbattery.com" },
+      update: {
+        full_name: "Vu Thi Staff 4",
+        password_hash: staffPasswordHash,
+        phone: "0987654324",
+        role: "STAFF",
+        station_id: stations[2].station_id,
+        status: "ACTIVE",
+      },
+      create: {
         full_name: "Vu Thi Staff 4",
         email: "staff4@evbattery.com",
         password_hash: staffPasswordHash,
@@ -156,11 +230,19 @@ async function main() {
   console.log("✅ Created staff users:", staffs.length);
 
   // ===========================================
-  // CREATE DRIVER USERS
+  // CREATE DRIVER USERS (using upsert to avoid duplicates)
   // ===========================================
   const drivers = await Promise.all([
-    prisma.user.create({
-      data: {
+    prisma.user.upsert({
+      where: { email: "driver1@evbattery.com" },
+      update: {
+        full_name: "Tran Van Driver 1",
+        password_hash: driverPasswordHash,
+        phone: "0912345678",
+        role: "DRIVER",
+        status: "ACTIVE",
+      },
+      create: {
         full_name: "Tran Van Driver 1",
         email: "driver1@evbattery.com",
         password_hash: driverPasswordHash,
@@ -169,8 +251,16 @@ async function main() {
         status: "ACTIVE",
       },
     }),
-    prisma.user.create({
-      data: {
+    prisma.user.upsert({
+      where: { email: "driver2@evbattery.com" },
+      update: {
+        full_name: "Nguyen Thi Driver 2",
+        password_hash: driverPasswordHash,
+        phone: "0912345679",
+        role: "DRIVER",
+        status: "ACTIVE",
+      },
+      create: {
         full_name: "Nguyen Thi Driver 2",
         email: "driver2@evbattery.com",
         password_hash: driverPasswordHash,
@@ -179,8 +269,16 @@ async function main() {
         status: "ACTIVE",
       },
     }),
-    prisma.user.create({
-      data: {
+    prisma.user.upsert({
+      where: { email: "driver3@evbattery.com" },
+      update: {
+        full_name: "Le Van Driver 3",
+        password_hash: driverPasswordHash,
+        phone: "0912345680",
+        role: "DRIVER",
+        status: "ACTIVE",
+      },
+      create: {
         full_name: "Le Van Driver 3",
         email: "driver3@evbattery.com",
         password_hash: driverPasswordHash,
@@ -189,8 +287,16 @@ async function main() {
         status: "ACTIVE",
       },
     }),
-    prisma.user.create({
-      data: {
+    prisma.user.upsert({
+      where: { email: "driver4@evbattery.com" },
+      update: {
+        full_name: "Pham Thi Driver 4",
+        password_hash: driverPasswordHash,
+        phone: "0912345681",
+        role: "DRIVER",
+        status: "ACTIVE",
+      },
+      create: {
         full_name: "Pham Thi Driver 4",
         email: "driver4@evbattery.com",
         password_hash: driverPasswordHash,
@@ -199,8 +305,16 @@ async function main() {
         status: "ACTIVE",
       },
     }),
-    prisma.user.create({
-      data: {
+    prisma.user.upsert({
+      where: { email: "driver5@evbattery.com" },
+      update: {
+        full_name: "Hoang Van Driver 5",
+        password_hash: driverPasswordHash,
+        phone: "0912345682",
+        role: "DRIVER",
+        status: "ACTIVE",
+      },
+      create: {
         full_name: "Hoang Van Driver 5",
         email: "driver5@evbattery.com",
         password_hash: driverPasswordHash,
@@ -209,8 +323,16 @@ async function main() {
         status: "ACTIVE",
       },
     }),
-    prisma.user.create({
-      data: {
+    prisma.user.upsert({
+      where: { email: "driver6@evbattery.com" },
+      update: {
+        full_name: "Vu Thi Driver 6",
+        password_hash: driverPasswordHash,
+        phone: "0912345683",
+        role: "DRIVER",
+        status: "INACTIVE",
+      },
+      create: {
         full_name: "Vu Thi Driver 6",
         email: "driver6@evbattery.com",
         password_hash: driverPasswordHash,

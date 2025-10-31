@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   getUserBookings,
   createBooking,
+  createInstantBooking,
   getBookingDetails,
   updateBooking,
   cancelBooking,
@@ -129,6 +130,43 @@ router.get("/", getUserBookings);
  *         description: Bad request
  */
 router.post("/", createBooking);
+
+/**
+ * @swagger
+ * /api/driver/bookings/instant:
+ *   post:
+ *     summary: Create instant booking (Đổi pin ngay)
+ *     tags: [Driver - Bookings]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - station_id
+ *               - vehicle_id
+ *               - battery_model
+ *             properties:
+ *               station_id:
+ *                 type: string
+ *               vehicle_id:
+ *                 type: string
+ *               battery_model:
+ *                 type: string
+ *               notes:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Instant booking created successfully
+ *       401:
+ *         description: Unauthorized
+ *       400:
+ *         description: Bad request
+ */
+router.post("/instant", createInstantBooking);
 
 /**
  * @swagger

@@ -10,7 +10,7 @@ import {
   LoginData
 } from '../services/auth.service';
 import { asyncHandler } from '../middlewares/error.middleware';
-import { uploadImage } from '../services/cloudinary.service';
+import { uploadImageFromBuffer } from '../services/cloudinary.service';
 
 /**
  * Register a new user
@@ -221,30 +221,38 @@ export const uploadProfileImage = asyncHandler(async (req: Request, res: Respons
     });
   }
 
-  try {
-    // Upload image to Cloudinary
-    const result = await uploadImage(req.file.buffer.toString('base64'), 'user-profiles');
-
-    // Update user profile with new avatar URL
-    const user = await updateUserProfile(userId, {
-      avatar: result.secure_url
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: 'Profile image uploaded successfully',
-      data: {
-        user,
-        image_url: result.secure_url
-      }
-    });
-  } catch (error) {
-    console.error('Image upload error:', error);
-    return res.status(500).json({
+  // Validate buffer exists and is not empty
+  if (!req.file.buffer || req.file.buffer.length === 0) {
+    return res.status(400).json({
       success: false,
-      message: 'Failed to upload image'
+      message: 'Invalid image file: file is empty'
     });
   }
+
+  // Validate file size (double check)
+  if (req.file.size > 5 * 1024 * 1024) {
+    return res.status(400).json({
+      success: false,
+      message: 'File size too large. Maximum size is 5MB'
+    });
+  }
+
+  // Upload image to Cloudinary from buffer
+  const result = await uploadImageFromBuffer(req.file.buffer, 'user-profiles');
+
+  // Update user profile with new avatar URL
+  const user = await updateUserProfile(userId, {
+    avatar: result.secure_url
+  });
+
+  return res.status(200).json({
+    success: true,
+    message: 'Profile image uploaded successfully',
+    data: {
+      user,
+      image_url: result.secure_url
+    }
+  });
 });
 
 /**

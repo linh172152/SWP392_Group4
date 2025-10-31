@@ -115,7 +115,4 @@ router.get("/:id", getStationDetails);
  */
 router.get("/:id/batteries", getStationBatteries);
 
-// All routes require authentication
-router.use(authenticateToken);
-
 export default router;

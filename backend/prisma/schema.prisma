@@ -36,6 +36,8 @@ model User {
   subscriptions       UserSubscription[]
   station             Station?             @relation(fields: [station_id], references: [station_id])
   vehicles            Vehicle[]
+  wallet              Wallet?
+  notifications       Notification[]
 
   @@map("users")
 }
@@ -114,6 +116,7 @@ model Booking {
   checked_in_by_staff_id String?       @db.Uuid
   pin_code               String?       @db.VarChar(6)
   pin_verified_at        DateTime?
+  is_instant             Boolean       @default(false)
   notes                  String?
   created_at             DateTime      @default(now())
   checked_in_by_staff    User?         @relation("CheckedInByStaff", fields: [checked_in_by_staff_id], references: [user_id])
@@ -160,6 +163,7 @@ model Payment {
   payment_id          String            @id @default(uuid()) @db.Uuid
   transaction_id      String?           @unique @db.Uuid
   subscription_id     String?           @db.Uuid
+  topup_package_id    String?           @db.Uuid
   user_id             String            @db.Uuid
   amount              Decimal           @db.Decimal(10, 2)
   payment_method      PaymentMethod
@@ -168,6 +172,7 @@ model Payment {
   paid_at             DateTime?
   created_at          DateTime          @default(now())
   subscription        UserSubscription? @relation(fields: [subscription_id], references: [subscription_id], onDelete: Cascade)
+  topup_package       TopUpPackage?     @relation(fields: [topup_package_id], references: [package_id], onDelete: Cascade)
   transaction         Transaction?      @relation(fields: [transaction_id], references: [transaction_id], onDelete: Cascade)
   user                User              @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
@@ -274,6 +279,60 @@ model BatteryTransferLog {
   @@map("battery_transfer_logs")
 }
 
+
+model Wallet {
+  wallet_id  String   @id @default(uuid()) @db.Uuid
+  user_id    String   @unique @db.Uuid
+  balance    Decimal  @default(0) @db.Decimal(10, 2)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  user       User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@map("wallets")
+}
+
+model BatteryPricing {
+  pricing_id    String   @id @default(uuid()) @db.Uuid
+  battery_model String   @db.VarChar(50)
+  price         Decimal  @db.Decimal(10, 2)
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@unique([battery_model])
+  @@map("battery_pricings")
+}
+
+model TopUpPackage {
+  package_id    String    @id @default(uuid()) @db.Uuid
+  name          String    @db.VarChar(100)
+  description   String?
+  topup_amount  Decimal   @db.Decimal(10, 2)
+  bonus_amount  Decimal   @db.Decimal(10, 2)
+  actual_amount Decimal   @db.Decimal(10, 2)
+  is_active     Boolean   @default(true)
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  payments      Payment[]
+
+  @@map("topup_packages")
+}
+
+model Notification {
+  notification_id String   @id @default(uuid()) @db.Uuid
+  user_id         String   @db.Uuid
+  type            String   @db.VarChar(50)
+  title           String   @db.VarChar(200)
+  message         String   @db.Text
+  is_read         Boolean  @default(false)
+  data            Json?
+  created_at      DateTime @default(now())
+  user            User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@index([user_id, is_read])
+  @@map("notifications")
+}
+
 enum UserRole {
   DRIVER
   STAFF
@@ -325,6 +384,7 @@ enum PaymentStatus {
 
 enum PaymentMethod {
   cash
+  wallet
   vnpay
   momo
   credit_card

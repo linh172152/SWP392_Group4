@@ -13,10 +13,11 @@ import swaggerJsdoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
 import { createServer } from "http";
 import { NotificationService } from "./services/notification.service";
+import * as cron from "node-cron";
+import { autoCancelExpiredBookings, sendBookingReminders } from "./services/booking-auto-cancel.service";
 
 // Import routes
 import authRoutes from "./routes/auth.routes";
-import googleOAuthRoutes from "./routes/google-oauth.routes";
 import vnpayRoutes from "./routes/vnpay.routes";
 import driverRoutes from "./routes/driver.routes";
 import staffRoutes from "./routes/staff.routes";
@@ -35,16 +36,21 @@ import staffBookingRoutes from "./routes/staff-booking.routes";
 
 // Import new Admin API routes
 import adminUserRoutes from "./routes/admin-user.routes";
+import adminStationRoutes from "./routes/admin-station.routes";
+import adminStaffRoutes from "./routes/admin-staff.routes";
 
 // Import new Shared API routes
 import publicStationRoutes from "./routes/public-station.routes";
 import supportRoutes from "./routes/support.routes";
 
 // Import new Service Package routes
-import servicePackageRoutes from "./routes/service-package.routes";
-import subscriptionRoutes from "./routes/subscription.routes";
+// ❌ Removed: ServicePackage và Subscription (đã thay bằng TopUpPackage)
+// import servicePackageRoutes from "./routes/service-package.routes";
+// import subscriptionRoutes from "./routes/subscription.routes";
 import ratingRoutes from "./routes/rating.routes";
-import reportRoutes from "./routes/report.routes";
+
+// ✅ topupPackageRoutes is already imported and mounted in admin.routes.ts
+// import topupPackageRoutes from "./routes/topup-package.routes";
 
 // Import middlewares
 import { errorHandler } from "./middlewares/error.middleware";
@@ -168,7 +174,6 @@ app.get("/health", (_req, res) => {
 
 // API routes - Specific routes first
 app.use("/api/auth", authRoutes);
-app.use("/api/google", googleOAuthRoutes);
 app.use("/api/payments/vnpay", vnpayRoutes);
 
 // Driver API routes - Specific routes first to avoid conflicts
@@ -185,17 +190,20 @@ app.use("/api/staff", staffRoutes); // Placeholder routes last
 
 // Admin API routes - Specific routes first to avoid conflicts
 app.use("/api/admin/users", adminUserRoutes);
-app.use("/api/admin", adminRoutes); // Placeholder routes last
+app.use("/api/admin/stations", adminStationRoutes);
+app.use("/api/admin/staff", adminStaffRoutes);
+app.use("/api/admin", adminRoutes); // Contains pricing and topup-packages routes
 
 // Public API routes
 app.use("/api/stations/public", publicStationRoutes);
 
 // User API routes
 app.use("/api/support", supportRoutes);
-app.use("/api/packages", servicePackageRoutes);
-app.use("/api/subscriptions", subscriptionRoutes);
+// ❌ Removed: ServicePackage và Subscription routes (đã thay bằng TopUpPackage)
+// app.use("/api/packages", servicePackageRoutes);
+// app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/ratings", ratingRoutes);
-app.use("/api/reports", reportRoutes);
+// ✅ Reports routes đã mount trong admin routes: /api/admin/dashboard
 
 // Shared routes
 app.use("/api", sharedRoutes);
@@ -223,6 +231,35 @@ server.listen(PORT, () => {
   console.log(`📊 Environment: ${process.env.NODE_ENV || "development"}`);
   console.log(`🔗 Health check: http://localhost:${PORT}/health`);
   console.log(`🔌 WebSocket enabled for real-time notifications`);
+
+  // Start cron jobs for booking management
+  // Run every 5 minutes to check and auto-cancel expired bookings
+  cron.schedule("*/5 * * * *", async () => {
+    try {
+      console.log("🔄 Running auto-cancel expired bookings check...");
+      const result = await autoCancelExpiredBookings();
+      if (result.cancelled > 0) {
+        console.log(`✅ Auto-cancelled ${result.cancelled} expired booking(s)`);
+      }
+    } catch (error) {
+      console.error("❌ Error in auto-cancel cron job:", error);
+    }
+  });
+
+  // Run every 5 minutes to send booking reminders
+  cron.schedule("*/5 * * * *", async () => {
+    try {
+      console.log("🔄 Running booking reminders check...");
+      const result = await sendBookingReminders();
+      if (result.remindersSent > 0 || result.finalRemindersSent > 0) {
+        console.log(`✅ Sent ${result.remindersSent} reminders and ${result.finalRemindersSent} final reminders`);
+      }
+    } catch (error) {
+      console.error("❌ Error in booking reminders cron job:", error);
+    }
+  });
+
+  console.log(`⏰ Cron jobs started: auto-cancel (every 5 min), reminders (every 5 min)`);
 });
 
 export default app;

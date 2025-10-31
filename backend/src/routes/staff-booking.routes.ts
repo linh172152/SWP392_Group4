@@ -3,7 +3,6 @@ import {
   getStationBookings,
   getBookingDetails,
   confirmBooking,
-  verifyPinCode,
   completeBooking,
   cancelBooking,
 } from "../controllers/staff-booking.controller";
@@ -100,60 +99,8 @@ router.get("/:id", getBookingDetails);
 /**
  * @swagger
  * /api/staff/bookings/{id}/confirm:
- *   put:
- *     summary: Confirm booking
- *     tags: [Staff - Bookings]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Booking confirmed successfully
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden - Staff role required
- *       404:
- *         description: Booking not found
- */
-router.put("/:id/confirm", confirmBooking);
-
-/**
- * @swagger
- * /api/staff/bookings/{id}/complete:
- *   put:
- *     summary: Complete booking
- *     tags: [Staff - Bookings]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Booking completed successfully
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden - Staff role required
- *       404:
- *         description: Booking not found
- */
-router.put("/:id/complete", completeBooking);
-
-/**
- * @swagger
- * /api/staff/bookings/{id}/verify-pin:
  *   post:
- *     summary: Verify PIN code for booking
+ *     summary: Confirm booking (verify SĐT, không cần PIN)
  *     tags: [Staff - Bookings]
  *     security:
  *       - bearerAuth: []
@@ -169,17 +116,17 @@ router.put("/:id/complete", completeBooking);
  *         application/json:
  *           schema:
  *             type: object
- *             properties:
- *               pin_code:
- *                 type: string
- *                 description: PIN code provided by user
  *             required:
- *               - pin_code
+ *               - phone
+ *             properties:
+ *               phone:
+ *                 type: string
+ *                 description: Phone number to verify user identity
  *     responses:
  *       200:
- *         description: PIN code verified successfully
+ *         description: Booking confirmed successfully
  *       400:
- *         description: Invalid PIN code
+ *         description: Phone number does not match or invalid request
  *       401:
  *         description: Unauthorized
  *       403:
@@ -187,7 +134,60 @@ router.put("/:id/complete", completeBooking);
  *       404:
  *         description: Booking not found
  */
-router.post("/:id/verify-pin", verifyPinCode);
+router.post("/:id/confirm", confirmBooking);
+
+/**
+ * @swagger
+ * /api/staff/bookings/{id}/complete:
+ *   post:
+ *     summary: Complete booking (dùng battery_code)
+ *     tags: [Staff - Bookings]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - old_battery_code
+ *               - battery_model
+ *             properties:
+ *               old_battery_code:
+ *                 type: string
+ *                 description: Code of the old battery being returned
+ *               battery_model:
+ *                 type: string
+ *                 description: Model of the new battery to assign
+ *               old_battery_status:
+ *                 type: string
+ *                 enum: [good, damaged, maintenance]
+ *                 default: good
+ *                 description: Status of the old battery
+ *               notes:
+ *                 type: string
+ *                 description: Additional notes
+ *     responses:
+ *       200:
+ *         description: Booking completed successfully
+ *       400:
+ *         description: Bad request
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - Staff role required
+ *       404:
+ *         description: Booking not found
+ */
+router.post("/:id/complete", completeBooking);
+
 
 /**
  * @swagger
