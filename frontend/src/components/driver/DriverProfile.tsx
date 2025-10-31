@@ -31,6 +31,9 @@ const DriverProfile: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [authError, setAuthError] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [profile, setProfile] = useState({
@@ -38,6 +41,12 @@ const DriverProfile: React.FC = () => {
     email: '',
     phone: '',
     avatar: ''
+  });
+  
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
   });
   
   const [stats, setStats] = useState({
@@ -101,11 +110,44 @@ const DriverProfile: React.FC = () => {
     try {
       setSaving(true);
       
-      await authService.updateProfile({
-        full_name: profile.full_name,
-        phone: profile.phone,
-        avatar: profile.avatar
-      });
+      // Validate data before sending
+      if (profile.full_name.trim().length < 2) {
+        alert("Họ tên phải có ít nhất 2 ký tự");
+        setSaving(false);
+        return;
+      }
+      
+      if (profile.phone && profile.phone.trim()) {
+        // Validate phone format
+        const phonePattern = /^[0-9+\-\s()]+$/;
+        if (!phonePattern.test(profile.phone.trim())) {
+          alert("Số điện thoại chỉ được chứa số, dấu +, -, khoảng trắng và dấu ngoặc");
+          setSaving(false);
+          return;
+        }
+        if (profile.phone.replace(/[\s\-()]/g, '').length < 10) {
+          alert("Số điện thoại phải có ít nhất 10 số");
+          setSaving(false);
+          return;
+        }
+      }
+      
+      // Only send fields that have values
+      const updateData: any = {
+        full_name: profile.full_name.trim()
+      };
+      
+      // Only include phone if it's not empty
+      if (profile.phone && profile.phone.trim()) {
+        updateData.phone = profile.phone.trim();
+      }
+      
+      // Only include avatar if it's not empty
+      if (profile.avatar && profile.avatar.trim()) {
+        updateData.avatar = profile.avatar.trim();
+      }
+      
+      await authService.updateProfile(updateData);
       
       alert("Cập nhật thông tin thành công!");
       setIsEditing(false);
@@ -133,6 +175,101 @@ const DriverProfile: React.FC = () => {
       }
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    try {
+      // Validation
+      if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+        alert("Vui lòng điền đầy đủ thông tin");
+        return;
+      }
+      
+      if (passwordData.newPassword.length < 6) {
+        alert("Mật khẩu mới phải có ít nhất 6 ký tự");
+        return;
+      }
+      
+      if (passwordData.newPassword !== passwordData.confirmPassword) {
+        alert("Mật khẩu mới và xác nhận mật khẩu không khớp");
+        return;
+      }
+      
+      setChangingPassword(true);
+      
+      await authService.changePassword({
+        current_password: passwordData.currentPassword,
+        new_password: passwordData.newPassword
+      });
+      
+      alert("Đổi mật khẩu thành công!");
+      setShowChangePassword(false);
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+    } catch (error: any) {
+      console.error('Error changing password:', error);
+      
+      if (error.status === 401) {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('ev_swap_user');
+        alert("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+        navigate('/');
+      } else {
+        alert(error.message || "Không thể đổi mật khẩu");
+      }
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert("Vui lòng chọn file ảnh");
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Kích thước ảnh không được vượt quá 5MB");
+      return;
+    }
+
+    try {
+      setUploadingAvatar(true);
+
+      const response = await authService.uploadAvatar(file);
+      
+      alert("Upload avatar thành công!");
+      
+      // Update profile with new avatar URL
+      setProfile(prev => ({
+        ...prev,
+        avatar: response.data.image_url
+      }));
+
+      // Reload profile to get fresh data
+      loadProfile();
+    } catch (error: any) {
+      console.error('Error uploading avatar:', error);
+      
+      if (error.status === 401) {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('ev_swap_user');
+        alert("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+        navigate('/');
+      } else {
+        alert(error.message || "Không thể upload avatar");
+      }
+    } finally {
+      setUploadingAvatar(false);
     }
   };
 
@@ -204,11 +341,26 @@ const DriverProfile: React.FC = () => {
                   {profile.full_name.charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
-              {isEditing && (
-                <Button size="sm" className="absolute bottom-0 right-0 rounded-full w-8 h-8 p-0">
+              <input
+                type="file"
+                id="avatar-upload"
+                className="hidden"
+                accept="image/*"
+                onChange={handleAvatarUpload}
+                disabled={uploadingAvatar}
+              />
+              <Button 
+                size="sm" 
+                className="absolute bottom-0 right-0 rounded-full w-8 h-8 p-0"
+                onClick={() => document.getElementById('avatar-upload')?.click()}
+                disabled={uploadingAvatar}
+              >
+                {uploadingAvatar ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
                   <Camera className="h-4 w-4" />
-                </Button>
-              )}
+                )}
+              </Button>
             </div>
             
             <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">{profile.full_name}</h2>
@@ -333,15 +485,97 @@ const DriverProfile: React.FC = () => {
           <CardDescription className="text-slate-600 dark:text-slate-400">Quản lý bảo mật và tùy chọn tài khoản</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between p-4 glass rounded-lg">
-            <div>
-              <h4 className="font-medium text-slate-900 dark:text-white">Đổi mật khẩu</h4>
-              <p className="text-sm text-slate-600 dark:text-slate-400">Cập nhật mật khẩu đăng nhập</p>
+          {!showChangePassword ? (
+            <div className="flex items-center justify-between p-4 glass rounded-lg">
+              <div>
+                <h4 className="font-medium text-slate-900 dark:text-white">Đổi mật khẩu</h4>
+                <p className="text-sm text-slate-600 dark:text-slate-400">Cập nhật mật khẩu đăng nhập</p>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="glass border-slate-200/50 dark:border-slate-700/50"
+                onClick={() => setShowChangePassword(true)}
+              >
+                Thay đổi
+              </Button>
             </div>
-            <Button variant="outline" size="sm" className="glass border-slate-200/50 dark:border-slate-700/50">
-              Thay đổi
-            </Button>
-          </div>
+          ) : (
+            <div className="p-4 glass rounded-lg space-y-4">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="font-medium text-slate-900 dark:text-white">Đổi mật khẩu</h4>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => {
+                    setShowChangePassword(false);
+                    setPasswordData({currentPassword: '', newPassword: '', confirmPassword: ''});
+                  }}
+                >
+                  Hủy
+                </Button>
+              </div>
+              
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="currentPassword" className="text-slate-700 dark:text-slate-300">
+                    Mật khẩu hiện tại
+                  </Label>
+                  <Input
+                    id="currentPassword"
+                    type="password"
+                    value={passwordData.currentPassword}
+                    onChange={(e) => setPasswordData({...passwordData, currentPassword: e.target.value})}
+                    className="glass border-slate-200/50 dark:border-slate-700/50"
+                    placeholder="Nhập mật khẩu hiện tại"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="newPassword" className="text-slate-700 dark:text-slate-300">
+                    Mật khẩu mới
+                  </Label>
+                  <Input
+                    id="newPassword"
+                    type="password"
+                    value={passwordData.newPassword}
+                    onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
+                    className="glass border-slate-200/50 dark:border-slate-700/50"
+                    placeholder="Nhập mật khẩu mới (tối thiểu 6 ký tự)"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword" className="text-slate-700 dark:text-slate-300">
+                    Xác nhận mật khẩu mới
+                  </Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    value={passwordData.confirmPassword}
+                    onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
+                    className="glass border-slate-200/50 dark:border-slate-700/50"
+                    placeholder="Nhập lại mật khẩu mới"
+                  />
+                </div>
+              </div>
+              
+              <Button 
+                className="w-full gradient-primary text-white"
+                onClick={handleChangePassword}
+                disabled={changingPassword}
+              >
+                {changingPassword ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Đang xử lý...
+                  </>
+                ) : (
+                  "Xác nhận đổi mật khẩu"
+                )}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
