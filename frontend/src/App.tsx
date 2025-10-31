@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { ThemeProvider } from './contexts/ThemeContext';
 import LandingPage from './components/LandingPage';
 import AuthModal from './components/AuthModal';
+import GoogleCallback from './components/GoogleCallback';
 import DriverDashboard from './components/driver/DriverDashboard';
 import StaffDashboard from './components/staff/StaffDashboard';
 import AdminDashboard from './components/admin/AdminDashboard';
@@ -64,6 +65,14 @@ function App() {
                 <LandingPage onAuth={openAuth} />
               )
             } 
+          />
+          <Route 
+            path="/auth/callback" 
+            element={<GoogleCallback onLogin={handleLogin} />} 
+          />
+          <Route 
+            path="/auth/error" 
+            element={<GoogleCallback onLogin={handleLogin} />} 
           />
           <Route 
             path="/driver/*" 
