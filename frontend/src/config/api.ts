@@ -9,8 +9,12 @@ export const API_ENDPOINTS = {
     LOGOUT: `${API_BASE_URL}/auth/logout`,
     PROFILE: `${API_BASE_URL}/auth/me`,
     VERIFY: `${API_BASE_URL}/auth/verify`,
-    GOOGLE: `${API_BASE_URL}/auth/google`,
-    GOOGLE_CALLBACK: `${API_BASE_URL}/auth/google/callback`,
+  },
+  GOOGLE: {
+    AUTH: `${API_BASE_URL}/google/auth`,
+    CALLBACK: `${API_BASE_URL}/google/callback`,
+    LINK: `${API_BASE_URL}/google/link`,
+    UNLINK: `${API_BASE_URL}/google/unlink`,
   },
   ADMIN: {
     USERS: `${API_BASE_URL}/admin/users`,
