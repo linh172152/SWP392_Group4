@@ -59,6 +59,7 @@ export const API_ENDPOINTS = {
     VEHICLES: `${API_BASE_URL}/driver/vehicles`,
     STATIONS: `${API_BASE_URL}/driver/stations`,
     BOOKINGS: `${API_BASE_URL}/driver/bookings`,
+    TRANSACTIONS: `${API_BASE_URL}/driver/transactions`,
   },
   HEALTH: `${API_BASE_URL}/health`,
 };

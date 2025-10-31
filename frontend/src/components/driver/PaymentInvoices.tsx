@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -15,56 +16,10 @@ import {
   Plus,
   Settings,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
-
-// Mock payment data
-const mockInvoices = [
-  {
-    id: 'INV-2024-001',
-    date: '2024-01-05',
-    amount: 28.50,
-    status: 'paid',
-    station: 'Downtown EV Hub',
-    batteryType: 'Standard Range',
-    duration: '3 minutes',
-    paymentMethod: 'Visa ****1234',
-    downloadUrl: '#'
-  },
-  {
-    id: 'INV-2024-002',
-    date: '2024-01-03',
-    amount: 28.50,
-    status: 'paid',
-    station: 'Mall Plaza Station',
-    batteryType: 'Standard Range',
-    duration: '2.5 minutes',
-    paymentMethod: 'Visa ****1234',
-    downloadUrl: '#'
-  },
-  {
-    id: 'INV-2024-003',
-    date: '2024-01-01',
-    amount: 35.00,
-    status: 'paid',
-    station: 'Highway Rest Stop',
-    batteryType: 'Long Range',
-    duration: '3.5 minutes',
-    paymentMethod: 'Visa ****1234',
-    downloadUrl: '#'
-  },
-  {
-    id: 'INV-2023-156',
-    date: '2023-12-28',
-    amount: 28.50,
-    status: 'overdue',
-    station: 'Airport Terminal 1',
-    batteryType: 'Standard Range',
-    duration: '3 minutes',
-    paymentMethod: 'Visa ****1234',
-    downloadUrl: '#'
-  }
-];
+import { transactionService, type Transaction } from '../../services/transaction.service';
 
 const mockPaymentMethods = [
   {
@@ -92,37 +47,133 @@ const mockSubscription = {
 };
 
 const PaymentInvoices: React.FC = () => {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentPage] = useState(1);
+  const [_totalPages, setTotalPages] = useState(1);
+  const [totalAmount, setTotalAmount] = useState(0);
+  const [authError, setAuthError] = useState(false);
 
-  const totalSpent = mockInvoices.reduce((sum, inv) => sum + inv.amount, 0);
-  const paidInvoices = mockInvoices.filter(inv => inv.status === 'paid');
-  const overdueInvoices = mockInvoices.filter(inv => inv.status === 'overdue');
+  // Load transactions from API
+  useEffect(() => {
+    // Check if user is logged in
+    const accessToken = localStorage.getItem('accessToken');
+    const user = localStorage.getItem('ev_swap_user');
+    
+    if (!accessToken || !user) {
+      setAuthError(true);
+      setLoading(false);
+      return;
+    }
+    
+    loadTransactions();
+  }, [statusFilter, currentPage]);
+
+  const loadTransactions = async () => {
+    try {
+      setLoading(true);
+      setAuthError(false);
+      
+      const params: any = {
+        page: currentPage,
+        limit: 10,
+      };
+      
+      if (statusFilter !== 'all') {
+        params.status = statusFilter;
+      }
+
+      const response = await transactionService.getTransactions(params);
+      setTransactions(response.data.transactions);
+      setTotalPages(response.data.pagination.pages);
+      
+      // Calculate total spent
+      const total = response.data.transactions.reduce((sum, t) => sum + Number(t.amount), 0);
+      setTotalAmount(total);
+    } catch (error: any) {
+      console.error('Error loading transactions:', error);
+      
+      // Handle 401 Unauthorized error
+      if (error.status === 401) {
+        setAuthError(true);
+        // Clear invalid tokens
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('ev_swap_user');
+        
+        alert("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+        
+        // Redirect to login page after a short delay
+        setTimeout(() => {
+          navigate('/');
+        }, 1500);
+      } else {
+        alert(error.message || "Không thể tải danh sách giao dịch");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const totalSpent = totalAmount;
+  const paidInvoices = transactions.filter(t => t.payment_status === 'completed');
+  const overdueInvoices = transactions.filter(t => t.payment_status === 'pending' && Number(t.amount) > 0);
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'paid': return 'bg-green-100 text-green-800';
+      case 'completed': return 'bg-green-100 text-green-800';
       case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'overdue': return 'bg-red-100 text-red-800';
+      case 'failed': return 'bg-red-100 text-red-800';
+      case 'refunded': return 'bg-blue-100 text-blue-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'paid': return <CheckCircle className="h-4 w-4" />;
+      case 'completed': return <CheckCircle className="h-4 w-4" />;
       case 'pending': return <AlertCircle className="h-4 w-4" />;
-      case 'overdue': return <AlertCircle className="h-4 w-4" />;
+      case 'failed': return <AlertCircle className="h-4 w-4" />;
       default: return <Receipt className="h-4 w-4" />;
     }
   };
 
-  const filteredInvoices = mockInvoices.filter(invoice => {
-    const matchesSearch = invoice.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         invoice.station.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter;
-    return matchesSearch && matchesStatus;
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'completed': return 'Đã thanh toán';
+      case 'pending': return 'Chờ thanh toán';
+      case 'failed': return 'Thất bại';
+      case 'refunded': return 'Đã hoàn tiền';
+      default: return status;
+    }
+  };
+
+  const handlePayNow = async (transactionId: string) => {
+    try {
+      await transactionService.payTransaction(transactionId, { payment_method: 'vnpay' });
+      alert("Đã thanh toán giao dịch thành công");
+      loadTransactions();
+    } catch (error: any) {
+      // Handle 401 Unauthorized error
+      if (error.status === 401) {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('ev_swap_user');
+        alert("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+        navigate('/');
+      } else {
+        alert(error.message || "Không thể thanh toán");
+      }
+    }
+  };
+
+  const filteredInvoices = transactions.filter(transaction => {
+    const matchesSearch = 
+      transaction.transaction_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (transaction.station?.name || '').toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesSearch;
   });
 
   return (
@@ -130,17 +181,17 @@ const PaymentInvoices: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Payments & Invoices</h1>
-          <p className="text-gray-600">Manage your payment methods and billing history</p>
+          <h1 className="text-3xl font-bold text-gray-900">Thanh toán & Hóa đơn</h1>
+          <p className="text-gray-600">Quản lý phương thức thanh toán và lịch sử giao dịch</p>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline">
+          <Button variant="outline" onClick={loadTransactions}>
             <Download className="mr-2 h-4 w-4" />
-            Export All
+            Làm mới
           </Button>
           <Button>
             <Plus className="mr-2 h-4 w-4" />
-            Add Payment Method
+            Thêm phương thức
           </Button>
         </div>
       </div>
@@ -154,8 +205,8 @@ const PaymentInvoices: React.FC = () => {
                 <DollarSign className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Total Spent</p>
-                <p className="text-xl font-bold">${totalSpent.toFixed(2)}</p>
+                <p className="text-sm text-gray-600">Tổng chi tiêu</p>
+                <p className="text-xl font-bold">{totalSpent.toLocaleString('vi-VN')} ₫</p>
               </div>
             </div>
           </CardContent>
@@ -168,7 +219,7 @@ const PaymentInvoices: React.FC = () => {
                 <CheckCircle className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Paid Invoices</p>
+                <p className="text-sm text-gray-600">Đã thanh toán</p>
                 <p className="text-xl font-bold">{paidInvoices.length}</p>
               </div>
             </div>
@@ -182,7 +233,7 @@ const PaymentInvoices: React.FC = () => {
                 <AlertCircle className="h-5 w-5 text-red-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Overdue</p>
+                <p className="text-sm text-gray-600">Chờ thanh toán</p>
                 <p className="text-xl font-bold">{overdueInvoices.length}</p>
               </div>
             </div>
@@ -193,9 +244,9 @@ const PaymentInvoices: React.FC = () => {
       {/* Tabs */}
       <Tabs defaultValue="invoices" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="invoices">Invoices</TabsTrigger>
-          <TabsTrigger value="payment-methods">Payment Methods</TabsTrigger>
-          <TabsTrigger value="subscription">Subscription</TabsTrigger>
+          <TabsTrigger value="invoices">Giao dịch</TabsTrigger>
+          <TabsTrigger value="payment-methods">Phương thức thanh toán</TabsTrigger>
+          <TabsTrigger value="subscription">Gói đăng ký</TabsTrigger>
         </TabsList>
 
         <TabsContent value="invoices" className="space-y-4">
@@ -206,7 +257,7 @@ const PaymentInvoices: React.FC = () => {
                 <div className="relative">
                   <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                   <Input
-                    placeholder="Search invoices..."
+                    placeholder="Tìm kiếm giao dịch..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-10"
@@ -214,24 +265,25 @@ const PaymentInvoices: React.FC = () => {
                 </div>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Filter by status" />
+                    <SelectValue placeholder="Lọc theo trạng thái" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="paid">Paid</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="overdue">Overdue</SelectItem>
+                    <SelectItem value="all">Tất cả</SelectItem>
+                    <SelectItem value="completed">Đã thanh toán</SelectItem>
+                    <SelectItem value="pending">Chờ thanh toán</SelectItem>
+                    <SelectItem value="failed">Thất bại</SelectItem>
+                    <SelectItem value="refunded">Đã hoàn tiền</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={dateFilter} onValueChange={setDateFilter}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Filter by date" />
+                    <SelectValue placeholder="Lọc theo thời gian" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Time</SelectItem>
-                    <SelectItem value="week">Last Week</SelectItem>
-                    <SelectItem value="month">Last Month</SelectItem>
-                    <SelectItem value="quarter">Last 3 Months</SelectItem>
+                    <SelectItem value="all">Tất cả</SelectItem>
+                    <SelectItem value="week">7 ngày qua</SelectItem>
+                    <SelectItem value="month">30 ngày qua</SelectItem>
+                    <SelectItem value="quarter">3 tháng qua</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -239,65 +291,96 @@ const PaymentInvoices: React.FC = () => {
           </Card>
 
           {/* Invoice List */}
-          <div className="space-y-4">
-            {filteredInvoices.map((invoice) => (
-              <Card key={invoice.id}>
-                <CardContent className="p-6">
-                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center space-x-3">
-                          <div className="p-2 bg-blue-100 rounded-lg">
-                            <Receipt className="h-5 w-5 text-blue-600" />
+          {authError ? (
+            <Card>
+              <CardContent className="p-12 text-center">
+                <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Phiên đăng nhập không hợp lệ</h3>
+                <p className="text-gray-600 mb-4">Vui lòng đăng nhập để xem giao dịch của bạn.</p>
+                <Button onClick={() => navigate('/')}>
+                  Đăng nhập
+                </Button>
+              </CardContent>
+            </Card>
+          ) : loading ? (
+            <div className="flex justify-center items-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            </div>
+          ) : filteredInvoices.length === 0 ? (
+            <Card>
+              <CardContent className="p-12 text-center">
+                <Receipt className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Không có giao dịch</h3>
+                <p className="text-gray-600">Chưa có giao dịch nào được tìm thấy.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {filteredInvoices.map((transaction) => (
+                <Card key={transaction.transaction_id}>
+                  <CardContent className="p-6">
+                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center space-x-3">
+                            <div className="p-2 bg-blue-100 rounded-lg">
+                              <Receipt className="h-5 w-5 text-blue-600" />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-lg">{transaction.transaction_code}</h3>
+                              <p className="text-sm text-gray-600">{transaction.station?.name || 'N/A'}</p>
+                            </div>
+                          </div>
+                          <Badge className={getStatusColor(transaction.payment_status)}>
+                            {getStatusIcon(transaction.payment_status)}
+                            <span className="ml-1">{getStatusLabel(transaction.payment_status)}</span>
+                          </Badge>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                          <div>
+                            <p className="text-gray-500">Ngày</p>
+                            <p className="font-medium">{new Date(transaction.created_at).toLocaleDateString('vi-VN')}</p>
                           </div>
                           <div>
-                            <h3 className="font-semibold text-lg">{invoice.id}</h3>
-                            <p className="text-sm text-gray-600">{invoice.station}</p>
+                            <p className="text-gray-500">Số tiền</p>
+                            <p className="font-medium text-lg">{Number(transaction.amount).toLocaleString('vi-VN')} ₫</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-500">Pin mới</p>
+                            <p className="font-medium">{transaction.new_battery?.model || 'N/A'}</p>
+                            {transaction.swap_duration_minutes && (
+                              <p className="text-xs text-gray-600">Thời gian: {transaction.swap_duration_minutes} phút</p>
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-gray-500">Xe</p>
+                            <p className="font-medium">{transaction.vehicle?.license_plate || 'N/A'}</p>
                           </div>
                         </div>
-                        <Badge className={getStatusColor(invoice.status)}>
-                          {getStatusIcon(invoice.status)}
-                          <span className="ml-1 capitalize">{invoice.status}</span>
-                        </Badge>
                       </div>
 
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div>
-                          <p className="text-gray-500">Date</p>
-                          <p className="font-medium">{new Date(invoice.date).toLocaleDateString()}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-500">Amount</p>
-                          <p className="font-medium text-lg">${invoice.amount.toFixed(2)}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-500">Battery Type</p>
-                          <p className="font-medium">{invoice.batteryType}</p>
-                          <p className="text-xs text-gray-600">Duration: {invoice.duration}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-500">Payment Method</p>
-                          <p className="font-medium">{invoice.paymentMethod}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <Button variant="outline" size="sm">
-                        <Download className="mr-1 h-3 w-3" />
-                        Download
-                      </Button>
-                      {invoice.status === 'overdue' && (
-                        <Button size="sm" className="bg-red-600 hover:bg-red-700">
-                          Pay Now
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Button variant="outline" size="sm">
+                          <Download className="mr-1 h-3 w-3" />
+                          Chi tiết
                         </Button>
-                      )}
+                        {transaction.payment_status === 'pending' && Number(transaction.amount) > 0 && (
+                          <Button 
+                            size="sm" 
+                            className="bg-red-600 hover:bg-red-700"
+                            onClick={() => handlePayNow(transaction.transaction_id)}
+                          >
+                            Thanh toán
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="payment-methods" className="space-y-4">
