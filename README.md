@@ -21,12 +21,11 @@
 - **TypeScript** - Type safety
 - **Prisma** - Database ORM
 - **PostgreSQL** - Database
-- **JWT** - Authentication
-- **Google OAuth** - Social login
+- **JWT** - Authentication (Access + Refresh tokens)
 - **VNPay** - Payment gateway
-- **Gmail SMTP** - Email service
-- **Track-Asia** - Maps API
-- **Cloudinary** - File upload
+- **Track-Asia** - Maps API (directions, distance, duration)
+- **Cloudinary** - File upload (avatars, station images)
+- **Socket.IO** - Real-time notifications
 
 ### **Frontend:**
 
@@ -117,7 +116,7 @@ npm run dev
 
 ### **Authentication Methods:**
 
-- **Email/Password** - Traditional login
+- **Email/Password** - Traditional login (NO Google OAuth)
 - **JWT Tokens** - Access & Refresh tokens
 
 ---
@@ -188,7 +187,7 @@ npm run dev
 ### **Admin APIs:**
 
 - `GET /api/admin/users` - All users (CRUD)
-- `GET /api/admin/stations` - All stations (CRUD)
+- `GET /api/admin/stations` - All stations (CRUD + image upload)
 - `GET /api/admin/staff` - All staff (CRUD)
 - `GET /api/admin/pricing` - Battery pricing (CRUD)
 - `GET /api/admin/topup-packages` - Top-up packages (CRUD)
@@ -202,9 +201,10 @@ npm run dev
 
 ### **Maps APIs:**
 
-- `GET /api/maps/directions` - Get route directions
-- `GET /api/maps/distance` - Get distance & duration
-- `POST /api/maps/calculate-distance` - Calculate distance
+- `GET /api/maps/directions` - Get route directions (Track-Asia API)
+- `GET /api/maps/distance` - Get distance & duration (road distance)
+- `POST /api/maps/calculate-distance` - Calculate straight-line distance (Haversine)
+- `GET /api/maps/test` - Test Track-Asia API connection
 
 ---
 
@@ -281,8 +281,9 @@ CLOUDINARY_API_SECRET=your-api-secret
 - 💰 **Wallet System** - Top-up packages with bonus
 - 📊 **Pricing System** - Battery pricing by model
 - 📧 **Notification System** - In-app notifications (Socket.IO)
-- 🗺️ **Maps Integration** - Track-Asia API (directions, distance)
-- ☁️ **File Upload** - Cloudinary (avatars, station images)
+- 🗺️ **Maps Integration** - Track-Asia API (directions, distance) ✅
+- ☁️ **File Upload** - Cloudinary (avatars, station images) ✅
+- 🔧 **Code Optimization** - Prisma singleton, utility functions, parallel queries ✅
 - 🗄️ **Database** - PostgreSQL + Prisma
 - 🎨 **Frontend** - React + TypeScript + Tailwind
 - 🚗 **Driver APIs** - Vehicle & Booking management (100%)
@@ -304,11 +305,12 @@ CLOUDINARY_API_SECRET=your-api-secret
 
 ### **💰 Payment System:**
 
-- **Wallet-based** - Users top up wallet
+- **Wallet-based ONLY** - Users top up wallet (NO cash payment)
 - **TopUp Packages** - Bonus on top-up (e.g., Nạp 1M nhận 1.05M)
 - **Battery Pricing** - Dynamic pricing by battery model
 - **VNPay Integration** - Secure payment gateway
-- **NO Cash Payment** - Wallet only
+- **Auto-payment** - Automatic wallet deduction on booking completion
+- **Insufficient Funds** - Error if balance < price (must top up first)
 
 ### **📋 Booking System:**
 
@@ -384,7 +386,7 @@ curl http://localhost:3000/api/stations/public
 - **Backend Development:** Node.js + TypeScript + Prisma
 - **Frontend Development:** React + TypeScript + Tailwind
 - **Database Design:** PostgreSQL + Prisma ORM
-- **API Integration:** Google OAuth + VNPay + Gmail + Track-Asia + Cloudinary
+- **API Integration:** VNPay + Track-Asia + Cloudinary + Socket.IO
 
 ---
 
@@ -416,6 +418,8 @@ For technical support or questions:
 
 **📝 Last Updated:** 2024  
 **✅ Status:** Production Ready - 100% Complete  
+**📊 Total Endpoints:** ~125 API endpoints  
+**🔧 Code Quality:** Optimized (Prisma singleton, utility functions, parallel queries)  
 **👨‍💻 Maintainer:** Development Team  
 **🏢 Organization:** FPT University - SWP392 Group 4
 
