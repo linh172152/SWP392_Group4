@@ -19,8 +19,8 @@ export const API_ENDPOINTS = {
   ADMIN: {
     USERS: `${API_BASE_URL}/admin/users`,
     STATIONS: `${API_BASE_URL}/admin/stations`,
-    // Reports endpoint in backend is mounted at /api/reports (admin-protected)
-    REPORTS: `${API_BASE_URL}/reports`,
+    // Reports endpoint in backend is mounted at /api/admin/dashboard (admin-protected)
+    REPORTS: `${API_BASE_URL}/admin/dashboard`,
     DASHBOARD: `${API_BASE_URL}/admin/dashboard`,
     BATTERIES: `${API_BASE_URL}/admin/batteries`,
   },
