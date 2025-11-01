@@ -46,6 +46,7 @@ Hệ thống quản lý đổi pin cho xe điện, bao gồm:
 - **Payment:** VNPay (có thể mở rộng MoMo, ZaloPay)
 - **Real-time:** Socket.IO
 - **File Upload:** Cloudinary
+- **Maps:** Track-Asia API (directions, distance, duration)
 
 ---
 
@@ -81,23 +82,24 @@ Check Wallet Balance
 │ Kịch bản A: Đủ tiền (Balance >= Price) │
 │ → Tự động trừ ví                        │
 │ → Payment: wallet, completed           │
+│ → Booking status: completed            │
 └─────────────────────────────────────────┘
     ↓
 ┌─────────────────────────────────────────┐
-│ Kịch bản B: Hết tiền (Balance = 0)    │
-│ → Pop-up cho Staff:                    │
-│   [Thanh toán trực tiếp] [Nạp tiền]   │
-│ → Payment: cash, completed            │
+│ Kịch bản B: Không đủ tiền (Balance < Price) │
+│ → KHÔNG cho complete booking          │
+│ → Thông báo: "Số dư không đủ"          │
+│ → Yêu cầu: Nạp thêm tiền vào ví        │
+│ → Booking status: confirmed (chờ thanh toán) │
+│ → Payment: pending                    │
 └─────────────────────────────────────────┘
     ↓
-┌─────────────────────────────────────────┐
-│ Kịch bản C: Thiếu tiền (0 < Balance < Price) │
-│ → Pop-up cho Staff:                    │
-│   [Thanh toán bù] [Thanh toán toàn bộ] │
-│ → Payment 1: wallet (trừ hết)         │
-│ → Payment 2: cash (phần thiếu)         │
-└─────────────────────────────────────────┘
+│ User nạp đủ tiền → Staff complete lại │
+│ → Payment: wallet, completed          │
+│ → Booking status: completed           │
 ```
+
+**✅ Quyết định:** Bỏ thanh toán bằng tiền mặt (cash). Chỉ dùng Wallet. Nếu không đủ tiền → User phải nạp thêm vào ví trước khi complete booking.
 
 ---
 
@@ -234,8 +236,7 @@ model TopUpPackage {
   revenue: {
     total: 50000000,
     by_payment_method: {
-      wallet: 40000000,
-      cash: 10000000
+      wallet: 50000000  // ✅ Chỉ dùng Wallet, không có cash
     },
     trend: "+15%",  // So với tháng trước
     daily_average: 1666666
@@ -812,7 +813,7 @@ await prisma.notification.create({
 **1. Validation:**
 
 - ✅ Check staff thuộc trạm
-- ✅ Check `status = "confirmed"`
+- ✅ Check `status = "pending"` hoặc `"confirmed"` (✅ Cho phép complete booking pending nếu user đến sớm)
 - ✅ Tìm old battery từ code:
 
   ```typescript
@@ -873,11 +874,25 @@ await prisma.$transaction(async (tx) => {
   // 4. Thanh toán tự động (xem 2.2 Flow Thanh toán)
   let paymentStatus = "pending";
   if (walletBalance >= amount) {
+    // Đủ tiền → Tự động trừ ví
     await tx.wallet.update({
       where: { user_id: booking.user_id },
       data: { balance: walletBalance - amount },
     });
     paymentStatus = "completed";
+  } else {
+    // KHÔNG đủ tiền → KHÔNG cho complete booking
+    // User phải nạp thêm tiền vào ví trước
+    throw new CustomError(
+      `Số dư ví không đủ. Cần ${amount.toLocaleString(
+        "vi-VN"
+      )}đ, hiện có ${walletBalance.toLocaleString(
+        "vi-VN"
+      )}đ. Vui lòng nạp thêm ${(amount - walletBalance).toLocaleString(
+        "vi-VN"
+      )}đ vào ví.`,
+      400
+    );
   }
 
   // 5. Create Transaction
@@ -1159,11 +1174,13 @@ model Booking {
 
 #### Stations
 
-- `POST /api/admin/stations` - Tạo trạm ✅ (Vừa implement)
-- `GET /api/admin/stations` - Danh sách trạm ✅ (Vừa implement)
-- `GET /api/admin/stations/:id` - Chi tiết trạm ✅ (Vừa implement)
-- `PUT /api/admin/stations/:id` - Cập nhật trạm ✅ (Vừa implement)
-- `DELETE /api/admin/stations/:id` - Xóa trạm ✅ (Vừa implement)
+- `POST /api/admin/stations` - Tạo trạm ✅
+- `GET /api/admin/stations` - Danh sách trạm ✅
+- `GET /api/admin/stations/:id` - Chi tiết trạm ✅
+- `PUT /api/admin/stations/:id` - Cập nhật trạm ✅
+- `DELETE /api/admin/stations/:id` - Xóa trạm ✅
+- `POST /api/admin/stations/:id/upload-image` - Upload ảnh trạm ✅
+- `DELETE /api/admin/stations/:id/delete-image` - Xóa ảnh trạm ✅
 
 #### Staff
 
@@ -1240,7 +1257,7 @@ for (const booking of expiredBookings) {
 }
 ```
 
-#### 6.1.2 Auto-cancel Instant Bookings
+#### 6.1.2 Auto-cancel Instant Bookings ✅ IMPLEMENTED
 
 ```typescript
 const now = new Date();
@@ -1251,12 +1268,35 @@ const expiredInstantBookings = await prisma.booking.findMany({
     status: { in: ["pending", "confirmed"] },
     is_instant: true,
     scheduled_at: { lte: fifteenMinutesAgo },
-    // Chưa check-in
+    checked_in_at: null, // User hasn't checked in
   },
 });
 
-// Tương tự như trên - cancel và tạo notification
+// Cancel và tạo notification cho user
+for (const booking of expiredInstantBookings) {
+  await prisma.booking.update({
+    where: { booking_id: booking.booking_id },
+    data: {
+      status: "cancelled",
+      notes:
+        "Auto-cancelled: Instant booking expired - User did not arrive within 15 minutes.",
+    },
+  });
+
+  // Tạo notification (KHÔNG gửi email/SMS)
+  await prisma.notification.create({
+    data: {
+      user_id: booking.user_id,
+      type: "booking_cancelled",
+      title: "Đặt chỗ ngay đã bị hủy tự động",
+      message: `Đặt chỗ ngay của bạn tại ${booking.station.name} đã bị hủy tự động do bạn không có mặt trong vòng 15 phút.`,
+      data: { booking_id: booking.booking_id },
+    },
+  });
+}
 ```
+
+**✅ Status:** Đã implement trong `booking-auto-cancel.service.ts`, cron job chạy mỗi 5 phút trong `server.ts`
 
 #### 6.1.3 Send Booking Reminders
 
@@ -1311,9 +1351,36 @@ const tenMinReminders = await prisma.booking.findMany({
 
 #### 6.2.4 Thanh toán tự động
 
-- Đủ tiền → Trừ ví tự động
-- Hết tiền → Pop-up cho Staff
-- Thiếu tiền → Pop-up cho Staff (thanh toán bù hoặc toàn bộ)
+- **Đủ tiền** → Tự động trừ ví → Booking completed
+- **Không đủ tiền** → Không cho complete → Yêu cầu nạp thêm tiền vào ví
+- **✅ Quyết định:** Chỉ dùng Wallet. KHÔNG có thanh toán bằng tiền mặt (cash).
+- **✅ Implementation:** Đã bỏ hoàn toàn logic cash payment và partial payment.
+
+#### 6.2.5 Battery Inventory Format ✅ IMPLEMENTED
+
+- Tất cả station responses (driver/staff/admin/public) đều có `battery_inventory`
+- Format: `{ "Pin loại V": { available: 5, charging: 3, total: 8 } }`
+- `available` = pin có `status = "full"`
+- `charging` = pin có `status = "charging"`
+- `total` = available + charging
+- Chỉ hiển thị models có pin trong trạm
+
+**✅ Implementation:** Đã có trong:
+
+- `GET /api/driver/stations/nearby`
+- `GET /api/driver/stations/:id`
+- `GET /api/stations/public/nearby`
+- `GET /api/stations/public/:id`
+- `GET /api/admin/stations` (list + details)
+
+#### 6.2.6 Complete Pending Booking ✅ IMPLEMENTED
+
+- Staff có thể complete booking với status `pending` hoặc `confirmed`
+- Cho phép user đến sớm, staff verify SĐT và complete luôn
+- Validation: `status === "pending" || status === "confirmed"`
+- Không cần phải confirm trước khi complete
+
+**✅ Implementation:** Đã có trong `POST /api/staff/bookings/:id/complete`
 
 ---
 
@@ -1425,6 +1492,27 @@ const tenMinReminders = await prisma.booking.findMany({
     - `PUT /api/admin/staff/:id` - Cập nhật staff ✅
     - `DELETE /api/admin/staff/:id` - Xóa staff ✅
 
+### ✅ Phase 5 (Final Enhancements - Đã hoàn thành):
+
+14. ✅ **Auto-cancel Instant Bookings** ✅ COMPLETE
+
+    - Function `autoCancelInstantBookings()` trong `booking-auto-cancel.service.ts` ✅
+    - Cron job mỗi 5 phút trong `server.ts` ✅
+    - Cancel instant bookings sau 15 phút nếu chưa check-in ✅
+    - Gửi notification cho user ✅
+
+15. ✅ **Battery Inventory Format** ✅ COMPLETE
+
+    - Format: `{ "Pin loại V": { available, charging, total } }` ✅
+    - Đã thêm vào tất cả station responses ✅
+    - `station.controller.ts`: findNearbyStations, getStationDetails ✅
+    - `public-station.controller.ts`: findNearbyPublicStations, getPublicStationDetails ✅
+
+16. ✅ **Complete Pending Booking** ✅ COMPLETE
+    - Cho phép complete booking `pending` hoặc `confirmed` ✅
+    - Staff có thể bỏ qua bước confirm nếu user đến sớm ✅
+    - Validation: verify SĐT (không cần PIN) ✅
+
 ---
 
 ## 📝 GHI CHÚ QUAN TRỌNG
@@ -1436,6 +1524,8 @@ const tenMinReminders = await prisma.booking.findMany({
 5. **✅ Chính sách hủy:** Trừ phí nếu hủy < 15 phút trước giờ hẹn → Ngăn abuse ✅
 6. **✅ Battery Code:** Staff quét mã vạch hoặc gõ tay mã pin (PIN001) thay vì UUID ✅
 7. **✅ Tự động assign pin:** Chọn `battery_model` → System tự assign pin `full` cũ nhất ✅
+8. **✅ Maps Integration:** Track-Asia API cho directions, distance, duration ✅
+9. **✅ Code Optimization:** Prisma singleton, utility functions (station.util.ts), parallel queries ✅
 
 ---
 
@@ -1477,6 +1567,13 @@ const tenMinReminders = await prisma.booking.findMany({
 
 - Public stations endpoints ✅
 
+#### **Maps APIs:** 4 endpoints ✅
+
+- `GET /api/maps/directions` - Lấy đường đi (Track-Asia API) ✅
+- `GET /api/maps/distance` - Tính khoảng cách và thời gian đường bộ ✅
+- `POST /api/maps/calculate-distance` - Tính khoảng cách đường thẳng (Haversine) ✅
+- `GET /api/maps/test` - Test kết nối Track-Asia API ✅
+
 #### **Database Models:** Tất cả đã có ✅
 
 - Wallet, BatteryPricing, TopUpPackage, Notification ✅
@@ -1487,19 +1584,22 @@ const tenMinReminders = await prisma.booking.findMany({
 #### **Business Logic:** Tất cả đã implement ✅
 
 - ✅ Auto-cancel expired bookings (mỗi 5 phút) ✅
+- ✅ Auto-cancel instant bookings (mỗi 5 phút, sau 15 phút) ✅
 - ✅ Booking reminders (mỗi 5 phút) ✅
 - ✅ Cancellation policy (trừ phí < 15 phút) ✅
 - ✅ Instant booking với 15 phút reservation ✅
 - ✅ Damaged battery handling (maintenance/damaged status) ✅
-- ✅ Auto-payment logic (wallet + cash fallback) ✅
+- ✅ Auto-payment logic (chỉ Wallet, không có cash) ✅
 - ✅ Battery auto-assignment (theo model, chọn pin cũ nhất) ✅
 - ✅ Phone verification thay PIN code ✅
+- ✅ Battery inventory format (available, charging, total per model) ✅
+- ✅ Complete pending booking (cho phép complete booking pending nếu user đến sớm) ✅
 
 ### 📊 Tổng Kết Kỹ Thuật:
 
-- **Total Routes Files:** 25 ✅
+- **Total Routes Files:** 26 ✅ (includes maps.routes.ts)
 - **Total Controllers Files:** 24 ✅
-- **Total Endpoints:** ~121 route definitions ✅
+- **Total Endpoints:** ~125 route definitions ✅ (includes Maps APIs)
 - **TypeScript Compilation:** ✅ PASSED (0 errors)
 - **Database Migrations:** ✅ 2 migrations (init + wallet/pricing/notification)
 - **Database Status:** ✅ Synced (Local + Render)
@@ -1515,6 +1615,11 @@ const tenMinReminders = await prisma.booking.findMany({
 3. **Staff Booking:** `PUT /confirm` → `POST /confirm` (Đã sửa để khớp documentation) ✅
 4. **Staff Booking:** `PUT /complete` → `POST /complete` (Đã sửa để khớp documentation) ✅
 5. **Auto-cancel:** `pin_verified_at` → `checked_in_at` (PIN đã bỏ) ✅
+6. **Complete Booking:** Cho phép complete booking `pending` hoặc `confirmed` (implementation đã hỗ trợ) ✅
+7. **Payment Flow:** Đã bỏ hoàn toàn cash payment và partial payment, chỉ dùng Wallet ✅
+8. **Battery Inventory:** Đã thêm format `battery_inventory` vào tất cả station responses ✅
+9. **Maps APIs:** Đã thêm 4 endpoints cho Track-Asia API (directions, distance, calculate-distance, test) ✅
+10. **Code Optimization:** Prisma singleton pattern, utility functions (station.util.ts), parallel queries với Promise.all() ✅
 
 ### 🎯 FINAL STATUS:
 

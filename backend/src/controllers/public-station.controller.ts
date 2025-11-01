@@ -1,9 +1,8 @@
 import { Request, Response } from "express";
-import { PrismaClient } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
-
-const prisma = new PrismaClient();
+import { prisma } from "../server";
+import { calculateStationStats } from "../utils/station.util";
 
 /**
  * Get all public stations
@@ -140,6 +139,12 @@ export const getPublicStationDetails = asyncHandler(
       {} as Record<string, number>
     );
 
+    // ✅ Optimized: Calculate battery inventory and capacity warning in one go
+    const stationStats = await calculateStationStats(
+      station.station_id,
+      station.capacity
+    );
+
     const stationWithStats = {
       ...station,
       average_rating: avgRating,
@@ -147,6 +152,9 @@ export const getPublicStationDetails = asyncHandler(
       battery_stats: batteryStats,
       available_batteries: station.batteries.filter((b) => b.status === "full")
         .length,
+      battery_inventory: stationStats.batteryInventory,
+      capacity_percentage: stationStats.capacityPercentage,
+      capacity_warning: stationStats.capacityWarning,
     };
 
     res.status(200).json({
@@ -210,31 +218,42 @@ export const findNearbyPublicStations = asyncHandler(
     });
 
     // Calculate distance and average rating for each station
-    const stationsWithDistance = stations.map((station) => {
-      const avgRating =
-        station.station_ratings.length > 0
-          ? station.station_ratings.reduce(
-              (sum: number, r: any) => sum + r.rating,
-              0
-            ) / station.station_ratings.length
-          : 0;
+    const stationsWithDistance = await Promise.all(
+      stations.map(async (station) => {
+        const avgRating =
+          station.station_ratings.length > 0
+            ? station.station_ratings.reduce(
+                (sum: number, r: any) => sum + r.rating,
+                0
+              ) / station.station_ratings.length
+            : 0;
 
-      // Calculate distance using Haversine formula
-      const distance = calculateDistance(
-        lat,
-        lng,
-        parseFloat(station.latitude?.toString() || "0"),
-        parseFloat(station.longitude?.toString() || "0")
-      );
+        // Calculate distance using Haversine formula
+        const distance = calculateDistance(
+          lat,
+          lng,
+          parseFloat(station.latitude?.toString() || "0"),
+          parseFloat(station.longitude?.toString() || "0")
+        );
 
-      return {
-        ...station,
-        average_rating: avgRating,
-        total_ratings: station.station_ratings.length,
-        available_batteries: station.batteries.length,
-        distance_km: distance,
-      };
-    });
+        // ✅ Optimized: Calculate battery inventory and capacity warning in one go
+        const stationStats = await calculateStationStats(
+          station.station_id,
+          station.capacity
+        );
+
+        return {
+          ...station,
+          average_rating: avgRating,
+          total_ratings: station.station_ratings.length,
+          available_batteries: station.batteries.length,
+          distance_km: distance,
+          capacity_percentage: stationStats.capacityPercentage,
+          capacity_warning: stationStats.capacityWarning,
+          battery_inventory: stationStats.batteryInventory,
+        };
+      })
+    );
 
     // Sort by distance
     stationsWithDistance.sort((a, b) => a.distance_km - b.distance_km);
