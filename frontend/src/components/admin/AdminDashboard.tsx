@@ -1,12 +1,12 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { User } from '../../App';
+import type { User } from '../../App';
 import AdminLayout from './AdminLayout';
 import AdminHome from './AdminHome';
 import StationManagement from './StationManagement';
 import BatteryCoordination from './BatteryCoordination';
 import UserManagement from './UserManagement';
-import EmployeeManagement from '../staff/EmployeeManagement'; // Import from staff folder
+import StaffManagement from './StaffManagement';
 import ReportsAnalytics from './ReportsAnalytics';
 import AISuggestions from './AISuggestions';
 
@@ -24,7 +24,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
         <Route path="/stations" element={<StationManagement />} />
         <Route path="/coordination" element={<BatteryCoordination />} />
         <Route path="/users" element={<UserManagement />} />
-        <Route path="/employees" element={<EmployeeManagement />} />
+        <Route path="/employees" element={<StaffManagement />} />
         <Route path="/reports" element={<ReportsAnalytics />} />
         <Route path="/ai-suggestions" element={<AISuggestions />} />
       </Routes>

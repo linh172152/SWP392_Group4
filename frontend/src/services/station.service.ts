@@ -2,6 +2,7 @@ import { API_ENDPOINTS } from "../config/api";
 import authFetch from "./apiClient";
 
 export interface Station {
+  id: string;
   station_id: string;
   name: string;
   address: string;
@@ -9,7 +10,7 @@ export interface Station {
     lat: number;
     lng: number;
   };
-  status: string;
+  status: 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE';
   capacity: number;
   available_batteries: number;
   charging_batteries: number;
@@ -31,6 +32,7 @@ export async function getAllStations(params?: {
   status?: string;
   search?: string;
 }) {
+  console.log('Calling getAllStations with params:', params);
   const query = new URLSearchParams();
   if (params?.page) query.set("page", String(params.page));
   if (params?.limit) query.set("limit", String(params.limit));
@@ -38,7 +40,9 @@ export async function getAllStations(params?: {
   if (params?.search) query.set("search", params.search);
 
   const url = `${API_ENDPOINTS.ADMIN.STATIONS}${query.toString() ? `?${query.toString()}` : ""}`;
+  console.log('Fetching stations from URL:', url);
   const res = await authFetch(url);
+  console.log('Station API raw response:', res);
   return res;
 }
 

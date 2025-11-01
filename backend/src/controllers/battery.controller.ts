@@ -79,6 +79,27 @@ export const addBattery = asyncHandler(async (req: Request, res: Response) => {
     throw new CustomError("Battery with this code already exists", 400);
   }
 
+  // ✅ Capacity Warning Logic (theo DOC)
+  const currentBatteryCount = await prisma.battery.count({
+    where: { station_id: stationId },
+  });
+
+  const capacityPercentage = (currentBatteryCount / Number(station.capacity)) * 100;
+
+  // >= 100% → Không cho thêm pin mới
+  if (capacityPercentage >= 100) {
+    throw new CustomError(
+      `Trạm đã đầy (${currentBatteryCount}/${station.capacity} pin). Không thể thêm pin mới.`,
+      400
+    );
+  }
+
+  // >= 90% → Cảnh báo (nhưng vẫn cho thêm)
+  let warningMessage = null;
+  if (capacityPercentage >= 90) {
+    warningMessage = `Cảnh báo: Trạm sắp đầy (${Math.round(capacityPercentage)}%). Chỉ còn ${station.capacity - currentBatteryCount} slot.`;
+  }
+
   const battery = await prisma.battery.create({
     data: {
       battery_code,
@@ -103,8 +124,16 @@ export const addBattery = asyncHandler(async (req: Request, res: Response) => {
 
   res.status(201).json({
     success: true,
-    message: "Battery added successfully",
-    data: battery,
+    message: warningMessage || "Battery added successfully",
+    data: {
+      ...battery,
+      capacity_info: {
+        current_count: currentBatteryCount + 1,
+        capacity: Number(station.capacity),
+        capacity_percentage: Math.round(((currentBatteryCount + 1) / Number(station.capacity)) * 100),
+        warning: capacityPercentage >= 90 ? { level: "almost_full", percentage: Math.round(capacityPercentage) } : null,
+      },
+    },
   });
 });
 
