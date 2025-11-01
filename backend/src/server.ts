@@ -14,7 +14,11 @@ import swaggerUi from "swagger-ui-express";
 import { createServer } from "http";
 import { NotificationService } from "./services/notification.service";
 import * as cron from "node-cron";
-import { autoCancelExpiredBookings, sendBookingReminders } from "./services/booking-auto-cancel.service";
+import {
+  autoCancelExpiredBookings,
+  autoCancelInstantBookings,
+  sendBookingReminders,
+} from "./services/booking-auto-cancel.service";
 
 // Import routes
 import authRoutes from "./routes/auth.routes";
@@ -42,6 +46,7 @@ import adminStaffRoutes from "./routes/admin-staff.routes";
 // Import new Shared API routes
 import publicStationRoutes from "./routes/public-station.routes";
 import supportRoutes from "./routes/support.routes";
+import mapsRoutes from "./routes/maps.routes";
 
 // Import new Service Package routes
 // ❌ Removed: ServicePackage và Subscription (đã thay bằng TopUpPackage)
@@ -197,6 +202,9 @@ app.use("/api/admin", adminRoutes); // Contains pricing and topup-packages route
 // Public API routes
 app.use("/api/stations/public", publicStationRoutes);
 
+// Maps API routes (Track-Asia - directions, distance, duration)
+app.use("/api/maps", mapsRoutes);
+
 // User API routes
 app.use("/api/support", supportRoutes);
 // ❌ Removed: ServicePackage và Subscription routes (đã thay bằng TopUpPackage)
@@ -246,6 +254,19 @@ server.listen(PORT, () => {
     }
   });
 
+  // Run every 5 minutes to auto-cancel expired instant bookings
+  cron.schedule("*/5 * * * *", async () => {
+    try {
+      console.log("🔄 Running auto-cancel instant bookings check...");
+      const result = await autoCancelInstantBookings();
+      if (result.cancelled > 0) {
+        console.log(`✅ Auto-cancelled ${result.cancelled} expired instant booking(s)`);
+      }
+    } catch (error) {
+      console.error("❌ Error in auto-cancel instant bookings cron job:", error);
+    }
+  });
+
   // Run every 5 minutes to send booking reminders
   cron.schedule("*/5 * * * *", async () => {
     try {
@@ -259,7 +280,7 @@ server.listen(PORT, () => {
     }
   });
 
-  console.log(`⏰ Cron jobs started: auto-cancel (every 5 min), reminders (every 5 min)`);
+  console.log(`⏰ Cron jobs started: auto-cancel (every 5 min), auto-cancel-instant (every 5 min), reminders (every 5 min)`);
 });
 
 export default app;

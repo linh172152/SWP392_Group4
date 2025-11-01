@@ -537,8 +537,10 @@ export const completeBooking = asyncHandler(
       throw new CustomError("Booking not found", 404);
     }
 
-    if (booking.status !== "confirmed") {
-      throw new CustomError("Booking must be confirmed before completion", 400);
+    // ✅ Cho phép complete booking pending hoặc confirmed
+    // Staff có thể complete booking pending nếu user đến sớm (verify SĐT)
+    if (booking.status !== "confirmed" && booking.status !== "pending") {
+      throw new CustomError("Booking must be pending or confirmed before completion", 400);
     }
 
     // ✅ Bỏ check PIN - không cần PIN nữa (đã verify SĐT khi confirm)
@@ -635,24 +637,25 @@ export const completeBooking = asyncHandler(
 
       const walletBalance = Number(wallet.balance);
       const transactionAmountNum = Number(transactionAmount);
-      let paymentStatus: "pending" | "completed" = "pending";
-      let paymentMethod: "wallet" | "cash" | null = null;
 
-      // ✅ Thanh toán tự động nếu đủ tiền
-      if (walletBalance >= transactionAmountNum) {
-        // Đủ tiền → Trừ ví
-        await tx.wallet.update({
-          where: { user_id: booking.user_id },
-          data: { balance: walletBalance - transactionAmountNum },
-        });
-        paymentStatus = "completed";
-        paymentMethod = "wallet";
-      } else {
-        // Thiếu/hết tiền → Pop-up cho Staff (thanh toán trực tiếp)
-        // For now, set status as pending - Staff will handle payment manually
-        paymentStatus = "pending";
-        // Staff sẽ tạo Payment record sau (cash)
+      // ✅ Thanh toán tự động - CHỈ dùng Wallet
+      if (walletBalance < transactionAmountNum) {
+        // KHÔNG đủ tiền → KHÔNG cho complete booking
+        // User phải nạp thêm tiền vào ví trước
+        throw new CustomError(
+          `Số dư ví không đủ. Cần ${transactionAmountNum.toLocaleString("vi-VN")}đ, hiện có ${walletBalance.toLocaleString("vi-VN")}đ. Vui lòng nạp thêm ${(transactionAmountNum - walletBalance).toLocaleString("vi-VN")}đ vào ví trước khi hoàn tất đổi pin.`,
+          400
+        );
       }
+
+      // Đủ tiền → Tự động trừ ví
+      await tx.wallet.update({
+        where: { user_id: booking.user_id },
+        data: { balance: walletBalance - transactionAmountNum },
+      });
+
+      const paymentStatus: "completed" = "completed";
+      const paymentMethod: "wallet" = "wallet";
 
       // Create transaction record
       const transaction = await tx.transaction.create({
@@ -762,15 +765,13 @@ export const completeBooking = asyncHandler(
           amount: Number(result.transactionAmount),
           payment_status: result.paymentStatus,
         },
-        payment: result.payment ? {
+        payment: {
           payment_method: "wallet",
           amount: Number(result.transactionAmount),
           status: "completed",
-        } : null,
+        },
         wallet_balance: Number(result.walletBalance),
-        message: result.paymentStatus === "completed" 
-          ? `Đã thanh toán ${Number(result.transactionAmount).toLocaleString("vi-VN")}đ từ ví. Số dư còn lại: ${Number(result.walletBalance).toLocaleString("vi-VN")}đ.`
-          : `Số dư không đủ (${Number(result.walletBalance).toLocaleString("vi-VN")}đ < ${Number(result.transactionAmount).toLocaleString("vi-VN")}đ). Vui lòng xử lý thanh toán.`,
+        message: `Đã thanh toán ${Number(result.transactionAmount).toLocaleString("vi-VN")}đ từ ví. Số dư còn lại: ${Number(result.walletBalance).toLocaleString("vi-VN")}đ.`,
       },
     });
   }

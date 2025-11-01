@@ -2,6 +2,10 @@ import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
+import {
+  uploadImageFromBuffer,
+  deleteImage,
+} from "../services/cloudinary.service";
 
 const prisma = new PrismaClient();
 
@@ -195,10 +199,7 @@ export const createStation = asyncHandler(
     } = req.body;
 
     if (!name || !address || !capacity) {
-      throw new CustomError(
-        "Name, address, and capacity are required",
-        400
-      );
+      throw new CustomError("Name, address, and capacity are required", 400);
     }
 
     if (capacity < 1) {
@@ -208,10 +209,7 @@ export const createStation = asyncHandler(
     // Validate supported_models if provided
     if (supported_models) {
       if (!Array.isArray(supported_models)) {
-        throw new CustomError(
-          "supported_models must be an array",
-          400
-        );
+        throw new CustomError("supported_models must be an array", 400);
       }
     }
 
@@ -226,10 +224,7 @@ export const createStation = asyncHandler(
     });
 
     if (existingStation) {
-      throw new CustomError(
-        "Station with this name already exists",
-        400
-      );
+      throw new CustomError("Station with this name already exists", 400);
     }
 
     const station = await prisma.station.create({
@@ -293,10 +288,7 @@ export const updateStation = asyncHandler(
       });
 
       if (existingStation) {
-        throw new CustomError(
-          "Station with this name already exists",
-          400
-        );
+        throw new CustomError("Station with this name already exists", 400);
       }
     }
 
@@ -310,21 +302,22 @@ export const updateStation = asyncHandler(
     // Validate supported_models if provided
     if (supported_models !== undefined) {
       if (!Array.isArray(supported_models)) {
-        throw new CustomError(
-          "supported_models must be an array",
-          400
-        );
+        throw new CustomError("supported_models must be an array", 400);
       }
     }
 
     const updateData: any = {};
     if (name !== undefined) updateData.name = name;
     if (address !== undefined) updateData.address = address;
-    if (latitude !== undefined) updateData.latitude = latitude ? parseFloat(latitude) : null;
-    if (longitude !== undefined) updateData.longitude = longitude ? parseFloat(longitude) : null;
+    if (latitude !== undefined)
+      updateData.latitude = latitude ? parseFloat(latitude) : null;
+    if (longitude !== undefined)
+      updateData.longitude = longitude ? parseFloat(longitude) : null;
     if (capacity !== undefined) updateData.capacity = parseInt(capacity);
-    if (supported_models !== undefined) updateData.supported_models = supported_models;
-    if (operating_hours !== undefined) updateData.operating_hours = operating_hours;
+    if (supported_models !== undefined)
+      updateData.supported_models = supported_models;
+    if (operating_hours !== undefined)
+      updateData.operating_hours = operating_hours;
     if (status !== undefined) updateData.status = status;
 
     const updatedStation = await prisma.station.update({
@@ -391,10 +384,7 @@ export const deleteStation = asyncHandler(
     });
 
     if (activeBookings > 0) {
-      throw new CustomError(
-        "Cannot delete station with active bookings",
-        400
-      );
+      throw new CustomError("Cannot delete station with active bookings", 400);
     }
 
     // Check if station has staff assigned
@@ -417,3 +407,102 @@ export const deleteStation = asyncHandler(
   }
 );
 
+/**
+ * Upload station image (Admin)
+ */
+export const uploadStationImage = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+
+    if (!req.file) {
+      throw new CustomError("No image file provided", 400);
+    }
+
+    // Validate buffer exists and is not empty
+    if (!req.file.buffer || req.file.buffer.length === 0) {
+      throw new CustomError("Invalid image file: file is empty", 400);
+    }
+
+    // Validate file size (max 5MB)
+    if (req.file.size > 5 * 1024 * 1024) {
+      throw new CustomError("File size too large. Maximum size is 5MB", 400);
+    }
+
+    // Check if station exists
+    const station = await prisma.station.findUnique({
+      where: { station_id: id },
+    });
+
+    if (!station) {
+      throw new CustomError("Station not found", 404);
+    }
+
+    // Upload image to Cloudinary
+    const result = await uploadImageFromBuffer(
+      req.file.buffer,
+      "station-images"
+    );
+
+    // Upload successful - return image URL
+    // Note: To save images array to DB, add 'images' JSON field to Station model in schema
+    // Example migration: ALTER TABLE stations ADD COLUMN images JSONB DEFAULT '[]'::jsonb;
+
+    res.status(200).json({
+      success: true,
+      message: "Station image uploaded successfully",
+      data: {
+        station_id: id,
+        image_url: result.secure_url,
+        public_id: result.public_id,
+        width: result.width,
+        height: result.height,
+        format: result.format,
+        bytes: result.bytes,
+        // Note: To persist images array in DB, add 'images' JSON field to Station schema
+        // Then uncomment this update:
+        // await prisma.station.update({
+        //   where: { station_id: id },
+        //   data: { images: images }
+        // });
+      },
+    });
+  }
+);
+
+/**
+ * Delete station image (Admin)
+ */
+export const deleteStationImage = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { publicId } = req.body;
+
+    if (!publicId) {
+      throw new CustomError("Public ID is required", 400);
+    }
+
+    // Check if station exists
+    const station = await prisma.station.findUnique({
+      where: { station_id: id },
+    });
+
+    if (!station) {
+      throw new CustomError("Station not found", 404);
+    }
+
+    // Delete image from Cloudinary
+    await deleteImage(publicId);
+
+    // Remove image URL from station's images array
+    // Note: You'll need to implement this when images field is added to schema
+
+    res.status(200).json({
+      success: true,
+      message: "Station image deleted successfully",
+      data: {
+        station_id: id,
+        public_id: publicId,
+      },
+    });
+  }
+);

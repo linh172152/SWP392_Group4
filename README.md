@@ -118,7 +118,6 @@ npm run dev
 ### **Authentication Methods:**
 
 - **Email/Password** - Traditional login
-- **Google OAuth** - Social login
 - **JWT Tokens** - Access & Refresh tokens
 
 ---
@@ -134,12 +133,13 @@ npm run dev
 - **Booking** - Swap appointments
 - **Transaction** - Payment records
 - **Payment** - Payment details
-- **ServicePackage** - Subscription plans
-- **UserSubscription** - User subscriptions
+- **Wallet** - User wallet balance
+- **BatteryPricing** - Battery pricing by model
+- **TopUpPackage** - Top-up packages with bonus
+- **Notification** - In-app notifications
 - **SupportTicket** - Customer support
 - **TicketReply** - Support responses
 - **StationRating** - Station reviews
-- **BatteryTransferLog** - Battery transfers
 
 ---
 
@@ -153,10 +153,11 @@ npm run dev
 - `GET /api/auth/profile` - User profile
 - `POST /api/auth/refresh` - Refresh token
 
-### **Google OAuth:**
+### **Payment (Wallet):**
 
-- `GET /api/google/auth` - Google login
-- `GET /api/auth/google/callback` - OAuth callback
+- `GET /api/driver/wallet/balance` - Get wallet balance
+- `GET /api/driver/wallet/transactions` - Get transaction history
+- `POST /api/driver/wallet/topup` - Top-up wallet (VNPay)
 
 ### **Payment (VNPay):**
 
@@ -166,28 +167,44 @@ npm run dev
 
 ### **Driver APIs:**
 
-- `GET /api/driver/vehicles` - User vehicles
-- `GET /api/driver/stations` - Nearby stations
-- `GET /api/driver/bookings` - User bookings
-- `GET /api/driver/transactions` - Payment history
+- `GET /api/driver/vehicles` - User vehicles (CRUD)
+- `GET /api/driver/stations/nearby` - Nearby stations
+- `GET /api/driver/stations/:id` - Station details
+- `GET /api/driver/bookings` - User bookings (CRUD)
+- `POST /api/driver/bookings/instant` - Instant booking
+- `PUT /api/driver/bookings/:id/cancel` - Cancel booking
+- `GET /api/driver/wallet/*` - Wallet management
+- `GET /api/driver/notifications` - Notifications
 
 ### **Staff APIs:**
 
-- `GET /api/staff/batteries` - Station batteries
+- `GET /api/staff/batteries` - Station batteries (CRUD)
+- `POST /api/staff/batteries` - Add new battery
+- `PUT /api/staff/batteries/:id` - Update battery status
 - `GET /api/staff/bookings` - Station bookings
-- `PUT /api/staff/bookings/:id/confirm` - Confirm booking
+- `POST /api/staff/bookings/:id/confirm` - Confirm booking (phone verify)
+- `POST /api/staff/bookings/:id/complete` - Complete booking (battery code)
 
 ### **Admin APIs:**
 
-- `GET /api/admin/users` - All users
-- `GET /api/admin/stations` - All stations
-- `GET /api/admin/reports` - System reports
+- `GET /api/admin/users` - All users (CRUD)
+- `GET /api/admin/stations` - All stations (CRUD)
+- `GET /api/admin/staff` - All staff (CRUD)
+- `GET /api/admin/pricing` - Battery pricing (CRUD)
+- `GET /api/admin/topup-packages` - Top-up packages (CRUD)
+- `GET /api/admin/dashboard/stats` - Dashboard statistics
 
-### **Test APIs:**
+### **Public APIs:**
 
-- `POST /api/test/email` - Test email service
-- `GET /api/test/maps` - Test maps service
-- `GET /api/test/cloudinary` - Test file upload
+- `GET /api/stations/public` - Public stations
+- `GET /api/stations/public/nearby` - Nearby public stations
+- `GET /api/stations/public/:id` - Public station details
+
+### **Maps APIs:**
+
+- `GET /api/maps/directions` - Get route directions
+- `GET /api/maps/distance` - Get distance & duration
+- `POST /api/maps/calculate-distance` - Calculate distance
 
 ---
 
@@ -240,18 +257,9 @@ FRONTEND_URL=http://localhost:5173
 JWT_SECRET=your-jwt-secret
 JWT_REFRESH_SECRET=your-refresh-secret
 
-# Google OAuth
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-
 # VNPay
 VNPAY_TMN_CODE=your-tmn-code
 VNPAY_HASH_SECRET=your-hash-secret
-
-# Email
-EMAIL_HOST=smtp.gmail.com
-EMAIL_USER=your-email@gmail.com
-EMAIL_PASSWORD=your-app-password
 
 # Maps
 TRACKASIA_ACCESS_TOKEN=your-trackasia-token
@@ -266,72 +274,90 @@ CLOUDINARY_API_SECRET=your-api-secret
 
 ## 📈 **FEATURES**
 
-### **✅ Completed:**
+### **✅ Completed (100%):**
 
-- 🔐 **Authentication System** - JWT + Google OAuth
-- 💳 **Payment Integration** - VNPay Sandbox
-- 📧 **Email Service** - Gmail SMTP
-- 🗺️ **Maps Integration** - Track-Asia API
-- ☁️ **File Upload** - Cloudinary
+- 🔐 **Authentication System** - JWT (Access + Refresh tokens)
+- 💳 **Payment System** - Wallet + VNPay integration
+- 💰 **Wallet System** - Top-up packages with bonus
+- 📊 **Pricing System** - Battery pricing by model
+- 📧 **Notification System** - In-app notifications (Socket.IO)
+- 🗺️ **Maps Integration** - Track-Asia API (directions, distance)
+- ☁️ **File Upload** - Cloudinary (avatars, station images)
 - 🗄️ **Database** - PostgreSQL + Prisma
 - 🎨 **Frontend** - React + TypeScript + Tailwind
-
-### **🚧 In Progress:**
-
-- 🚗 **Driver APIs** - Vehicle & Booking management
-- 👨‍💼 **Staff APIs** - Battery & Station operations
-- 👑 **Admin APIs** - User & System management
-- 🌐 **Public APIs** - Station discovery
+- 🚗 **Driver APIs** - Vehicle & Booking management (100%)
+- 👨‍💼 **Staff APIs** - Battery & Station operations (100%)
+- 👑 **Admin APIs** - User & System management (100%)
+- 🌐 **Public APIs** - Station discovery (100%)
+- ⏰ **Background Jobs** - Auto-cancel bookings, reminders
 
 ---
 
-## 📋 **ROADMAP**
+## 📋 **KEY FEATURES**
 
-### **Phase 1: Core Driver Features (Week 1-2)**
+### **🔐 Authentication & Authorization:**
 
-- Vehicle Management APIs
-- Station Discovery APIs
-- Basic Booking APIs
+- Email/Password login (NO Google OAuth)
+- JWT Access + Refresh tokens
+- Role-based access (DRIVER, STAFF, ADMIN)
+- Token blacklist for logout
 
-### **Phase 2: Staff Operations (Week 3-4)**
+### **💰 Payment System:**
 
-- Battery Management APIs
-- Booking Processing APIs
-- Station Operations APIs
+- **Wallet-based** - Users top up wallet
+- **TopUp Packages** - Bonus on top-up (e.g., Nạp 1M nhận 1.05M)
+- **Battery Pricing** - Dynamic pricing by battery model
+- **VNPay Integration** - Secure payment gateway
+- **NO Cash Payment** - Wallet only
 
-### **Phase 3: Admin Dashboard (Week 5-6)**
+### **📋 Booking System:**
 
-- User Management APIs
-- Station Management APIs
-- System Reports APIs
+- **Scheduled Booking** - 30 min - 12 hours ahead
+- **Instant Booking** - 15-minute reservation
+- **Auto-cancel** - Expired bookings cancelled automatically
+- **Reminders** - 30 min & 10 min before scheduled time
+- **Cancellation Fee** - 20k if cancelled < 15 min before
 
-### **Phase 4: Public Features (Week 7-8)**
+### **🔋 Battery Management:**
 
-- Public Station APIs
-- Support System APIs
-- Integration Testing
+- **Capacity Warning** - >= 90% warning, >= 100% reject
+- **Battery Inventory** - Format by model (available, charging, total)
+- **Status Management** - full → charging → in_use
+- **Damaged Battery** - No charging if damaged/maintenance
+
+### **👨‍💼 Staff Operations:**
+
+- **Phone Verification** - No PIN code required
+- **Battery Code** - Use battery code (not UUID)
+- **Auto-assign** - System assigns oldest full battery
+- **Complete Pending** - Can complete pending bookings if user arrives early
 
 ---
 
 ## 🧪 **TESTING**
 
-### **Backend Testing:**
+### **Swagger Documentation:**
+
+- **Swagger UI:** `http://localhost:3000/api-docs`
+- All endpoints documented with examples
+- Test endpoints directly from Swagger UI
+
+### **Health Check:**
 
 ```bash
-# Test all APIs
 curl http://localhost:3000/health
-curl -X POST http://localhost:3000/api/auth/register
-curl http://localhost:3000/api/test/email
-curl http://localhost:3000/api/test/maps
-curl http://localhost:3000/api/test/cloudinary
 ```
 
-### **Frontend Testing:**
+### **API Testing:**
 
 ```bash
-# Start frontend
-npm run dev
-# Open http://localhost:5173
+# Authentication
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"password123","full_name":"Test User","phone":"0901234567"}'
+
+# Public Stations
+curl http://localhost:3000/api/stations/public
 ```
 
 ---
@@ -378,7 +404,18 @@ For technical support or questions:
 
 ---
 
-**📝 Last Updated:** October 22, 2024  
+---
+
+## 📚 **DOCUMENTATION**
+
+- **Main Documentation:** `PROJECT_DOCUMENTATION.md` - Complete project documentation with all flows, business logic, and API details
+- **Backend README:** `backend/README.md` - Backend setup and API documentation
+- **Frontend README:** `frontend/README.md` - Frontend setup and component documentation
+
+---
+
+**📝 Last Updated:** 2024  
+**✅ Status:** Production Ready - 100% Complete  
 **👨‍💻 Maintainer:** Development Team  
 **🏢 Organization:** FPT University - SWP392 Group 4
 

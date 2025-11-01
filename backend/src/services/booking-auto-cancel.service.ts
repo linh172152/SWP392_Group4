@@ -213,3 +213,96 @@ export async function sendBookingReminders() {
   }
 }
 
+/**
+ * Auto-cancel instant bookings that are not checked in within 15 minutes
+ * This should run as a cron job every 5 minutes
+ */
+export async function autoCancelInstantBookings() {
+  try {
+    const now = new Date();
+    const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000); // 15 minutes ago
+
+    // Find instant bookings that:
+    // 1. Are pending or confirmed
+    // 2. Created/scheduled more than 15 minutes ago
+    // 3. Not checked in yet (checked_in_at is null)
+    // 4. Not already completed or cancelled
+    const expiredInstantBookings = await prisma.booking.findMany({
+      where: {
+        is_instant: true, // ✅ Only instant bookings
+        status: { in: ["pending", "confirmed"] },
+        scheduled_at: {
+          lte: fifteenMinutesAgo, // Created/scheduled more than 15 minutes ago
+        },
+        checked_in_at: null, // User hasn't checked in
+      },
+      include: {
+        user: {
+          select: {
+            user_id: true,
+            full_name: true,
+            email: true,
+          },
+        },
+        station: {
+          select: {
+            name: true,
+            address: true,
+          },
+        },
+      },
+    });
+
+    if (expiredInstantBookings.length === 0) {
+      return { cancelled: 0, message: "No expired instant bookings to cancel" };
+    }
+
+    // Cancel all expired instant bookings
+    const cancelledBookings = await Promise.all(
+      expiredInstantBookings.map(async (booking) => {
+        const updatedBooking = await prisma.booking.update({
+          where: { booking_id: booking.booking_id },
+          data: {
+            status: "cancelled",
+            notes: booking.notes
+              ? `${booking.notes}\nAuto-cancelled: Instant booking expired - User did not arrive within 15 minutes.`
+              : "Auto-cancelled: Instant booking expired - User did not arrive within 15 minutes.",
+          },
+        });
+
+        // Send notification to user
+        try {
+          await notificationService.sendNotification({
+            type: "booking_cancelled",
+            userId: booking.user_id,
+            title: "Đặt chỗ ngay đã bị hủy tự động",
+            message: `Đặt chỗ ngay của bạn tại ${booking.station.name} đã bị hủy tự động do bạn không có mặt trong vòng 15 phút.`,
+            data: {
+              email: booking.user.email,
+              userName: booking.user.full_name,
+              bookingId: booking.booking_code,
+              stationName: booking.station.name,
+              stationAddress: booking.station.address,
+              scheduledTime: booking.scheduled_at.toISOString(),
+              cancelledAt: new Date().toISOString(),
+            },
+          });
+        } catch (error) {
+          console.error(`Failed to send cancellation notification for instant booking ${booking.booking_code}:`, error);
+        }
+
+        return updatedBooking;
+      })
+    );
+
+    return {
+      cancelled: cancelledBookings.length,
+      bookings: cancelledBookings.map((b) => b.booking_code),
+      message: `Successfully auto-cancelled ${cancelledBookings.length} expired instant booking(s)`,
+    };
+  } catch (error) {
+    console.error("Error in autoCancelInstantBookings:", error);
+    throw error;
+  }
+}
+
