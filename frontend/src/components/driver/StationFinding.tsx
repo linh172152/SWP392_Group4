@@ -17,10 +17,14 @@ import {
 import { ImageWithFallback } from '../figma/ImageWithFallback';
 import { useDriverStations } from '../../hooks/useDriverStations';
 import { Alert, AlertDescription } from '../ui/alert';
+import BookingModal from './BookingModal';
 
 const StationFinding: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [selectedStation, setSelectedStation] = useState<any>(null);
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
   
   const { 
     stations, 
@@ -40,17 +44,40 @@ const StationFinding: React.FC = () => {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
           });
+          setLocationError(null);
         },
         (error) => {
-          console.error("Error getting location:", error);
+          // Xử lý lỗi geolocation một cách thân thiện
+          let errorMessage = "Không thể lấy vị trí của bạn. ";
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              errorMessage += "Vui lòng cho phép truy cập vị trí trong trình duyệt.";
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMessage += "Thông tin vị trí không khả dụng.";
+              break;
+            case error.TIMEOUT:
+              errorMessage += "Hết thời gian chờ lấy vị trí.";
+              break;
+            default:
+              errorMessage += "Đã xảy ra lỗi không xác định.";
+          }
+          setLocationError(errorMessage);
+          
           // Sử dụng vị trí mặc định (TP.HCM) nếu không lấy được vị trí
           setUserLocation({
             latitude: 10.762622,
             longitude: 106.660172,
           });
+        },
+        {
+          enableHighAccuracy: false,
+          timeout: 5000,
+          maximumAge: 0
         }
       );
     } else {
+      setLocationError("Trình duyệt không hỗ trợ định vị. Sử dụng vị trí mặc định.");
       // Sử dụng vị trí mặc định nếu trình duyệt không hỗ trợ geolocation
       setUserLocation({
         latitude: 10.762622,
@@ -138,6 +165,46 @@ const StationFinding: React.FC = () => {
             <Button variant="ghost" size="sm" onClick={clearError}>
               Đóng
             </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Location Error Alert */}
+      {locationError && (
+        <Alert className="glass-card border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-900/20">
+          <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+          <AlertDescription className="flex flex-col gap-3">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <p className="text-orange-800 dark:text-orange-200 font-medium mb-2">
+                  {locationError}
+                </p>
+                <p className="text-sm text-orange-700 dark:text-orange-300">
+                  Đang sử dụng vị trí mặc định: <strong>TP. Hồ Chí Minh</strong>. Bạn vẫn có thể tìm kiếm trạm theo tên hoặc địa chỉ.
+                </p>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setLocationError(null)}
+                className="text-orange-600 hover:text-orange-700 hover:bg-orange-100 dark:hover:bg-orange-900/30"
+              >
+                ✕
+              </Button>
+            </div>
+            
+            {/* Hướng dẫn cho phép vị trí */}
+            <details className="text-xs text-orange-700 dark:text-orange-300 cursor-pointer">
+              <summary className="font-medium hover:text-orange-800 dark:hover:text-orange-200">
+                📍 Cách bật quyền truy cập vị trí
+              </summary>
+              <div className="mt-2 pl-4 space-y-2 text-orange-600 dark:text-orange-400">
+                <p><strong>Chrome/Edge:</strong> Nhấn vào biểu tượng 🔒 bên trái thanh địa chỉ → Cài đặt trang web → Vị trí → Cho phép</p>
+                <p><strong>Firefox:</strong> Nhấn vào biểu tượng (i) bên trái thanh địa chỉ → Quyền → Vị trí → Cho phép</p>
+                <p><strong>Safari:</strong> Safari → Cài đặt → Trang web này → Vị trí → Cho phép</p>
+                <p className="text-orange-700 dark:text-orange-300 italic">Sau khi cho phép, hãy tải lại trang để sử dụng vị trí của bạn.</p>
+              </div>
+            </details>
           </AlertDescription>
         </Alert>
       )}
@@ -331,6 +398,10 @@ const StationFinding: React.FC = () => {
                         variant="outline" 
                         className="flex-1 glass border-blue-200/50 dark:border-purple-400/30 hover:bg-blue-50/50 dark:hover:bg-purple-500/10" 
                         size="sm"
+                        onClick={() => {
+                          setSelectedStation(station);
+                          setIsBookingModalOpen(true);
+                        }}
                       >
                         <Calendar className="mr-1 h-3 w-3" />
                         Đặt chỗ
@@ -343,6 +414,26 @@ const StationFinding: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Booking Modal */}
+      {selectedStation && (
+        <BookingModal
+          isOpen={isBookingModalOpen}
+          onClose={() => {
+            setIsBookingModalOpen(false);
+            setSelectedStation(null);
+          }}
+          station={{
+            station_id: selectedStation.station_id,
+            name: selectedStation.name,
+            address: selectedStation.address,
+          }}
+          onSuccess={(booking) => {
+            console.log('Booking created:', booking);
+            // Có thể thêm thông báo thành công ở đây
+          }}
+        />
+      )}
     </div>
   );
 };

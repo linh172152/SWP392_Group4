@@ -22,6 +22,7 @@ import {
   Car
 } from 'lucide-react';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
+import BookingModal from './BookingModal';
 
 // Mock station data
 const mockStation = {
@@ -88,6 +89,7 @@ const mockReviews = [
 const StationDetail: React.FC = () => {
   const { id } = useParams();
   const [selectedImage, setSelectedImage] = useState(0);
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
 
   const getInventoryColor = (available: number, total: number) => {
     const percentage = (available / total) * 100;
@@ -144,13 +146,25 @@ const StationDetail: React.FC = () => {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3">
-          <Button size="lg">
+          <Button size="lg" onClick={() => {
+            if (mockStation.coordinates) {
+              window.open(
+                `https://www.google.com/maps/dir/?api=1&destination=${mockStation.coordinates.lat},${mockStation.coordinates.lng}`,
+                '_blank'
+              );
+            }
+          }}>
             <Navigation className="mr-2 h-4 w-4" />
-            Get Directions
+            Dẫn đường
           </Button>
-          <Button variant="outline" size="lg">
+          <Button 
+            variant="outline" 
+            size="lg"
+            onClick={() => setIsBookingModalOpen(true)}
+            className="gradient-primary text-white"
+          >
             <Calendar className="mr-2 h-4 w-4" />
-            Reserve Slot
+            Đặt chỗ
           </Button>
         </div>
       </div>
@@ -370,6 +384,21 @@ const StationDetail: React.FC = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Booking Modal */}
+      <BookingModal
+        isOpen={isBookingModalOpen}
+        onClose={() => setIsBookingModalOpen(false)}
+        station={{
+          station_id: mockStation.id,
+          name: mockStation.name,
+          address: mockStation.address,
+        }}
+        onSuccess={(booking) => {
+          console.log('Booking created:', booking);
+          // Có thể thêm thông báo thành công ở đây
+        }}
+      />
     </div>
   );
 };
