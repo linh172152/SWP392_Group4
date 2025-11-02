@@ -6,9 +6,11 @@ export interface Vehicle {
   license_plate: string;
   vehicle_type: "MOTORBIKE" | "CAR" | "TRUCK";
   brand: string;
+  make?: string; // Alias for brand
   model: string;
   year?: number;
   battery_capacity?: number;
+  battery_model?: string; // Model/type of the battery
   created_at: string;
   updated_at: string;
 }
@@ -20,6 +22,7 @@ export interface CreateVehicleData {
   model: string;
   year?: number;
   battery_capacity?: number;
+  battery_model?: string;
 }
 
 export interface UpdateVehicleData {
@@ -29,6 +32,7 @@ export interface UpdateVehicleData {
   model?: string;
   year?: number;
   battery_capacity?: number;
+  battery_model?: string;
 }
 
 const getAuthHeaders = () => {
