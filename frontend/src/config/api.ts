@@ -65,6 +65,21 @@ export const API_ENDPOINTS = {
     BOOKINGS: `${API_BASE_URL}/driver/bookings`,
     TRANSACTIONS: `${API_BASE_URL}/driver/transactions`,
   },
+  STAFF: {
+    BOOKINGS: `${API_BASE_URL}/staff/bookings`,
+    BOOKING_DETAILS: (id: string) => `${API_BASE_URL}/staff/bookings/${id}`,
+    CONFIRM_BOOKING: (id: string) => `${API_BASE_URL}/staff/bookings/${id}/confirm`,
+    COMPLETE_BOOKING: (id: string) => `${API_BASE_URL}/staff/bookings/${id}/complete`,
+    CANCEL_BOOKING: (id: string) => `${API_BASE_URL}/staff/bookings/${id}/cancel`,
+    
+    // Battery endpoints
+    BATTERIES: `${API_BASE_URL}/staff/batteries`,
+    BATTERY_DETAILS: (id: string) => `${API_BASE_URL}/staff/batteries/${id}`,
+    BATTERY_HISTORY: (id: string) => `${API_BASE_URL}/staff/batteries/${id}/history`,
+    ADD_BATTERY: `${API_BASE_URL}/staff/batteries`,
+    UPDATE_BATTERY: (id: string) => `${API_BASE_URL}/staff/batteries/${id}`,
+    DELETE_BATTERY: (id: string) => `${API_BASE_URL}/staff/batteries/${id}`,
+  },
   HEALTH: `${API_BASE_URL}/health`,
 };
 
