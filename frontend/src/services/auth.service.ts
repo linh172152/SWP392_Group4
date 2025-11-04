@@ -46,7 +46,7 @@ export const authService = {
    * Lấy thông tin profile của user hiện tại
    */
   async getProfile(): Promise<{ success: boolean; message: string; data: { user: UserProfile } }> {
-    const response = await fetch(API_ENDPOINTS.AUTH.PROFILE, {
+    const response = await fetch(`${API_ENDPOINTS.AUTH.PROFILE}`, {
       method: "GET",
       headers: getAuthHeaders(),
     });
@@ -65,7 +65,8 @@ export const authService = {
    * Cập nhật thông tin profile
    */
   async updateProfile(data: UpdateProfileData): Promise<{ success: boolean; message: string; data: { user: UserProfile } }> {
-    const response = await fetch(`${API_ENDPOINTS.AUTH.PROFILE.replace('/me', '/profile')}`, {
+    const baseUrl = API_ENDPOINTS.AUTH.PROFILE.replace('/me', '');
+    const response = await fetch(`${baseUrl}/profile`, {
       method: "PUT",
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
@@ -85,7 +86,8 @@ export const authService = {
    * Đổi mật khẩu
    */
   async changePassword(data: ChangePasswordData): Promise<{ success: boolean; message: string }> {
-    const response = await fetch(`${API_ENDPOINTS.AUTH.PROFILE.replace('/me', '/change-password')}`, {
+    const baseUrl = API_ENDPOINTS.AUTH.PROFILE.replace('/me', '');
+    const response = await fetch(`${baseUrl}/change-password`, {
       method: "PUT",
       headers: getAuthHeaders(),
       body: JSON.stringify({
@@ -107,13 +109,14 @@ export const authService = {
   /**
    * Upload avatar
    */
-  async uploadAvatar(file: File): Promise<{ success: boolean; message: string; data: { image_url: string } }> {
+  async uploadAvatar(file: File): Promise<{ success: boolean; message: string; data: { user: UserProfile; image_url: string } }> {
     const token = localStorage.getItem("accessToken");
+    const baseUrl = API_ENDPOINTS.AUTH.PROFILE.replace('/me', '');
     
     const formData = new FormData();
     formData.append('image', file);
 
-    const response = await fetch(`${API_ENDPOINTS.AUTH.PROFILE.replace('/me', '/upload-avatar')}`, {
+    const response = await fetch(`${baseUrl}/upload-avatar`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
