@@ -1,10 +1,7 @@
 import { Request, Response } from "express";
-import { PrismaClient } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
-import { notificationService } from "../server";
-
-const prisma = new PrismaClient();
+import { prisma, notificationService } from "../server";
 
 /**
  * Get user bookings
@@ -99,6 +96,15 @@ export const createBooking = asyncHandler(
       );
     }
 
+    // Validate UUIDs format (basic check)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(vehicle_id)) {
+      throw new CustomError("Invalid vehicle ID format", 400);
+    }
+    if (!uuidRegex.test(station_id)) {
+      throw new CustomError("Invalid station ID format", 400);
+    }
+
     // Check if vehicle belongs to user
     const vehicle = await prisma.vehicle.findFirst({
       where: {
@@ -123,16 +129,35 @@ export const createBooking = asyncHandler(
       throw new CustomError("Station not found or not active", 404);
     }
 
-    // Check if battery model is compatible with vehicle
-    if (vehicle.battery_model !== battery_model) {
+    // Check if battery model is compatible with vehicle (case-insensitive)
+    if (vehicle.battery_model.toLowerCase().trim() !== battery_model.toLowerCase().trim()) {
       throw new CustomError(
-        "Battery model is not compatible with your vehicle",
+        `Battery model "${battery_model}" is not compatible with your vehicle (requires "${vehicle.battery_model}")`,
         400
       );
     }
 
-    // Check if scheduled_at is in the future
-    const scheduledTime = new Date(scheduled_at);
+    // Validate and parse scheduled_at
+    let scheduledTime: Date;
+    try {
+      scheduledTime = new Date(scheduled_at);
+      // Check if date is valid
+      if (isNaN(scheduledTime.getTime())) {
+        throw new CustomError(
+          "Invalid date format for scheduled_at. Please use ISO 8601 format (e.g., 2024-01-15T14:00:00Z)",
+          400
+        );
+      }
+    } catch (error) {
+      if (error instanceof CustomError) {
+        throw error;
+      }
+      throw new CustomError(
+        "Invalid date format for scheduled_at. Please use ISO 8601 format (e.g., 2024-01-15T14:00:00Z)",
+        400
+      );
+    }
+
     const now = new Date();
     if (scheduledTime <= now) {
       throw new CustomError(
@@ -160,43 +185,69 @@ export const createBooking = asyncHandler(
       );
     }
 
-    // Check if there are available batteries at scheduled time
-    // Exclude batteries that are reserved for confirmed bookings at the same scheduled time
-    const confirmedBookingsAtTime = await prisma.booking.count({
+    // Normalize battery_model for comparison (case-insensitive, trim)
+    const normalizedBatteryModel = battery_model.toLowerCase().trim();
+
+    // Get all batteries at station and filter by model (case-insensitive)
+    const allBatteriesAtStation = await prisma.battery.findMany({
       where: {
         station_id,
-        battery_model,
+      },
+      select: {
+        model: true,
+        status: true,
+      },
+    });
+
+    // Filter batteries by model (case-insensitive)
+    const batteriesOfModel = allBatteriesAtStation.filter(
+      (b) => b.model.toLowerCase().trim() === normalizedBatteryModel
+    );
+
+    if (batteriesOfModel.length === 0) {
+      // Get unique models for error message
+      const availableModels = [...new Set(allBatteriesAtStation.map((b) => b.model))];
+      throw new CustomError(
+        `No batteries of model "${battery_model}" found at this station. Available models: ${availableModels.join(", ") || "none"}.`,
+        400
+      );
+    }
+
+    // Check if there are available batteries at scheduled time
+    // Exclude batteries that are reserved for confirmed bookings at the same scheduled time
+    // Query bookings with case-insensitive battery_model comparison
+    const allBookingsAtTime = await prisma.booking.findMany({
+      where: {
+        station_id,
         scheduled_at: {
           gte: new Date(scheduledTime.getTime() - 30 * 60 * 1000), // 30 minutes before
           lte: new Date(scheduledTime.getTime() + 30 * 60 * 1000), // 30 minutes after
         },
         status: { in: ["pending", "confirmed"] },
       },
+      select: {
+        battery_model: true,
+      },
     });
+
+    // Filter bookings by battery_model (case-insensitive)
+    const confirmedBookingsAtTime = allBookingsAtTime.filter(
+      (b) => b.battery_model.toLowerCase().trim() === normalizedBatteryModel
+    ).length;
 
     // Get time difference in hours
     const hoursUntilScheduled = (scheduledTime.getTime() - now.getTime()) / (1000 * 60 * 60);
 
     // Check total available batteries:
     // 1. Batteries with status = "full" (ready now)
-    const fullBatteries = await prisma.battery.count({
-      where: {
-        station_id,
-        model: battery_model,
-        status: "full",
-      },
-    });
+    const fullBatteries = batteriesOfModel.filter((b) => b.status === "full").length;
 
     // 2. Batteries with status = "charging" that will be ready by scheduled time
     // Estimate: if battery is charging and scheduled time is >= 1 hour away,
     // assume it will be ready (conservative estimate: charging takes 1-2 hours typically)
-    const chargingBatteries = hoursUntilScheduled >= 1 ? await prisma.battery.count({
-      where: {
-        station_id,
-        model: battery_model,
-        status: "charging",
-      },
-    }) : 0;
+    const chargingBatteries = hoursUntilScheduled >= 1
+      ? batteriesOfModel.filter((b) => b.status === "charging").length
+      : 0;
 
     // Total available = full batteries + charging batteries that will be ready
     const totalAvailableBatteries = fullBatteries + chargingBatteries;
@@ -205,14 +256,21 @@ export const createBooking = asyncHandler(
     const availableBatteries = totalAvailableBatteries - confirmedBookingsAtTime;
 
     if (availableBatteries <= 0) {
+      // Provide detailed error message
+      const reason = totalAvailableBatteries === 0
+        ? `No batteries are ready (${fullBatteries} full, ${chargingBatteries} charging)`
+        : `All ${totalAvailableBatteries} available batteries are reserved by other bookings (${confirmedBookingsAtTime} bookings in ±30 min window)`;
+      
       throw new CustomError(
-        `No available batteries for this model at this station at ${scheduledTime.toLocaleString()}. Please choose another time.`,
+        `No available batteries for model "${battery_model}" at this station at ${scheduledTime.toLocaleString()}. ${reason}. Please choose another time or station.`,
         400
       );
     }
 
-    // Generate booking code
-    const bookingCode = `BK${Date.now()}${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+    // Generate booking code (max 20 chars: BK + timestamp last 10 digits + 2 random chars)
+    const timestamp = Date.now().toString().slice(-10); // Last 10 digits
+    const random = Math.random().toString(36).substr(2, 2).toUpperCase();
+    const bookingCode = `BK${timestamp}${random}`; // BK + 10 + 2 = 14 chars
 
     const booking = await prisma.booking.create({
       data: {
@@ -221,7 +279,7 @@ export const createBooking = asyncHandler(
         vehicle_id,
         station_id,
         battery_model,
-        scheduled_at: new Date(scheduled_at),
+        scheduled_at: scheduledTime, // Use validated date
         notes,
         status: "pending",
       },
@@ -434,6 +492,15 @@ export const createInstantBooking = asyncHandler(
       );
     }
 
+    // Validate UUIDs format (basic check)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(vehicle_id)) {
+      throw new CustomError("Invalid vehicle ID format", 400);
+    }
+    if (!uuidRegex.test(station_id)) {
+      throw new CustomError("Invalid station ID format", 400);
+    }
+
     // Check if vehicle belongs to user
     const vehicle = await prisma.vehicle.findFirst({
       where: {
@@ -458,10 +525,10 @@ export const createInstantBooking = asyncHandler(
       throw new CustomError("Station not found or not active", 404);
     }
 
-    // Check if battery model is compatible
-    if (vehicle.battery_model !== battery_model) {
+    // Check if battery model is compatible (case-insensitive)
+    if (vehicle.battery_model.toLowerCase().trim() !== battery_model.toLowerCase().trim()) {
       throw new CustomError(
-        "Battery model is not compatible with your vehicle",
+        `Battery model "${battery_model}" is not compatible with your vehicle (requires "${vehicle.battery_model}")`,
         400
       );
     }
@@ -470,20 +537,41 @@ export const createInstantBooking = asyncHandler(
     const now = new Date();
     const scheduledTime = new Date(now.getTime() + 15 * 60 * 1000); // 15 minutes from now
 
-    // Check if there are available batteries RIGHT NOW (full batteries)
-    const fullBatteries = await prisma.battery.count({
+    // Normalize battery_model for comparison (case-insensitive, trim)
+    const normalizedBatteryModel = battery_model.toLowerCase().trim();
+
+    // Get all batteries at station and filter by model (case-insensitive)
+    const allBatteriesAtStation = await prisma.battery.findMany({
       where: {
         station_id,
-        model: battery_model,
-        status: "full",
+      },
+      select: {
+        model: true,
+        status: true,
       },
     });
 
+    // Filter batteries by model (case-insensitive)
+    const batteriesOfModel = allBatteriesAtStation.filter(
+      (b) => b.model.toLowerCase().trim() === normalizedBatteryModel
+    );
+
+    if (batteriesOfModel.length === 0) {
+      // Get unique models for error message
+      const availableModels = [...new Set(allBatteriesAtStation.map((b) => b.model))];
+      throw new CustomError(
+        `No batteries of model "${battery_model}" found at this station. Available models: ${availableModels.join(", ") || "none"}.`,
+        400
+      );
+    }
+
+    // Check if there are available batteries RIGHT NOW (full batteries)
+    const fullBatteries = batteriesOfModel.filter((b) => b.status === "full").length;
+
     // Also check instant bookings that might reserve batteries
-    const instantBookingsAtStation = await prisma.booking.count({
+    const allInstantBookingsAtStation = await prisma.booking.findMany({
       where: {
         station_id,
-        battery_model,
         is_instant: true,
         status: { in: ["pending", "confirmed"] },
         scheduled_at: {
@@ -491,19 +579,33 @@ export const createInstantBooking = asyncHandler(
           lte: new Date(now.getTime() + 15 * 60 * 1000), // Next 15 minutes
         },
       },
+      select: {
+        battery_model: true,
+      },
     });
+
+    // Filter bookings by battery_model (case-insensitive)
+    const instantBookingsAtStation = allInstantBookingsAtStation.filter(
+      (b) => b.battery_model.toLowerCase().trim() === normalizedBatteryModel
+    ).length;
 
     const availableBatteries = fullBatteries - instantBookingsAtStation;
 
     if (availableBatteries <= 0) {
+      const reason = fullBatteries === 0
+        ? `No full batteries available (${batteriesOfModel.length} total batteries of this model)`
+        : `All ${fullBatteries} full batteries are reserved by other instant bookings (${instantBookingsAtStation} bookings in next 15 min)`;
+      
       throw new CustomError(
-        `Không có pin sẵn sàng ngay. Vui lòng đặt lịch hẹn cho thời gian khác.`,
+        `Không có pin sẵn sàng ngay. ${reason}. Vui lòng đặt lịch hẹn cho thời gian khác.`,
         400
       );
     }
 
-    // Generate booking code
-    const bookingCode = `INST${Date.now()}${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+    // Generate booking code (max 20 chars: INST + timestamp last 10 digits + 2 random chars)
+    const timestamp = Date.now().toString().slice(-10); // Last 10 digits
+    const random = Math.random().toString(36).substr(2, 2).toUpperCase();
+    const bookingCode = `INST${timestamp}${random}`; // INST + 10 + 2 = 16 chars
 
     const booking = await prisma.booking.create({
       data: {
