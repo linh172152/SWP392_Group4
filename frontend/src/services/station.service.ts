@@ -10,7 +10,7 @@ export interface Station {
     lat: number;
     lng: number;
   };
-  status: 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE';
+  status: 'active' | 'inactive' | 'maintenance';
   capacity: number;
   available_batteries: number;
   charging_batteries: number;
