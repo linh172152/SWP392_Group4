@@ -29,6 +29,7 @@ import {
   createStation, 
   updateStation 
 } from '../../services/station.service';
+import { updateStaff } from '../../services/staff.service';
 
 const StationManagement: React.FC = () => {
   const [stations, setStations] = useState<Station[]>([]);
@@ -115,30 +116,55 @@ const StationManagement: React.FC = () => {
         ...(statusFilter !== 'all' && { status: statusFilter })
       };
 
-      console.log('Fetching stations with params:', params); // Debug log
+      console.log('Fetching stations with params:', params);
       const res = await getAllStations(params);
-      console.log('API Response:', res); // Debug log
+      console.log('API Response:', res);
       
       if (res.success) {
         if (Array.isArray(res.data)) {
-          console.log('Station Data:', res.data); // Debug log
-          // Tạm thời sử dụng dữ liệu mẫu nếu API trả về mảng rỗng
-          setStations(res.data.length > 0 ? res.data : mockStations);
+          console.log('Station Data:', res.data);
+          
+          // Transform data: backend returns 'staff' array, frontend expects 'manager' object
+          const transformedStations = res.data.map((station: any) => {
+            // Get first staff member as manager (or you can filter by a specific role)
+            const manager = station.staff && station.staff.length > 0 
+              ? station.staff[0] 
+              : null;
+            
+            return {
+              ...station,
+              id: station.station_id, // Add id alias for convenience
+              manager: manager ? {
+                user_id: manager.user_id,
+                full_name: manager.full_name,
+                email: manager.email,
+                phone: manager.phone
+              } : null,
+              // Map battery stats if available
+              available_batteries: station.battery_stats?.full || 0,
+              charging_batteries: station.battery_stats?.charging || 0,
+              maintenance_batteries: station.battery_stats?.maintenance || 0,
+              // Ensure these fields exist
+              daily_swaps: station.daily_swaps || 0,
+              daily_revenue: station.daily_revenue || 0,
+              uptime: station.uptime || 0,
+            };
+          });
+          
+          console.log('Transformed stations:', transformedStations);
+          setStations(transformedStations.length > 0 ? transformedStations : mockStations);
         } else {
           console.error('Invalid API response format:', res);
-          // Fallback to mock data
           setStations(mockStations);
           toast.error('Định dạng dữ liệu không hợp lệ - Đang hiển thị dữ liệu mẫu');
         }
       } else {
         console.error('API Error:', res.message);
-        // Fallback to mock data
         setStations(mockStations);
         toast.error(res.message || 'Lỗi khi tải danh sách trạm - Đang hiển thị dữ liệu mẫu');
       }
     } catch (err: any) {
       console.error('Load stations error:', err);
-      // Fallback to mock data
       setStations(mockStations);
       toast.error('Lỗi kết nối API - Đang hiển thị dữ liệu mẫu');
     }
@@ -151,18 +177,54 @@ const StationManagement: React.FC = () => {
 
 
 
-  // Handle station deletion
   // Handle create/update station
   const handleCreateStation = async (data: any) => {
     try {
-      const res = await createStation(data);
-      if (res.success) {
-        toast.success('Tạo trạm thành công');
-        fetchStations();
-      } else {
+      const { manager_id, coordinates, ...rest } = data;
+      
+      // Transform data for backend API
+      const stationData = {
+        ...rest,
+        latitude: coordinates?.lat,
+        longitude: coordinates?.lng,
+      };
+      
+      // Step 1: Create station
+      const res = await createStation(stationData);
+      if (!res.success) {
         throw new Error(res.message || 'Failed to create station');
       }
+      
+      const newStation = res.data;
+      console.log('✅ Station created:', newStation);
+      
+      // Step 2: If manager_id is provided, assign staff to this station
+      if (manager_id) {
+        try {
+          const staffUpdateRes = await updateStaff(manager_id, {
+            station_id: newStation.station_id
+          });
+          
+          if (staffUpdateRes.success) {
+            console.log('✅ Staff assigned to station');
+            toast.success('Tạo trạm và gán quản lý thành công');
+          } else {
+            console.warn('⚠️ Station created but failed to assign staff:', staffUpdateRes.message);
+            toast.warning('Trạm đã tạo nhưng không gán được quản lý');
+          }
+        } catch (staffError) {
+          console.error('❌ Failed to assign staff:', staffError);
+          toast.warning('Trạm đã tạo nhưng không gán được quản lý');
+        }
+      } else {
+        toast.success('Tạo trạm thành công');
+      }
+      
+      // Refresh station list
+      await fetchStations();
+      
     } catch (error: any) {
+      console.error('❌ Create station error:', error);
       toast.error(error.message || 'Lỗi khi tạo trạm');
       throw error;
     }
@@ -171,14 +233,66 @@ const StationManagement: React.FC = () => {
   const handleUpdateStation = async (data: any) => {
     if (!editingStation) return;
     try {
-      const res = await updateStation(editingStation.id, data);
-      if (res.success) {
-        toast.success('Cập nhật trạm thành công');
-        fetchStations();
-      } else {
+      const { manager_id, coordinates, ...rest } = data;
+      
+      // Transform data for backend API
+      const stationData = {
+        ...rest,
+        latitude: coordinates?.lat,
+        longitude: coordinates?.lng,
+      };
+      
+      // Step 1: Update station info
+      const res = await updateStation(editingStation.id, stationData);
+      if (!res.success) {
         throw new Error(res.message || 'Failed to update station');
       }
+      
+      console.log('✅ Station updated:', res.data);
+      
+      // Step 2: Update staff assignment if manager_id changed
+      const currentManagerId = editingStation.manager?.user_id;
+      
+      if (manager_id !== currentManagerId) {
+        // If old manager exists, remove them from this station
+        if (currentManagerId) {
+          try {
+            await updateStaff(currentManagerId, { station_id: null });
+            console.log('✅ Old manager removed from station');
+          } catch (error) {
+            console.warn('⚠️ Failed to remove old manager:', error);
+          }
+        }
+        
+        // If new manager provided, assign them to this station
+        if (manager_id) {
+          try {
+            const staffUpdateRes = await updateStaff(manager_id, {
+              station_id: editingStation.station_id
+            });
+            
+            if (staffUpdateRes.success) {
+              console.log('✅ New manager assigned to station');
+              toast.success('Cập nhật trạm và quản lý thành công');
+            } else {
+              toast.warning('Trạm đã cập nhật nhưng không gán được quản lý mới');
+            }
+          } catch (staffError) {
+            console.error('❌ Failed to assign new manager:', staffError);
+            toast.warning('Trạm đã cập nhật nhưng không gán được quản lý mới');
+          }
+        } else {
+          toast.success('Cập nhật trạm thành công');
+        }
+      } else {
+        toast.success('Cập nhật trạm thành công');
+      }
+      
+      // Refresh station list
+      await fetchStations();
+      
     } catch (error: any) {
+      console.error('❌ Update station error:', error);
       toast.error(error.message || 'Lỗi khi cập nhật trạm');
       throw error;
     }
@@ -227,7 +341,7 @@ const StationManagement: React.FC = () => {
     console.log('Status for icon:', status); // Debug log
     switch (status) {
       case 'active': return <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />;
-      case 'inactive': return <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />;
+      case 'closed': return <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />;
       case 'maintenance': return <Clock className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />;
       default: return <Building className="h-4 w-4 text-slate-600 dark:text-slate-400" />;
     }
@@ -237,7 +351,7 @@ const StationManagement: React.FC = () => {
     console.log('Status for color:', status); // Debug log
     switch (status) {
       case 'active': return 'bg-green-50/80 dark:bg-green-500/10 text-green-800 dark:text-green-400 border-green-200/50 dark:border-green-500/20';
-      case 'inactive': return 'bg-red-50/80 dark:bg-red-500/10 text-red-800 dark:text-red-400 border-red-200/50 dark:border-red-500/20';
+      case 'closed': return 'bg-red-50/80 dark:bg-red-500/10 text-red-800 dark:text-red-400 border-red-200/50 dark:border-red-500/20';
       case 'maintenance': return 'bg-yellow-50/80 dark:bg-yellow-500/10 text-yellow-800 dark:text-yellow-400 border-yellow-200/50 dark:border-yellow-500/20';
       default: return 'bg-slate-50/80 dark:bg-slate-500/10 text-slate-800 dark:text-slate-400 border-slate-200/50 dark:border-slate-500/20';
     }
@@ -247,7 +361,7 @@ const StationManagement: React.FC = () => {
     console.log('Status for label:', status); // Debug log
     switch (status) {
       case 'active': return 'Trực tuyến';
-      case 'inactive': return 'Ngoại tuyến';
+      case 'closed': return 'Ngoại tuyến';
       case 'maintenance': return 'Bảo trì';
       default: return status || 'Unknown';
     }
@@ -270,7 +384,7 @@ const StationManagement: React.FC = () => {
     const normalizeStatus = (apiStatus?: string): Station['status'] => {
       if (!apiStatus) {
         console.warn('Missing status for station:', station);
-        return 'inactive';
+        return 'closed';
       }
 
       const status = apiStatus.toLowerCase().trim();
@@ -280,15 +394,16 @@ const StationManagement: React.FC = () => {
         case 'active':
         case 'online':
           return 'active';
+        case 'closed':
         case 'inactive':
         case 'offline':
-          return 'inactive';
+          return 'closed';
         case 'maintenance':
         case 'bảo trì':
           return 'maintenance';
         default:
           console.warn('Unknown status:', apiStatus);
-          return 'inactive';
+          return 'closed';
       }
     };
 
@@ -426,7 +541,7 @@ const StationManagement: React.FC = () => {
               <SelectContent className="glass-card border-0">
                 <SelectItem value="all">Tất cả trạng thái</SelectItem>
                 <SelectItem value="active">Trực tuyến</SelectItem>
-                <SelectItem value="inactive">Ngoại tuyến</SelectItem>
+                <SelectItem value="closed">Ngoại tuyến</SelectItem>
                 <SelectItem value="maintenance">Bảo trì</SelectItem>
               </SelectContent>
             </Select>
