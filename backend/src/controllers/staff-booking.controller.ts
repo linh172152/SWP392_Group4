@@ -606,12 +606,17 @@ export const completeBooking = asyncHandler(
         data: { status: "completed" },
       });
 
-      // ✅ Tính giá từ BatteryPricing
-      const pricing = await tx.batteryPricing.findUnique({
-        where: { battery_model: booking.battery_model },
+      // ✅ Tính giá từ BatteryPricing (case-insensitive matching)
+      // BatteryPricing có unique constraint trên battery_model, nhưng để an toàn ta query tất cả và filter
+      const allPricing = await tx.batteryPricing.findMany({
+        where: { is_active: true },
       });
+      
+      const pricing = allPricing.find(
+        (p) => p.battery_model.toLowerCase().trim() === booking.battery_model.toLowerCase().trim()
+      );
 
-      if (!pricing || !pricing.is_active) {
+      if (!pricing) {
         throw new CustomError(
           `Pricing not found or inactive for battery model "${booking.battery_model}"`,
           400
