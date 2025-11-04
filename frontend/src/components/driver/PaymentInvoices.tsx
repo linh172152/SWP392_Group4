@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -13,121 +12,87 @@ import {
   Download,
   DollarSign,
   Receipt,
-  Plus,
-  Settings,
   CheckCircle,
   AlertCircle,
-  Loader2
+  FileText
 } from 'lucide-react';
-import { transactionService, type Transaction } from '../../services/transaction.service';
+import API_ENDPOINTS, { fetchWithAuth } from '../../config/api';
 
-const mockPaymentMethods = [
-  {
-    id: '1',
-    type: 'Visa',
-    last4: '1234',
-    expiry: '12/26',
-    isDefault: true
-  },
-  {
-    id: '2',
-    type: 'Mastercard',
-    last4: '5678',
-    expiry: '09/25',
-    isDefault: false
-  }
-];
-
-const mockSubscription = {
-  plan: 'Premium',
-  monthlyFee: 19.99,
-  discountRate: 15,
-  nextBilling: '2024-02-01',
-  status: 'active'
-};
+interface TransactionItem {
+  transaction_id: string;
+  transaction_code: string;
+  amount: number;
+  payment_status: 'pending' | 'completed' | 'failed' | 'cancelled';
+  station?: { name: string; address?: string };
+  vehicle?: { license_plate?: string; model?: string; make?: string };
+  new_battery?: { model: string; battery_code?: string };
+  booking?: { booking_code?: string };
+  swap_duration_minutes?: number;
+  payment?: { payment_method?: string; paid_at?: string };
+  swap_at?: string;
+  created_at?: string;
+}
 
 const PaymentInvoices: React.FC = () => {
-  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'completed' | 'failed' | 'cancelled'>('all');
   const [dateFilter, setDateFilter] = useState('all');
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [currentPage] = useState(1);
-  const [_totalPages, setTotalPages] = useState(1);
-  const [totalAmount, setTotalAmount] = useState(0);
-  const [authError, setAuthError] = useState(false);
-
-  // Load transactions from API
-  useEffect(() => {
-    // Check if user is logged in
-    const accessToken = localStorage.getItem('accessToken');
-    const user = localStorage.getItem('ev_swap_user');
-    
-    if (!accessToken || !user) {
-      setAuthError(true);
-      setLoading(false);
-      return;
-    }
-    
-    loadTransactions();
-  }, [statusFilter, currentPage]);
+  const [invoices, setInvoices] = useState<TransactionItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const loadTransactions = async () => {
+    setLoading(true);
+    setError('');
     try {
-      setLoading(true);
-      setAuthError(false);
-      
-      const params: any = {
-        page: currentPage,
-        limit: 10,
-      };
-      
-      if (statusFilter !== 'all') {
-        params.status = statusFilter;
-      }
-
-      const response = await transactionService.getTransactions(params);
-      setTransactions(response.data.transactions);
-      setTotalPages(response.data.pagination.pages);
-      
-      // Calculate total spent
-      const total = response.data.transactions.reduce((sum, t) => sum + Number(t.amount), 0);
-      setTotalAmount(total);
-    } catch (error: any) {
-      console.error('Error loading transactions:', error);
-      
-      // Handle 401 Unauthorized error
-      if (error.status === 401) {
-        setAuthError(true);
-        // Clear invalid tokens
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('ev_swap_user');
-        
-        alert("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
-        
-        // Redirect to login page after a short delay
-        setTimeout(() => {
-          navigate('/');
-        }, 1500);
-      } else {
-        alert(error.message || "Không thể tải danh sách giao dịch");
-      }
+      const url = new URL(API_ENDPOINTS.DRIVER.TRANSACTIONS);
+      if (statusFilter !== 'all') url.searchParams.set('status', statusFilter);
+      const res = await fetchWithAuth(url.toString());
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Tải giao dịch thất bại');
+      const items: TransactionItem[] = data.data.transactions || data.data || [];
+      setInvoices(items);
+    } catch (e: any) {
+      setError(e.message || 'Có lỗi xảy ra');
     } finally {
       setLoading(false);
     }
   };
 
-  const totalSpent = totalAmount;
-  const paidInvoices = transactions.filter(t => t.payment_status === 'completed');
-  const overdueInvoices = transactions.filter(t => t.payment_status === 'pending' && Number(t.amount) > 0);
+  const payNow = async (id: string) => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetchWithAuth(`${API_ENDPOINTS.DRIVER.TRANSACTIONS}/${id}/pay`, { method: 'POST', body: JSON.stringify({ payment_method: 'vnpay' }) });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Thanh toán thất bại');
+      await loadTransactions();
+    } catch (e: any) {
+      setError(e.message || 'Có lỗi xảy ra');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadTransactions(); }, [statusFilter]);
+
+  const filteredInvoices = invoices.filter(invoice => {
+    const s = searchQuery.toLowerCase();
+    const matchesSearch = invoice.transaction_code?.toLowerCase().includes(s) ||
+                         (invoice.station?.name || '').toLowerCase().includes(s);
+    return matchesSearch;
+  });
+
+  const totalSpent = filteredInvoices.reduce((sum, inv) => sum + (Number(inv.amount) || 0), 0);
+  const paidInvoices = filteredInvoices.filter(inv => inv.payment_status === 'completed');
+  const overdueInvoices = filteredInvoices.filter(inv => inv.payment_status === 'pending');
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed': return 'bg-green-100 text-green-800';
       case 'pending': return 'bg-yellow-100 text-yellow-800';
       case 'failed': return 'bg-red-100 text-red-800';
-      case 'refunded': return 'bg-blue-100 text-blue-800';
+      case 'cancelled': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -141,62 +106,317 @@ const PaymentInvoices: React.FC = () => {
     }
   };
 
-  const getStatusLabel = (status: string) => {
+  const getPaymentStatusLabel = (status: string) => {
     switch (status) {
       case 'completed': return 'Đã thanh toán';
       case 'pending': return 'Chờ thanh toán';
-      case 'failed': return 'Thất bại';
-      case 'refunded': return 'Đã hoàn tiền';
+      case 'failed': return 'Lỗi thanh toán';
+      case 'cancelled': return 'Đã hủy';
       default: return status;
     }
   };
 
-  const handlePayNow = async (transactionId: string) => {
-    try {
-      await transactionService.payTransaction(transactionId, { payment_method: 'vnpay' });
-      alert("Đã thanh toán giao dịch thành công");
-      loadTransactions();
-    } catch (error: any) {
-      // Handle 401 Unauthorized error
-      if (error.status === 401) {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('ev_swap_user');
-        alert("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
-        navigate('/');
-      } else {
-        alert(error.message || "Không thể thanh toán");
-      }
+  const exportInvoice = (invoice: TransactionItem) => {
+    // Tạo Hóa đơn thanh toán - Invoice/Receipt sau khi đã thanh toán
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Hóa đơn thanh toán - ${invoice.transaction_code}</title>
+          <style>
+            @media print {
+              body { margin: 0; padding: 10px; }
+              .no-print { display: none; }
+            }
+            body {
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              padding: 20px;
+              max-width: 700px;
+              margin: 0 auto;
+              background: #fff;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 30px;
+              border-bottom: 3px solid #10b981;
+              padding-bottom: 20px;
+            }
+            .header h1 {
+              color: #059669;
+              margin: 0 0 10px 0;
+              font-size: 28px;
+            }
+            .invoice-info {
+              display: flex;
+              justify-content: space-between;
+              margin: 20px 0;
+              padding: 15px;
+              background: #f0fdf4;
+              border-radius: 8px;
+            }
+            .invoice-code-box {
+              text-align: center;
+              flex: 1;
+            }
+            .invoice-code-label {
+              font-size: 12px;
+              color: #047857;
+              margin-bottom: 5px;
+            }
+            .invoice-code {
+              font-size: 24px;
+              font-weight: bold;
+              color: #059669;
+              font-family: 'Courier New', monospace;
+            }
+            .status-badge {
+              display: inline-block;
+              padding: 8px 16px;
+              border-radius: 20px;
+              font-weight: bold;
+              background: #10b981;
+              color: white;
+              margin-top: 10px;
+            }
+            .section {
+              margin: 20px 0;
+              padding: 15px;
+              background: #f8fafc;
+              border-radius: 8px;
+              border-left: 4px solid #10b981;
+            }
+            .section h3 {
+              margin: 0 0 12px 0;
+              color: #059669;
+              font-size: 16px;
+            }
+            .info-row {
+              display: flex;
+              justify-content: space-between;
+              padding: 8px 0;
+              border-bottom: 1px solid #e2e8f0;
+            }
+            .info-row:last-child {
+              border-bottom: none;
+            }
+            .label {
+              font-weight: 600;
+              color: #475569;
+              min-width: 140px;
+            }
+            .value {
+              color: #1e293b;
+              text-align: right;
+              flex: 1;
+            }
+            .amount-box {
+              background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+              color: white;
+              padding: 20px;
+              border-radius: 8px;
+              margin: 20px 0;
+              text-align: center;
+            }
+            .amount-label {
+              font-size: 14px;
+              opacity: 0.9;
+              margin-bottom: 8px;
+            }
+            .amount-value {
+              font-size: 36px;
+              font-weight: bold;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 30px;
+              padding-top: 20px;
+              border-top: 2px dashed #cbd5e1;
+              font-size: 11px;
+              color: #64748b;
+            }
+            .no-print {
+              text-align: center;
+              margin: 20px 0;
+              color: #64748b;
+            }
+            .company-info {
+              background: #f8fafc;
+              padding: 15px;
+              border-radius: 8px;
+              margin-bottom: 20px;
+              text-align: center;
+            }
+            .company-name {
+              font-size: 18px;
+              font-weight: bold;
+              color: #059669;
+              margin-bottom: 5px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="company-info">
+            <div class="company-name">EVSwap</div>
+            <div style="font-size: 12px; color: #64748b;">Hệ thống đổi pin xe điện</div>
+          </div>
+
+          <div class="header">
+            <h1>HÓA ĐƠN THANH TOÁN</h1>
+            <div class="invoice-info">
+              <div class="invoice-code-box">
+                <div class="invoice-code-label">Mã giao dịch</div>
+                <div class="invoice-code">${invoice.transaction_code}</div>
+              </div>
+              ${invoice.booking?.booking_code ? `
+              <div class="invoice-code-box">
+                <div class="invoice-code-label">Mã đơn hàng</div>
+                <div class="invoice-code" style="font-size: 20px;">${invoice.booking.booking_code}</div>
+              </div>
+              ` : ''}
+            </div>
+            <div class="status-badge">${getPaymentStatusLabel(invoice.payment_status)}</div>
+          </div>
+          
+          <div class="section">
+            <h3>📍 Thông tin trạm</h3>
+            <div class="info-row">
+              <span class="label">Tên trạm:</span>
+              <span class="value">${invoice.station?.name || '—'}</span>
+            </div>
+            ${invoice.station?.address ? `
+            <div class="info-row">
+              <span class="label">Địa chỉ:</span>
+              <span class="value">${invoice.station.address}</span>
+            </div>
+            ` : ''}
+          </div>
+
+          <div class="section">
+            <h3>🚗 Thông tin xe</h3>
+            ${invoice.vehicle?.license_plate ? `
+            <div class="info-row">
+              <span class="label">Biển số:</span>
+              <span class="value">${invoice.vehicle.license_plate}</span>
+            </div>
+            ` : ''}
+            ${invoice.vehicle?.make ? `
+            <div class="info-row">
+              <span class="label">Hãng xe:</span>
+              <span class="value">${invoice.vehicle.make}</span>
+            </div>
+            ` : ''}
+            ${invoice.vehicle?.model ? `
+            <div class="info-row">
+              <span class="label">Model:</span>
+              <span class="value">${invoice.vehicle.model}</span>
+            </div>
+            ` : ''}
+          </div>
+
+          <div class="section">
+            <h3>🔋 Thông tin pin</h3>
+            ${invoice.new_battery?.model ? `
+            <div class="info-row">
+              <span class="label">Model pin:</span>
+              <span class="value">${invoice.new_battery.model}</span>
+            </div>
+            ` : ''}
+            ${invoice.new_battery?.battery_code ? `
+            <div class="info-row">
+              <span class="label">Mã pin:</span>
+              <span class="value">${invoice.new_battery.battery_code}</span>
+            </div>
+            ` : ''}
+            ${invoice.swap_duration_minutes ? `
+            <div class="info-row">
+              <span class="label">Thời gian đổi:</span>
+              <span class="value">${invoice.swap_duration_minutes} phút</span>
+            </div>
+            ` : ''}
+          </div>
+
+          ${invoice.swap_at ? `
+          <div class="section">
+            <h3>📅 Thời gian</h3>
+            <div class="info-row">
+              <span class="label">Ngày đổi pin:</span>
+              <span class="value">${new Date(invoice.swap_at).toLocaleDateString('vi-VN')}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Giờ đổi pin:</span>
+              <span class="value">${new Date(invoice.swap_at).toLocaleTimeString('vi-VN')}</span>
+            </div>
+          </div>
+          ` : ''}
+
+          <div class="amount-box">
+            <div class="amount-label">Tổng tiền thanh toán</div>
+            <div class="amount-value">${Number(invoice.amount || 0).toLocaleString('vi-VN')} đ</div>
+          </div>
+
+          <div class="section">
+            <h3>💳 Thông tin thanh toán</h3>
+            <div class="info-row">
+              <span class="label">Phương thức:</span>
+              <span class="value">${invoice.payment?.payment_method === 'vnpay' ? 'VNPay' : invoice.payment?.payment_method === 'cash' ? 'Tiền mặt' : invoice.payment?.payment_method || '—'}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Trạng thái:</span>
+              <span class="value">${getPaymentStatusLabel(invoice.payment_status)}</span>
+            </div>
+            ${invoice.payment?.paid_at ? `
+            <div class="info-row">
+              <span class="label">Thời gian thanh toán:</span>
+              <span class="value">${new Date(invoice.payment.paid_at).toLocaleString('vi-VN')}</span>
+            </div>
+            ` : ''}
+          </div>
+
+          <div class="footer">
+            <div>Xuất ngày: ${new Date().toLocaleString('vi-VN')}</div>
+            <div style="margin-top: 5px;">Đây là hóa đơn điện tử có giá trị pháp lý tương đương hóa đơn giấy</div>
+            <div style="margin-top: 10px; font-weight: bold;">Cảm ơn quý khách đã sử dụng dịch vụ!</div>
+          </div>
+
+          <div class="no-print">
+            <p>Đang mở hộp thoại in... Nếu không tự động mở, vui lòng nhấn Ctrl+P (Windows) hoặc Cmd+P (Mac)</p>
+          </div>
+
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+              }, 500);
+            }
+          </script>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
     }
   };
 
-  const filteredInvoices = transactions.filter(transaction => {
-    const matchesSearch = 
-      transaction.transaction_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (transaction.station?.name || '').toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesSearch;
-  });
-
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Thanh toán & Hóa đơn</h1>
-          <p className="text-gray-600">Quản lý phương thức thanh toán và lịch sử giao dịch</p>
+          <h1 className="text-3xl font-bold text-gray-900">Payments & Invoices</h1>
+          <p className="text-gray-600">Manage your payment history</p>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline" onClick={loadTransactions}>
+          <Button variant="outline" onClick={loadTransactions} disabled={loading}>
             <Download className="mr-2 h-4 w-4" />
-            Làm mới
-          </Button>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Thêm phương thức
+            Refresh
           </Button>
         </div>
       </div>
 
-      {/* Summary Cards */}
+      {error && (
+        <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg border border-red-200">{error}</div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-4">
@@ -205,8 +425,8 @@ const PaymentInvoices: React.FC = () => {
                 <DollarSign className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Tổng chi tiêu</p>
-                <p className="text-xl font-bold">{totalSpent.toLocaleString('vi-VN')} ₫</p>
+                <p className="text-sm text-gray-600">Total Spent</p>
+                <p className="text-xl font-bold">{totalSpent.toLocaleString()} đ</p>
               </div>
             </div>
           </CardContent>
@@ -219,7 +439,7 @@ const PaymentInvoices: React.FC = () => {
                 <CheckCircle className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Đã thanh toán</p>
+                <p className="text-sm text-gray-600">Paid</p>
                 <p className="text-xl font-bold">{paidInvoices.length}</p>
               </div>
             </div>
@@ -229,11 +449,11 @@ const PaymentInvoices: React.FC = () => {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-3">
-              <div className="p-2 bg-red-100 rounded-lg">
-                <AlertCircle className="h-5 w-5 text-red-600" />
+              <div className="p-2 bg-yellow-100 rounded-lg">
+                <AlertCircle className="h-5 w-5 text-yellow-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Chờ thanh toán</p>
+                <p className="text-sm text-gray-600">Pending</p>
                 <p className="text-xl font-bold">{overdueInvoices.length}</p>
               </div>
             </div>
@@ -241,289 +461,132 @@ const PaymentInvoices: React.FC = () => {
         </Card>
       </div>
 
-      {/* Tabs */}
       <Tabs defaultValue="invoices" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="invoices">Giao dịch</TabsTrigger>
-          <TabsTrigger value="payment-methods">Phương thức thanh toán</TabsTrigger>
-          <TabsTrigger value="subscription">Gói đăng ký</TabsTrigger>
+          <TabsTrigger value="invoices">Invoices</TabsTrigger>
+          <TabsTrigger value="stats">Stats</TabsTrigger>
         </TabsList>
 
         <TabsContent value="invoices" className="space-y-4">
-          {/* Filters */}
           <Card>
             <CardContent className="p-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="relative">
                   <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                   <Input
-                    placeholder="Tìm kiếm giao dịch..."
+                    placeholder="Search invoices..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-10"
                   />
                 </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Lọc theo trạng thái" />
+                    <SelectValue placeholder="Filter by status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Tất cả</SelectItem>
-                    <SelectItem value="completed">Đã thanh toán</SelectItem>
-                    <SelectItem value="pending">Chờ thanh toán</SelectItem>
-                    <SelectItem value="failed">Thất bại</SelectItem>
-                    <SelectItem value="refunded">Đã hoàn tiền</SelectItem>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="completed">Paid</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="failed">Failed</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={dateFilter} onValueChange={setDateFilter}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Lọc theo thời gian" />
+                    <SelectValue placeholder="Filter by date" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Tất cả</SelectItem>
-                    <SelectItem value="week">7 ngày qua</SelectItem>
-                    <SelectItem value="month">30 ngày qua</SelectItem>
-                    <SelectItem value="quarter">3 tháng qua</SelectItem>
+                    <SelectItem value="all">All Time</SelectItem>
+                    <SelectItem value="month">Last Month</SelectItem>
+                    <SelectItem value="quarter">Last 3 Months</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </CardContent>
           </Card>
 
-          {/* Invoice List */}
-          {authError ? (
-            <Card>
-              <CardContent className="p-12 text-center">
-                <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Phiên đăng nhập không hợp lệ</h3>
-                <p className="text-gray-600 mb-4">Vui lòng đăng nhập để xem giao dịch của bạn.</p>
-                <Button onClick={() => navigate('/')}>
-                  Đăng nhập
-                </Button>
-              </CardContent>
-            </Card>
-          ) : loading ? (
-            <div className="flex justify-center items-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-            </div>
-          ) : filteredInvoices.length === 0 ? (
-            <Card>
-              <CardContent className="p-12 text-center">
-                <Receipt className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Không có giao dịch</h3>
-                <p className="text-gray-600">Chưa có giao dịch nào được tìm thấy.</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {filteredInvoices.map((transaction) => (
-                <Card key={transaction.transaction_id}>
-                  <CardContent className="p-6">
-                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center space-x-3">
-                            <div className="p-2 bg-blue-100 rounded-lg">
-                              <Receipt className="h-5 w-5 text-blue-600" />
-                            </div>
-                            <div>
-                              <h3 className="font-semibold text-lg">{transaction.transaction_code}</h3>
-                              <p className="text-sm text-gray-600">{transaction.station?.name || 'N/A'}</p>
-                            </div>
-                          </div>
-                          <Badge className={getStatusColor(transaction.payment_status)}>
-                            {getStatusIcon(transaction.payment_status)}
-                            <span className="ml-1">{getStatusLabel(transaction.payment_status)}</span>
-                          </Badge>
-                        </div>
-
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                          <div>
-                            <p className="text-gray-500">Ngày</p>
-                            <p className="font-medium">{new Date(transaction.created_at).toLocaleDateString('vi-VN')}</p>
-                          </div>
-                          <div>
-                            <p className="text-gray-500">Số tiền</p>
-                            <p className="font-medium text-lg">{Number(transaction.amount).toLocaleString('vi-VN')} ₫</p>
-                          </div>
-                          <div>
-                            <p className="text-gray-500">Pin mới</p>
-                            <p className="font-medium">{transaction.new_battery?.model || 'N/A'}</p>
-                            {transaction.swap_duration_minutes && (
-                              <p className="text-xs text-gray-600">Thời gian: {transaction.swap_duration_minutes} phút</p>
-                            )}
-                          </div>
-                          <div>
-                            <p className="text-gray-500">Xe</p>
-                            <p className="font-medium">{transaction.vehicle?.license_plate || 'N/A'}</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <Button variant="outline" size="sm">
-                          <Download className="mr-1 h-3 w-3" />
-                          Chi tiết
-                        </Button>
-                        {transaction.payment_status === 'pending' && Number(transaction.amount) > 0 && (
-                          <Button 
-                            size="sm" 
-                            className="bg-red-600 hover:bg-red-700"
-                            onClick={() => handlePayNow(transaction.transaction_id)}
-                          >
-                            Thanh toán
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="payment-methods" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {mockPaymentMethods.map((method) => (
-              <Card key={method.id} className={method.isDefault ? 'border-blue-500' : ''}>
+          <div className="space-y-4">
+            {filteredInvoices.map((invoice) => (
+              <Card key={invoice.transaction_id}>
                 <CardContent className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-gray-100 rounded-lg">
-                        <CreditCard className="h-6 w-6 text-gray-600" />
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center space-x-3">
+                          <div className="p-2 bg-blue-100 rounded-lg">
+                            <Receipt className="h-5 w-5 text-blue-600" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-lg">{invoice.transaction_code}</h3>
+                            <p className="text-sm text-gray-600">{invoice.station?.name || '—'}</p>
+                          </div>
+                        </div>
+                        <Badge className={getStatusColor(invoice.payment_status)}>
+                          {getStatusIcon(invoice.payment_status)}
+                          <span className="ml-1 capitalize">{invoice.payment_status}</span>
+                        </Badge>
                       </div>
-                      <div>
-                        <h3 className="font-semibold">{method.type} ****{method.last4}</h3>
-                        <p className="text-sm text-gray-600">Expires {method.expiry}</p>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                          <p className="text-gray-500">Date</p>
+                          <p className="font-medium">{invoice.created_at ? new Date(invoice.created_at).toLocaleDateString() : '—'}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500">Amount</p>
+                          <p className="font-medium text-lg">{Number(invoice.amount || 0).toLocaleString()} đ</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500">Battery</p>
+                          <p className="font-medium">{invoice.new_battery?.model || '—'}</p>
+                          <p className="text-xs text-gray-600">Duration: {invoice.swap_duration_minutes || '—'} mins</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500">Method</p>
+                          <p className="font-medium">{invoice.payment?.payment_method || '—'}</p>
+                        </div>
                       </div>
                     </div>
-                    {method.isDefault && (
-                      <Badge className="bg-blue-100 text-blue-800">Default</Badge>
-                    )}
-                  </div>
 
-                  <div className="flex space-x-2">
-                    <Button variant="outline" size="sm" className="flex-1">
-                      <Settings className="mr-1 h-3 w-3" />
-                      Edit
-                    </Button>
-                    {!method.isDefault && (
-                      <Button variant="outline" size="sm" className="flex-1">
-                        Set Default
-                      </Button>
-                    )}
-                    <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
-                      Remove
-                    </Button>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      {invoice.payment_status === 'completed' && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="border-green-500 text-green-700 hover:bg-green-50"
+                          onClick={() => exportInvoice(invoice)}
+                        >
+                          <FileText className="mr-2 h-4 w-4" />
+                          Xuất hóa đơn
+                        </Button>
+                      )}
+                      {invoice.payment_status === 'pending' && (
+                        <Button size="sm" className="bg-red-600 hover:bg-red-700" onClick={() => payNow(invoice.transaction_id)} disabled={loading}>
+                          Pay Now
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
             ))}
-
-            {/* Add New Payment Method Card */}
-            <Card className="border-dashed border-2 border-gray-300">
-              <CardContent className="p-6 text-center">
-                <div className="p-4 bg-gray-50 rounded-lg inline-block mb-4">
-                  <Plus className="h-8 w-8 text-gray-400" />
-                </div>
-                <h3 className="font-semibold mb-2">Add Payment Method</h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  Add a new credit or debit card for seamless payments
-                </p>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Card
-                </Button>
-              </CardContent>
-            </Card>
           </div>
         </TabsContent>
 
-        <TabsContent value="subscription" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Current Subscription */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Current Subscription</CardTitle>
-                <CardDescription>Your active EVSwap plan</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-2xl font-bold">{mockSubscription.plan} Plan</h3>
-                    <p className="text-gray-600">${mockSubscription.monthlyFee}/month</p>
-                  </div>
-                  <Badge className="bg-green-100 text-green-800">
-                    <CheckCircle className="mr-1 h-3 w-3" />
-                    Active
-                  </Badge>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Discount on swaps</span>
-                    <span className="font-medium">{mockSubscription.discountRate}%</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Next billing</span>
-                    <span className="font-medium">{new Date(mockSubscription.nextBilling).toLocaleDateString()}</span>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t">
-                  <div className="flex space-x-2">
-                    <Button variant="outline" className="flex-1">
-                      Change Plan
-                    </Button>
-                    <Button variant="outline" className="text-red-600 hover:text-red-700">
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Subscription Benefits */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Subscription Benefits</CardTitle>
-                <CardDescription>What you get with Premium</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-3">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-sm">15% discount on all battery swaps</span>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-sm">Priority booking at busy stations</span>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-sm">Extended battery health warranty</span>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-sm">24/7 premium customer support</span>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-sm">Access to premium battery types</span>
-                  </div>
-                </div>
-
-                <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-                  <h4 className="font-semibold text-blue-900 mb-2">This Month's Savings</h4>
-                  <div className="text-2xl font-bold text-blue-600">$12.50</div>
-                  <p className="text-sm text-blue-700">You've saved this much with your Premium plan</p>
-                  <Progress value={75} className="mt-2" />
-                  <p className="text-xs text-blue-600 mt-1">75% of monthly fee recovered</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+        <TabsContent value="stats" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Monthly Savings</CardTitle>
+              <CardDescription>Tổng quan chi tiêu</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="mt-2">
+                <Progress value={75} />
+                <p className="text-xs text-gray-600 mt-1">Demo hiển thị, sẽ kết nối stats API nếu cần</p>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
