@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '../ui/card';
+import { Dialog, DialogContent } from '../ui/dialog';
+import StationForm from './StationForm';
+import StationDetails from './StationDetails';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Input } from '../ui/input';
@@ -20,21 +23,31 @@ import {
   Trash2
 } from 'lucide-react';
 import type { Station } from '../../services/station.service';
-import { deleteStation } from '../../services/station.service';
+import { 
+  getAllStations, 
+  deleteStation, 
+  createStation, 
+  updateStation 
+} from '../../services/station.service';
 
 const StationManagement: React.FC = () => {
   const [stations, setStations] = useState<Station[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [selectedStation, setSelectedStation] = useState<Station | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
+  const [editingStation, setEditingStation] = useState<Station | null>(null);
 
   // Mock data for development
   const mockStations: Station[] = [
     {
+      id: 'ST001',
       station_id: 'ST001',
       name: 'Trạm Thành phố',
       address: '123 Đường Chính, Quận 1, TP.HCM',
       coordinates: { lat: 10.762622, lng: 106.660172 },
-      status: 'online',
+      status: 'active',
       capacity: 12,
       available_batteries: 8,
       charging_batteries: 3,
@@ -50,11 +63,12 @@ const StationManagement: React.FC = () => {
       }
     },
     {
+      id: 'ST002',
       station_id: 'ST002',
       name: 'Trạm Trung tâm Thương mại',
       address: '456 Đại lộ Mua sắm, Quận 3, TP.HCM',
       coordinates: { lat: 10.786785, lng: 106.700471 },
-      status: 'online',
+      status: 'active',
       capacity: 20,
       available_batteries: 15,
       charging_batteries: 4,
@@ -70,6 +84,7 @@ const StationManagement: React.FC = () => {
       }
     },
     {
+      id: 'ST003',
       station_id: 'ST003',
       name: 'Trạm Nghỉ Cao tốc A1',
       address: 'Cao tốc A1 hướng Bắc Km 42',
@@ -91,38 +106,41 @@ const StationManagement: React.FC = () => {
     }
   ];
 
-  // Fetch stations from API (temporarily using mock data)
+  // Fetch stations from API
   const fetchStations = async () => {
     try {
-      // Simulating API call for development
-      setTimeout(() => {
-        // Filter mock data based on search and status
-        const filtered = mockStations.filter(station => {
-          const matchesSearch = searchTerm === '' || 
-            station.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            station.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            station.station_id.toLowerCase().includes(searchTerm.toLowerCase());
-          
-          const matchesStatus = statusFilter === 'all' || station.status === statusFilter;
-          
-          return matchesSearch && matchesStatus;
-        });
-        setStations(filtered);
-      }, 500); // Simulate network delay
+      // Only send status filter if not 'all'
+      const params = {
+        search: searchTerm,
+        ...(statusFilter !== 'all' && { status: statusFilter })
+      };
 
-      // TODO: Uncomment when API is ready
-      // const res = await getAllStations({
-      //   search: searchTerm,
-      //   status: statusFilter === 'all' ? undefined : statusFilter
-      // });
-      // if (res.success) {
-      //   setStations(res.data?.stations || []);
-      // } else {
-      //   throw new Error(res.message || 'Failed to load stations');
-      // }
+      console.log('Fetching stations with params:', params); // Debug log
+      const res = await getAllStations(params);
+      console.log('API Response:', res); // Debug log
+      
+      if (res.success) {
+        if (Array.isArray(res.data)) {
+          console.log('Station Data:', res.data); // Debug log
+          // Tạm thời sử dụng dữ liệu mẫu nếu API trả về mảng rỗng
+          setStations(res.data.length > 0 ? res.data : mockStations);
+        } else {
+          console.error('Invalid API response format:', res);
+          // Fallback to mock data
+          setStations(mockStations);
+          toast.error('Định dạng dữ liệu không hợp lệ - Đang hiển thị dữ liệu mẫu');
+        }
+      } else {
+        console.error('API Error:', res.message);
+        // Fallback to mock data
+        setStations(mockStations);
+        toast.error(res.message || 'Lỗi khi tải danh sách trạm - Đang hiển thị dữ liệu mẫu');
+      }
     } catch (err: any) {
       console.error('Load stations error:', err);
-      toast.error('API đang được phát triển. Tạm thời hiển thị dữ liệu mẫu.');
+      // Fallback to mock data
+      setStations(mockStations);
+      toast.error('Lỗi kết nối API - Đang hiển thị dữ liệu mẫu');
     }
   };
 
@@ -134,6 +152,38 @@ const StationManagement: React.FC = () => {
 
 
   // Handle station deletion
+  // Handle create/update station
+  const handleCreateStation = async (data: any) => {
+    try {
+      const res = await createStation(data);
+      if (res.success) {
+        toast.success('Tạo trạm thành công');
+        fetchStations();
+      } else {
+        throw new Error(res.message || 'Failed to create station');
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Lỗi khi tạo trạm');
+      throw error;
+    }
+  };
+
+  const handleUpdateStation = async (data: any) => {
+    if (!editingStation) return;
+    try {
+      const res = await updateStation(editingStation.id, data);
+      if (res.success) {
+        toast.success('Cập nhật trạm thành công');
+        fetchStations();
+      } else {
+        throw new Error(res.message || 'Failed to update station');
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Lỗi khi cập nhật trạm');
+      throw error;
+    }
+  };
+
   const handleDeleteStation = async (stationId: string) => {
     if (window.confirm('Bạn có chắc chắn muốn xóa trạm này?')) {
       try {
@@ -150,30 +200,56 @@ const StationManagement: React.FC = () => {
       }
     }
   };
-  const getStatusIcon = (status: string) => {
+
+  // Handle view details
+  const handleViewDetails = (station: Station) => {
+    setSelectedStation(station);
+    setShowDetails(true);
+  };
+
+  // Handle edit
+  const handleEdit = (station: Station) => {
+    setEditingStation(station);
+    setIsFormOpen(true);
+  };
+
+  // Handle form submission
+  const handleFormSubmit = async (data: any) => {
+    if (editingStation) {
+      await handleUpdateStation(data);
+    } else {
+      await handleCreateStation(data);
+    }
+    setIsFormOpen(false);
+    setEditingStation(null);
+  };
+  const getStatusIcon = (status: Station['status']) => {
+    console.log('Status for icon:', status); // Debug log
     switch (status) {
-      case 'online': return <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />;
-      case 'offline': return <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />;
+      case 'active': return <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />;
+      case 'inactive': return <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />;
       case 'maintenance': return <Clock className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />;
       default: return <Building className="h-4 w-4 text-slate-600 dark:text-slate-400" />;
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: Station['status']) => {
+    console.log('Status for color:', status); // Debug log
     switch (status) {
-      case 'online': return 'bg-green-50/80 dark:bg-green-500/10 text-green-800 dark:text-green-400 border-green-200/50 dark:border-green-500/20';
-      case 'offline': return 'bg-red-50/80 dark:bg-red-500/10 text-red-800 dark:text-red-400 border-red-200/50 dark:border-red-500/20';
+      case 'active': return 'bg-green-50/80 dark:bg-green-500/10 text-green-800 dark:text-green-400 border-green-200/50 dark:border-green-500/20';
+      case 'inactive': return 'bg-red-50/80 dark:bg-red-500/10 text-red-800 dark:text-red-400 border-red-200/50 dark:border-red-500/20';
       case 'maintenance': return 'bg-yellow-50/80 dark:bg-yellow-500/10 text-yellow-800 dark:text-yellow-400 border-yellow-200/50 dark:border-yellow-500/20';
       default: return 'bg-slate-50/80 dark:bg-slate-500/10 text-slate-800 dark:text-slate-400 border-slate-200/50 dark:border-slate-500/20';
     }
   };
 
-  const getStatusLabel = (status: string) => {
+  const getStatusLabel = (status: Station['status']) => {
+    console.log('Status for label:', status); // Debug log
     switch (status) {
-      case 'online': return 'Trực tuyến';
-      case 'offline': return 'Ngoại tuyến';
+      case 'active': return 'Trực tuyến';
+      case 'inactive': return 'Ngoại tuyến';
       case 'maintenance': return 'Bảo trì';
-      default: return status;
+      default: return status || 'Unknown';
     }
   };
 
@@ -183,20 +259,71 @@ const StationManagement: React.FC = () => {
     return 'text-green-600 dark:text-green-400';
   };
 
-  // Filter stations by search term and status
-  const filteredStations = stations.filter(station => {
-    const matchesSearch = station.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          station.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          station.station_id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || station.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  // Normalize and filter stations
+  const normalizeStation = (station: any): Station => {
+    if (!station) {
+      console.error('Received null or undefined station data');
+      return null as any;
+    }
 
-  const totalStations = stations.length;
-  const onlineStations = stations.filter(s => s.status === 'online').length;
-  const totalRevenue = stations.reduce((sum, s) => sum + (s.daily_revenue || 0), 0);
-  const totalSwaps = stations.reduce((sum, s) => sum + (s.daily_swaps || 0), 0);
+    // Normalize status to lowercase
+    const normalizeStatus = (apiStatus?: string): Station['status'] => {
+      if (!apiStatus) {
+        console.warn('Missing status for station:', station);
+        return 'inactive';
+      }
 
+      const status = apiStatus.toLowerCase().trim();
+      console.log('Normalizing status:', status); // Debug log
+
+      switch (status) {
+        case 'active':
+        case 'online':
+          return 'active';
+        case 'inactive':
+        case 'offline':
+          return 'inactive';
+        case 'maintenance':
+        case 'bảo trì':
+          return 'maintenance';
+        default:
+          console.warn('Unknown status:', apiStatus);
+          return 'inactive';
+      }
+    };
+
+    const normalized = {
+      id: station.id || station.station_id || '',
+      station_id: station.station_id || station.id || '',
+      name: station.name || 'Unnamed Station',
+      address: station.address || 'No Address',
+      coordinates: station.coordinates || { lat: 0, lng: 0 },
+      status: normalizeStatus(station.status),
+      capacity: Number(station.capacity) || 0,
+      available_batteries: Number(station.available_batteries) || 0,
+      charging_batteries: Number(station.charging_batteries) || 0,
+      maintenance_batteries: Number(station.maintenance_batteries) || 0,
+      daily_swaps: Number(station.daily_swaps) || 0,
+      daily_revenue: Number(station.daily_revenue) || 0,
+      uptime: Number(station.uptime) || 0,
+      operating_hours: station.operating_hours || '24/7',
+      manager: station.manager || null
+    } as Station;
+
+    console.log('Normalized station:', normalized); // Debug log
+    return normalized;
+  };
+
+  const filteredStations = stations.map(normalizeStation);
+  console.log('Filtered Stations:', filteredStations); // Debug log
+
+  // Calculate statistics
+  const stats = {
+    total: filteredStations.length,
+    online: filteredStations.filter((s: Station) => s.status === 'active').length,
+    revenue: filteredStations.reduce((sum: number, s: Station) => sum + (s.daily_revenue || 0), 0),
+    swaps: filteredStations.reduce((sum: number, s: Station) => sum + (s.daily_swaps || 0), 0)
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -206,7 +333,13 @@ const StationManagement: React.FC = () => {
           <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-purple-900 dark:from-white dark:to-purple-100 bg-clip-text text-transparent">Quản lý Trạm</h1>
           <p className="text-slate-600 dark:text-slate-300">Giám sát và quản lý mạng lưới trạm thay pin</p>
         </div>
-        <Button className="bg-gradient-to-r from-purple-500 to-violet-500 text-white shadow-lg hover:shadow-xl transition-all duration-300">
+        <Button 
+          className="bg-gradient-to-r from-purple-500 to-violet-500 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+          onClick={() => {
+            setEditingStation(null);
+            setIsFormOpen(true);
+          }}
+        >
           <Plus className="mr-2 h-4 w-4" />
           Thêm Trạm mới
         </Button>
@@ -222,7 +355,7 @@ const StationManagement: React.FC = () => {
               </div>
               <div>
                 <p className="text-sm text-slate-600 dark:text-slate-400">Tổng trạm</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{totalStations}</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.total}</p>
               </div>
             </div>
           </CardContent>
@@ -236,7 +369,7 @@ const StationManagement: React.FC = () => {
               </div>
               <div>
                 <p className="text-sm text-slate-600 dark:text-slate-400">Trực tuyến</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{onlineStations}</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.online}</p>
               </div>
             </div>
           </CardContent>
@@ -250,7 +383,7 @@ const StationManagement: React.FC = () => {
               </div>
               <div>
                 <p className="text-sm text-slate-600 dark:text-slate-400">Lần thay hôm nay</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{totalSwaps}</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.swaps}</p>
               </div>
             </div>
           </CardContent>
@@ -264,7 +397,7 @@ const StationManagement: React.FC = () => {
               </div>
               <div>
                 <p className="text-sm text-slate-600 dark:text-slate-400">Doanh thu hôm nay</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">${totalRevenue.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">${stats.revenue.toLocaleString()}</p>
               </div>
             </div>
           </CardContent>
@@ -292,8 +425,8 @@ const StationManagement: React.FC = () => {
               </SelectTrigger>
               <SelectContent className="glass-card border-0">
                 <SelectItem value="all">Tất cả trạng thái</SelectItem>
-                <SelectItem value="online">Trực tuyến</SelectItem>
-                <SelectItem value="offline">Ngoại tuyến</SelectItem>
+                <SelectItem value="active">Trực tuyến</SelectItem>
+                <SelectItem value="inactive">Ngoại tuyến</SelectItem>
                 <SelectItem value="maintenance">Bảo trì</SelectItem>
               </SelectContent>
             </Select>
@@ -326,7 +459,10 @@ const StationManagement: React.FC = () => {
                           <MapPin className="h-4 w-4 mr-1" />
                           {station.address}
                         </p>
-                        <p className="text-sm text-slate-600 dark:text-slate-400">ID: {station.station_id}</p>
+                        {/* Chỉ hiển thị ID cho admin khi hover */}
+                        <div className="hidden group-hover:block text-xs text-slate-400 dark:text-slate-500 mt-1">
+                          {station.station_id}
+                        </div>
                       </div>
                     </div>
                     
@@ -395,11 +531,21 @@ const StationManagement: React.FC = () => {
 
                   {/* Actions */}
                   <div className="lg:col-span-2 flex flex-col justify-center space-y-2">
-                    <Button variant="outline" size="sm" className="glass border-purple-200/50 dark:border-purple-400/30">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="glass border-purple-200/50 dark:border-purple-400/30"
+                      onClick={() => handleViewDetails(station)}
+                    >
                       <Activity className="mr-1 h-3 w-3" />
                       Chi tiết
                     </Button>
-                    <Button variant="outline" size="sm" className="glass border-blue-200/50 dark:border-blue-400/30">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="glass border-blue-200/50 dark:border-blue-400/30"
+                      onClick={() => handleEdit(station)}
+                    >
                       <Edit className="mr-1 h-3 w-3" />
                       Chỉnh sửa
                     </Button>
@@ -428,6 +574,33 @@ const StationManagement: React.FC = () => {
             <p className="text-slate-600 dark:text-slate-400">Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm</p>
           </CardContent>
         </Card>
+      )}
+
+      {/* Station Form Dialog */}
+      <StationForm
+        isOpen={isFormOpen}
+        onClose={() => {
+          setIsFormOpen(false);
+          setEditingStation(null);
+        }}
+        onSubmit={handleFormSubmit}
+        initialData={editingStation || undefined}
+        title={editingStation ? 'Chỉnh sửa Trạm' : 'Thêm Trạm mới'}
+      />
+
+      {/* Station Details Dialog */}
+      {showDetails && selectedStation && (
+        <Dialog open={showDetails} onOpenChange={setShowDetails}>
+          <DialogContent className="max-w-4xl">
+            <StationDetails
+              stationId={selectedStation.id}
+              onClose={() => {
+                setShowDetails(false);
+                setSelectedStation(null);
+              }}
+            />
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
