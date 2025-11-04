@@ -53,10 +53,10 @@ const BatteryCoordination: React.FC = () => {
               </div>
               <div>
                 <h1 className="text-4xl font-black text-white tracking-tight">
-                  Battery Pricing Management
+                  Quản lí Pin
                 </h1>
                 <p className="text-blue-100 text-lg mt-1">
-                  Configure and manage pricing for all battery models
+                  Quản lý và cấu hình giá cho tất cả các mẫu pin
                 </p>
               </div>
             </div>
@@ -105,10 +105,10 @@ const BatteryCoordination: React.FC = () => {
                   <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg">
                     <DollarSign className="h-6 w-6 text-white" />
                   </div>
-                  Pricing Configurations
+                  Danh sách giá pin
                 </CardTitle>
                 <CardDescription className="text-slate-600 mt-1">
-                  Manage and configure all battery model pricing
+                  Quản lý và cấu hình tất cả các mẫu pin
                 </CardDescription>
               </div>
 
