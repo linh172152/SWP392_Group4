@@ -10,6 +10,7 @@ export interface Battery {
   capacity_kwh?: number;
   voltage?: number;
   current_charge: number;
+  health_percentage?: number;
   status: 'full' | 'charging' | 'in_use' | 'maintenance' | 'damaged';
   last_charged_at?: string;
   created_at: string;
@@ -34,6 +35,7 @@ export interface AddBatteryData {
 export interface UpdateBatteryData {
   status?: 'full' | 'charging' | 'in_use' | 'maintenance' | 'damaged';
   current_charge?: number;
+  health_percentage?: number;
 }
 
 export interface BatteryTransferLog {

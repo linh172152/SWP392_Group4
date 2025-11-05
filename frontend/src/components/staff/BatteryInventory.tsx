@@ -4,7 +4,16 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Progress } from '../ui/progress';
 import { Input } from '../ui/input';
+import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
 import { 
   Battery, 
   Plus, 
@@ -17,13 +26,19 @@ import {
   Wrench,
   RefreshCw,
   Loader2,
-  Trash2
+  Trash2,
+  Eye,
+  Edit,
+  MapPin,
+  Calendar,
+  Activity
 } from 'lucide-react';
 import {
   Battery as BatteryType,
   getStationBatteries,
   deleteBattery,
-  updateBatteryStatus
+  updateBatteryStatus,
+  UpdateBatteryData
 } from '../../services/battery.service';
 import { useToast } from '../../hooks/use-toast';
 import AddBatteryDialog from './AddBatteryDialog';
@@ -36,7 +51,21 @@ const BatteryInventory: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [modelFilter, setModelFilter] = useState('all');
+  
+  // Dialog states
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedBattery, setSelectedBattery] = useState<BatteryType | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [editFormData, setEditFormData] = useState<UpdateBatteryData>({
+    status: 'full',
+    current_charge: 100,
+    health_percentage: undefined,
+  });
+  
   const { toast } = useToast();
 
   // Fetch batteries
@@ -67,20 +96,68 @@ const BatteryInventory: React.FC = () => {
     fetchBatteries();
   }, [statusFilter, modelFilter]);
 
-  // Handle delete battery
-  const handleDeleteBattery = async (battery: BatteryType) => {
-    if (!confirm(`Xác nhận xóa pin ${battery.battery_code}?`)) return;
+  // Dialog handlers
+  const handleViewDetail = (battery: BatteryType) => {
+    setSelectedBattery(battery);
+    setDetailDialogOpen(true);
+  };
+
+  const handleEdit = (battery: BatteryType) => {
+    setSelectedBattery(battery);
+    setEditFormData({
+      status: battery.status,
+      current_charge: battery.current_charge,
+      health_percentage: battery.health_percentage || undefined,
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleDelete = (battery: BatteryType) => {
+    setSelectedBattery(battery);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedBattery) return;
 
     try {
-      setActionLoading(battery.battery_id);
-      const response = await deleteBattery(battery.battery_id);
-      
+      setEditLoading(true);
+      const response = await updateBatteryStatus(selectedBattery.battery_id, editFormData);
+
       if (response.success) {
         toast({
           title: 'Thành công',
-          description: 'Đã xóa pin',
+          description: 'Đã cập nhật thông tin pin',
         });
         fetchBatteries();
+        setEditDialogOpen(false);
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Lỗi',
+        description: error.message || 'Không thể cập nhật pin',
+        variant: 'destructive',
+      });
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!selectedBattery) return;
+
+    try {
+      setDeleteLoading(true);
+      const response = await deleteBattery(selectedBattery.battery_id);
+
+      if (response.success) {
+        toast({
+          title: 'Thành công',
+          description: 'Đã xóa pin thành công',
+        });
+        fetchBatteries();
+        setDeleteDialogOpen(false);
       }
     } catch (error: any) {
       toast({
@@ -89,7 +166,18 @@ const BatteryInventory: React.FC = () => {
         variant: 'destructive',
       });
     } finally {
-      setActionLoading(null);
+      setDeleteLoading(false);
+    }
+  };
+
+  const getDetailStatusColor = (status: string) => {
+    switch (status) {
+      case 'full': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+      case 'charging': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+      case 'in_use': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
+      case 'maintenance': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+      case 'damaged': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
     }
   };
 
@@ -342,35 +430,32 @@ const BatteryInventory: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex space-x-2 pt-2">
+                <div className="flex gap-2 pt-2">
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    className="flex-1 glass border-green-200/50 dark:border-emerald-400/30"
-                    onClick={() => alert(`Chi tiết pin: ${battery.battery_code}`)}
+                    className="flex-1 glass border-blue-300/50 hover:bg-blue-50 dark:border-blue-700/50 dark:hover:bg-blue-900/20"
+                    onClick={() => handleViewDetail(battery)}
                   >
+                    <Eye className="mr-2 h-4 w-4" />
                     Chi tiết
                   </Button>
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    className="glass border-yellow-200/50 dark:border-yellow-400/30"
-                    onClick={() => alert(`Cập nhật trạng thái: ${battery.battery_code}`)}
+                    className="flex-1 glass border-green-300/50 hover:bg-green-50 dark:border-green-700/50 dark:hover:bg-green-900/20"
+                    onClick={() => handleEdit(battery)}
                   >
-                    <Wrench className="h-3 w-3" />
+                    <Edit className="mr-2 h-4 w-4" />
+                    Sửa
                   </Button>
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    className="glass border-red-200/50 dark:border-red-400/30 text-red-600"
-                    onClick={() => handleDeleteBattery(battery)}
-                    disabled={actionLoading === battery.battery_id}
+                    className="glass border-red-300/50 hover:bg-red-50 dark:border-red-700/50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400"
+                    onClick={() => handleDelete(battery)}
                   >
-                    {actionLoading === battery.battery_id ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-3 w-3" />
-                    )}
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
@@ -395,6 +480,351 @@ const BatteryInventory: React.FC = () => {
         onOpenChange={setAddDialogOpen}
         onSuccess={fetchBatteries}
       />
+
+      {/* Battery Detail Dialog */}
+      <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Battery className="h-5 w-5 text-blue-600" />
+              Chi tiết Pin
+            </DialogTitle>
+            <DialogDescription>
+              Thông tin chi tiết về pin {selectedBattery?.battery_code}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedBattery && (
+            <div className="space-y-6 py-4">
+              {/* Status Badge */}
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Trạng thái</h3>
+                <Badge className={getDetailStatusColor(selectedBattery.status)}>
+                  {getStatusLabel(selectedBattery.status)}
+                </Badge>
+              </div>
+
+              {/* Battery Info Grid */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2 bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-1">
+                    <Battery className="h-4 w-4" />
+                    <span>Mã Pin</span>
+                  </div>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {selectedBattery.battery_code}
+                  </p>
+                </div>
+
+                <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                  <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Model</div>
+                  <p className="font-semibold text-gray-900 dark:text-white">{selectedBattery.model}</p>
+                </div>
+
+                <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-1">
+                    <Zap className="h-4 w-4" />
+                    <span>Mức sạc</span>
+                  </div>
+                  <p className="font-semibold text-gray-900 dark:text-white">
+                    {selectedBattery.current_charge}%
+                  </p>
+                </div>
+
+                {selectedBattery.capacity_kwh && (
+                  <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                    <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Dung lượng</div>
+                    <p className="font-semibold text-gray-900 dark:text-white">
+                      {selectedBattery.capacity_kwh} kWh
+                    </p>
+                  </div>
+                )}
+
+                {selectedBattery.voltage && (
+                  <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                    <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Điện áp</div>
+                    <p className="font-semibold text-gray-900 dark:text-white">
+                      {selectedBattery.voltage} V
+                    </p>
+                  </div>
+                )}
+
+                {selectedBattery.health_percentage && (
+                  <div className="col-span-2 bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-2">
+                      <Activity className="h-4 w-4" />
+                      <span>Tình trạng sức khỏe</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full transition-all ${
+                            selectedBattery.health_percentage >= 80
+                              ? 'bg-green-500'
+                              : selectedBattery.health_percentage >= 50
+                              ? 'bg-yellow-500'
+                              : 'bg-red-500'
+                          }`}
+                          style={{ width: `${selectedBattery.health_percentage}%` }}
+                        />
+                      </div>
+                      <span className="font-semibold text-gray-900 dark:text-white">
+                        {selectedBattery.health_percentage}%
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {selectedBattery.station && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300 mb-2">
+                    <MapPin className="h-4 w-4" />
+                    <span className="font-semibold">Trạm</span>
+                  </div>
+                  <p className="text-gray-900 dark:text-white font-medium">{selectedBattery.station.name}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    {selectedBattery.station.address}
+                  </p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                {selectedBattery.last_charged_at && (
+                  <div>
+                    <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400 mb-1">
+                      <Calendar className="h-4 w-4" />
+                      <span>Sạc lần cuối</span>
+                    </div>
+                    <p className="text-gray-900 dark:text-white">
+                      {new Date(selectedBattery.last_charged_at).toLocaleString('vi-VN')}
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400 mb-1">
+                    <Calendar className="h-4 w-4" />
+                    <span>Ngày thêm</span>
+                  </div>
+                  <p className="text-gray-900 dark:text-white">
+                    {new Date(selectedBattery.created_at).toLocaleDateString('vi-VN')}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Battery Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Chỉnh sửa Pin</DialogTitle>
+            <DialogDescription>
+              Cập nhật thông tin cho pin {selectedBattery?.battery_code}
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleEditSubmit}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="battery_code" className="text-right">
+                  Mã Pin
+                </Label>
+                <Input
+                  id="battery_code"
+                  value={selectedBattery?.battery_code || ''}
+                  disabled
+                  className="col-span-3 bg-slate-50 dark:bg-slate-800"
+                />
+              </div>
+
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="model" className="text-right">
+                  Model
+                </Label>
+                <Input
+                  id="model"
+                  value={selectedBattery?.model || ''}
+                  disabled
+                  className="col-span-3 bg-slate-50 dark:bg-slate-800"
+                />
+              </div>
+
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="status" className="text-right">
+                  Trạng thái <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={editFormData.status}
+                  onValueChange={(value: any) => setEditFormData({ ...editFormData, status: value })}
+                  disabled={editLoading}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Chọn trạng thái" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="full">Đầy</SelectItem>
+                    <SelectItem value="charging">Đang sạc</SelectItem>
+                    <SelectItem value="in_use">Đang sử dụng</SelectItem>
+                    <SelectItem value="maintenance">Bảo trì</SelectItem>
+                    <SelectItem value="damaged">Hỏng</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="current_charge" className="text-right">
+                  Mức sạc (%) <span className="text-red-500">*</span>
+                </Label>
+                <div className="col-span-3">
+                  <Input
+                    id="current_charge"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={editFormData.current_charge}
+                    onChange={(e) => setEditFormData({ ...editFormData, current_charge: Number(e.target.value) })}
+                    disabled={editLoading}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Giá trị từ 0 đến 100</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="health_percentage" className="text-right">
+                  Tình trạng (%)
+                </Label>
+                <div className="col-span-3">
+                  <Input
+                    id="health_percentage"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={editFormData.health_percentage || ''}
+                    onChange={(e) => setEditFormData({ ...editFormData, health_percentage: e.target.value ? Number(e.target.value) : undefined })}
+                    disabled={editLoading}
+                    placeholder="Không bắt buộc"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Tình trạng sức khỏe pin (0-100%)</p>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditDialogOpen(false)}
+                disabled={editLoading}
+              >
+                Hủy
+              </Button>
+              <Button type="submit" disabled={editLoading}>
+                {editLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Lưu thay đổi
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Battery Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="h-5 w-5" />
+              Xác nhận Xóa Pin
+            </DialogTitle>
+            <DialogDescription>
+              Hành động này không thể hoàn tác. Pin sẽ bị xóa vĩnh viễn khỏi hệ thống.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedBattery && (
+            <div className="space-y-4 py-4">
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-red-900 dark:text-red-200">
+                      Cảnh báo: Xóa pin
+                    </p>
+                    <p className="text-sm text-red-700 dark:text-red-300">
+                      Bạn sắp xóa pin này khỏi hệ thống. Hành động này không thể hoàn tác.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4 space-y-3">
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Mã Pin</p>
+                  <p className="font-semibold text-lg text-gray-900 dark:text-white">
+                    {selectedBattery.battery_code}
+                  </p>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Model</p>
+                    <p className="font-medium text-gray-900 dark:text-white">{selectedBattery.model}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Trạng thái</p>
+                    <Badge 
+                      variant="outline" 
+                      className={
+                        selectedBattery.status === 'damaged' 
+                          ? 'border-red-500 text-red-700' 
+                          : 'border-gray-300 text-gray-700'
+                      }
+                    >
+                      {getStatusLabel(selectedBattery.status)}
+                    </Badge>
+                  </div>
+                </div>
+
+                {selectedBattery.station && (
+                  <div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Trạm</p>
+                    <p className="font-medium text-gray-900 dark:text-white">{selectedBattery.station.name}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+                <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                  💡 <strong>Lưu ý:</strong> Chỉ nên xóa pin khi đã hỏng không sửa được hoặc không còn sử dụng.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+              disabled={deleteLoading}
+            >
+              Hủy
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDeleteConfirm}
+              disabled={deleteLoading}
+            >
+              {deleteLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <AlertTriangle className="mr-2 h-4 w-4" />
+              Xóa Pin
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
