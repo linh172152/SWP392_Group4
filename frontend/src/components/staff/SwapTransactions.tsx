@@ -3,6 +3,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
 import { 
   Zap, 
   Clock, 
@@ -13,7 +24,12 @@ import {
   ArrowRight,
   RefreshCw,
   X,
-  Loader2
+  Loader2,
+  Eye,
+  Phone,
+  User,
+  MapPin,
+  Calendar
 } from 'lucide-react';
 import { 
   StaffBooking, 
@@ -32,6 +48,20 @@ const SwapTransactions: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [selectedBooking, setSelectedBooking] = useState<StaffBooking | null>(null);
+  
+  // Dialog states
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  
+  // Form states
+  const [phoneInput, setPhoneInput] = useState('');
+  const [oldBatteryCode, setOldBatteryCode] = useState('');
+  const [batteryModel, setBatteryModel] = useState('');
+  const [oldBatteryStatus, setOldBatteryStatus] = useState<'good' | 'damaged' | 'maintenance'>('good');
+  const [cancelReason, setCancelReason] = useState('');
+  
   const { toast } = useToast();
 
   // Fetch bookings
@@ -95,20 +125,40 @@ const SwapTransactions: React.FC = () => {
     }
   };
 
+  // Open detail dialog
+  const handleViewDetail = (booking: StaffBooking) => {
+    setSelectedBooking(booking);
+    setDetailDialogOpen(true);
+  };
+
+  // Open confirm dialog
+  const handleOpenConfirmDialog = (booking: StaffBooking) => {
+    setSelectedBooking(booking);
+    setPhoneInput('');
+    setConfirmDialogOpen(true);
+  };
+
   // Confirm booking - Verify phone
-  const handleConfirmBooking = async (booking: StaffBooking) => {
-    const phone = prompt('Nhập số điện thoại của khách hàng để xác nhận:');
-    if (!phone) return;
+  const handleConfirmBooking = async () => {
+    if (!selectedBooking || !phoneInput.trim()) {
+      toast({
+        title: 'Lỗi',
+        description: 'Vui lòng nhập số điện thoại',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     try {
-      setActionLoading(booking.booking_id);
-      const response = await confirmBooking(booking.booking_id, { phone });
+      setActionLoading(selectedBooking.booking_id);
+      const response = await confirmBooking(selectedBooking.booking_id, { phone: phoneInput });
       
       if (response.success) {
         toast({
           title: 'Thành công',
           description: 'Đã xác nhận booking',
         });
+        setConfirmDialogOpen(false);
         fetchBookings(); // Refresh list
       }
     } catch (error: any) {
@@ -122,20 +172,32 @@ const SwapTransactions: React.FC = () => {
     }
   };
 
-  // Complete booking - Swap battery
-  const handleCompleteBooking = async (booking: StaffBooking) => {
-    const oldBatteryCode = prompt('Nhập mã pin cũ (battery code):');
-    if (!oldBatteryCode) return;
+  // Open complete dialog
+  const handleOpenCompleteDialog = (booking: StaffBooking) => {
+    setSelectedBooking(booking);
+    setOldBatteryCode('');
+    setBatteryModel(booking.battery_model || '');
+    setOldBatteryStatus('good');
+    setCompleteDialogOpen(true);
+  };
 
-    const batteryModel = booking.battery_model || prompt('Nhập model pin mới:');
-    if (!batteryModel) return;
+  // Complete booking - Swap battery
+  const handleCompleteBooking = async () => {
+    if (!selectedBooking || !oldBatteryCode.trim() || !batteryModel.trim()) {
+      toast({
+        title: 'Lỗi',
+        description: 'Vui lòng điền đầy đủ thông tin',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     try {
-      setActionLoading(booking.booking_id);
-      const response = await completeBooking(booking.booking_id, {
+      setActionLoading(selectedBooking.booking_id);
+      const response = await completeBooking(selectedBooking.booking_id, {
         old_battery_code: oldBatteryCode,
         battery_model: batteryModel,
-        old_battery_status: 'good',
+        old_battery_status: oldBatteryStatus,
       });
       
       if (response.success) {
@@ -143,6 +205,7 @@ const SwapTransactions: React.FC = () => {
           title: 'Thành công',
           description: `Hoàn thành đổi pin. ${response.data?.message || ''}`,
         });
+        setCompleteDialogOpen(false);
         fetchBookings(); // Refresh list
       }
     } catch (error: any) {
@@ -156,20 +219,34 @@ const SwapTransactions: React.FC = () => {
     }
   };
 
+  // Open cancel dialog
+  const handleOpenCancelDialog = (booking: StaffBooking) => {
+    setSelectedBooking(booking);
+    setCancelReason('');
+    setCancelDialogOpen(true);
+  };
+
   // Cancel booking
-  const handleCancelBooking = async (booking: StaffBooking) => {
-    const reason = prompt('Lý do hủy:');
-    if (!reason) return;
+  const handleCancelBooking = async () => {
+    if (!selectedBooking || !cancelReason.trim()) {
+      toast({
+        title: 'Lỗi',
+        description: 'Vui lòng nhập lý do hủy',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     try {
-      setActionLoading(booking.booking_id);
-      const response = await cancelBooking(booking.booking_id, { reason });
+      setActionLoading(selectedBooking.booking_id);
+      const response = await cancelBooking(selectedBooking.booking_id, { reason: cancelReason });
       
       if (response.success) {
         toast({
           title: 'Thành công',
           description: 'Đã hủy booking',
         });
+        setCancelDialogOpen(false);
         fetchBookings(); // Refresh list
       }
     } catch (error: any) {
@@ -306,7 +383,7 @@ const SwapTransactions: React.FC = () => {
                     {booking.status === 'pending' && (
                       <Button 
                         size="sm" 
-                        onClick={() => handleConfirmBooking(booking)}
+                        onClick={() => handleOpenConfirmDialog(booking)}
                         disabled={actionLoading === booking.booking_id}
                       >
                         {actionLoading === booking.booking_id ? (
@@ -320,7 +397,7 @@ const SwapTransactions: React.FC = () => {
                     {booking.status === 'confirmed' && (
                       <Button 
                         size="sm" 
-                        onClick={() => handleCompleteBooking(booking)}
+                        onClick={() => handleOpenCompleteDialog(booking)}
                         disabled={actionLoading === booking.booking_id}
                       >
                         {actionLoading === booking.booking_id ? (
@@ -334,15 +411,16 @@ const SwapTransactions: React.FC = () => {
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      onClick={() => setSelectedBooking(booking)}
+                      onClick={() => handleViewDetail(booking)}
                     >
+                      <Eye className="mr-1 h-3 w-3" />
                       Chi tiết
                     </Button>
                     <Button 
                       variant="outline" 
                       size="sm" 
                       className="text-red-600 hover:text-red-700"
-                      onClick={() => handleCancelBooking(booking)}
+                      onClick={() => handleOpenCancelDialog(booking)}
                       disabled={actionLoading === booking.booking_id}
                     >
                       {actionLoading === booking.booking_id ? (
@@ -416,6 +494,349 @@ const SwapTransactions: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Detail Dialog */}
+      <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Chi tiết giao dịch thay pin</DialogTitle>
+            <DialogDescription>
+              Thông tin chi tiết về booking và khách hàng
+            </DialogDescription>
+          </DialogHeader>
+          {selectedBooking && (
+            <div className="space-y-4">
+              {/* Customer Info */}
+              <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded-lg space-y-3">
+                <h3 className="font-semibold flex items-center">
+                  <User className="h-4 w-4 mr-2" />
+                  Thông tin khách hàng
+                </h3>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-gray-500">Họ tên:</span>
+                    <p className="font-medium">{selectedBooking.user?.full_name || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Số điện thoại:</span>
+                    <p className="font-medium flex items-center">
+                      <Phone className="h-3 w-3 mr-1" />
+                      {selectedBooking.user?.phone || 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Email:</span>
+                    <p className="font-medium">{selectedBooking.user?.email || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Trạng thái:</span>
+                    <Badge className={getStatusColor(selectedBooking.status)}>
+                      {getStatusText(selectedBooking.status)}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              {/* Vehicle Info */}
+              <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded-lg space-y-3">
+                <h3 className="font-semibold flex items-center">
+                  <Car className="h-4 w-4 mr-2" />
+                  Thông tin xe
+                </h3>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-gray-500">Hãng xe:</span>
+                    <p className="font-medium">{selectedBooking.vehicle?.make || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Mẫu xe:</span>
+                    <p className="font-medium">{selectedBooking.vehicle?.model || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Biển số:</span>
+                    <p className="font-medium">{selectedBooking.vehicle?.license_plate || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Loại pin:</span>
+                    <p className="font-medium">{selectedBooking.battery_model || 'N/A'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Booking Info */}
+              <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded-lg space-y-3">
+                <h3 className="font-semibold flex items-center">
+                  <Calendar className="h-4 w-4 mr-2" />
+                  Thông tin đặt lịch
+                </h3>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-gray-500">Mã booking:</span>
+                    <p className="font-medium">{selectedBooking.booking_code}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Thời gian đặt:</span>
+                    <p className="font-medium">
+                      {new Date(selectedBooking.scheduled_at).toLocaleString('vi-VN')}
+                    </p>
+                  </div>
+                  {selectedBooking.checked_in_by_staff && (
+                    <div>
+                      <span className="text-gray-500">Xác nhận bởi:</span>
+                      <p className="font-medium">{selectedBooking.checked_in_by_staff.full_name}</p>
+                    </div>
+                  )}
+                  {selectedBooking.transaction && (
+                    <>
+                      <div>
+                        <span className="text-gray-500">Mã giao dịch:</span>
+                        <p className="font-medium">{selectedBooking.transaction.transaction_code}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Số tiền:</span>
+                        <p className="font-medium text-green-600">
+                          {Number(selectedBooking.transaction.amount).toLocaleString('vi-VN')}đ
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetailDialogOpen(false)}>
+              Đóng
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Booking Dialog */}
+      <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Xác nhận khách hàng</DialogTitle>
+            <DialogDescription>
+              Nhập số điện thoại của khách hàng để xác nhận booking
+            </DialogDescription>
+          </DialogHeader>
+          {selectedBooking && (
+            <div className="space-y-4">
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
+                <p className="text-sm">
+                  <strong>Khách hàng:</strong> {selectedBooking.user?.full_name}
+                </p>
+                <p className="text-sm">
+                  <strong>Mã booking:</strong> {selectedBooking.booking_code}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone">
+                  Số điện thoại <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  placeholder="Nhập số điện thoại khách hàng"
+                  value={phoneInput}
+                  onChange={(e) => setPhoneInput(e.target.value)}
+                  disabled={actionLoading === selectedBooking.booking_id}
+                />
+                <p className="text-xs text-gray-500">
+                  Số điện thoại phải khớp với thông tin đăng ký của khách hàng
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setConfirmDialogOpen(false)}
+              disabled={actionLoading === selectedBooking?.booking_id}
+            >
+              Hủy
+            </Button>
+            <Button 
+              onClick={handleConfirmBooking}
+              disabled={!phoneInput.trim() || actionLoading === selectedBooking?.booking_id}
+            >
+              {actionLoading === selectedBooking?.booking_id ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Đang xác nhận...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  Xác nhận
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Complete Booking Dialog */}
+      <Dialog open={completeDialogOpen} onOpenChange={setCompleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Hoàn thành đổi pin</DialogTitle>
+            <DialogDescription>
+              Nhập thông tin pin để hoàn tất giao dịch
+            </DialogDescription>
+          </DialogHeader>
+          {selectedBooking && (
+            <div className="space-y-4">
+              <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
+                <p className="text-sm">
+                  <strong>Khách hàng:</strong> {selectedBooking.user?.full_name}
+                </p>
+                <p className="text-sm">
+                  <strong>Mã booking:</strong> {selectedBooking.booking_code}
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="oldBatteryCode">
+                  Mã pin cũ <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="oldBatteryCode"
+                  type="text"
+                  placeholder="Nhập mã pin cũ của khách hàng"
+                  value={oldBatteryCode}
+                  onChange={(e) => setOldBatteryCode(e.target.value)}
+                  disabled={actionLoading === selectedBooking.booking_id}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="batteryModel">
+                  Model pin mới <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="batteryModel"
+                  type="text"
+                  placeholder="Nhập model pin mới"
+                  value={batteryModel}
+                  onChange={(e) => setBatteryModel(e.target.value)}
+                  disabled={actionLoading === selectedBooking.booking_id}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="oldBatteryStatus">
+                  Tình trạng pin cũ <span className="text-red-500">*</span>
+                </Label>
+                <select
+                  id="oldBatteryStatus"
+                  className="w-full border rounded-md p-2 bg-white dark:bg-slate-900"
+                  value={oldBatteryStatus}
+                  onChange={(e) => setOldBatteryStatus(e.target.value as any)}
+                  disabled={actionLoading === selectedBooking.booking_id}
+                >
+                  <option value="good">Tốt</option>
+                  <option value="damaged">Hư hỏng</option>
+                  <option value="maintenance">Cần bảo trì</option>
+                </select>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setCompleteDialogOpen(false)}
+              disabled={actionLoading === selectedBooking?.booking_id}
+            >
+              Hủy
+            </Button>
+            <Button 
+              onClick={handleCompleteBooking}
+              disabled={!oldBatteryCode.trim() || !batteryModel.trim() || actionLoading === selectedBooking?.booking_id}
+            >
+              {actionLoading === selectedBooking?.booking_id ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Đang xử lý...
+                </>
+              ) : (
+                <>
+                  <Zap className="mr-2 h-4 w-4" />
+                  Hoàn thành
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Booking Dialog */}
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Hủy booking</DialogTitle>
+            <DialogDescription>
+              Vui lòng nhập lý do hủy booking này
+            </DialogDescription>
+          </DialogHeader>
+          {selectedBooking && (
+            <div className="space-y-4">
+              <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg">
+                <p className="text-sm">
+                  <strong>Khách hàng:</strong> {selectedBooking.user?.full_name}
+                </p>
+                <p className="text-sm">
+                  <strong>Mã booking:</strong> {selectedBooking.booking_code}
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="cancelReason">
+                  Lý do hủy <span className="text-red-500">*</span>
+                </Label>
+                <Textarea
+                  id="cancelReason"
+                  placeholder="Nhập lý do hủy booking..."
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  rows={4}
+                  disabled={actionLoading === selectedBooking.booking_id}
+                />
+                <p className="text-xs text-gray-500">
+                  Lý do hủy sẽ được thông báo đến khách hàng
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setCancelDialogOpen(false)}
+              disabled={actionLoading === selectedBooking?.booking_id}
+            >
+              Quay lại
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={handleCancelBooking}
+              disabled={!cancelReason.trim() || actionLoading === selectedBooking?.booking_id}
+            >
+              {actionLoading === selectedBooking?.booking_id ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Đang hủy...
+                </>
+              ) : (
+                <>
+                  <X className="mr-2 h-4 w-4" />
+                  Xác nhận hủy
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
