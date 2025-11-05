@@ -661,10 +661,10 @@ const BatteryInventory: React.FC = () => {
                   onValueChange={(value: any) => setEditFormData({ ...editFormData, status: value })}
                   disabled={editLoading}
                 >
-                  <SelectTrigger className="col-span-3">
+                  <SelectTrigger className="col-span-3 bg-white dark:bg-slate-900 border-gray-300 dark:border-slate-600">
                     <SelectValue placeholder="Chọn trạng thái" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white dark:bg-slate-900 border-gray-300 dark:border-slate-600">
                     <SelectItem value="full">Đầy</SelectItem>
                     <SelectItem value="charging">Đang sạc</SelectItem>
                     <SelectItem value="in_use">Đang sử dụng</SelectItem>
