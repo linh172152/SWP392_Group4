@@ -5,6 +5,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { Progress } from '../ui/progress';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { 
   MapPin, 
   Search, 
@@ -13,7 +14,8 @@ import {
   Star,
   Calendar,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  ChevronDown
 } from 'lucide-react';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
 import { useDriverStations } from '../../hooks/useDriverStations';
@@ -24,6 +26,7 @@ const StationFinding: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
   
   const { 
     stations, 
@@ -370,9 +373,45 @@ const StationFinding: React.FC = () => {
                           </Badge>
                         ))}
                         {getBatteryTypes(station.supported_models).length > 3 && (
-                          <Badge variant="secondary" className="text-xs glass border-0">
-                            +{getBatteryTypes(station.supported_models).length - 3}
-                          </Badge>
+                          <Popover 
+                            open={openPopoverId === station.station_id} 
+                            onOpenChange={(open) => setOpenPopoverId(open ? station.station_id : null)}
+                          >
+                            <PopoverTrigger asChild>
+                              <button
+                                type="button"
+                                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-0 cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenPopoverId(openPopoverId === station.station_id ? null : station.station_id);
+                                }}
+                              >
+                                +{getBatteryTypes(station.supported_models).length - 3}
+                                <ChevronDown className="ml-1 h-3 w-3 inline" />
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent 
+                              className="w-64 p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-lg z-50"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <div className="space-y-2">
+                                <h4 className="font-semibold text-sm text-slate-900 dark:text-white mb-2">
+                                  Tất cả loại pin ({getBatteryTypes(station.supported_models).length})
+                                </h4>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {getBatteryTypes(station.supported_models).map((type, idx) => (
+                                    <Badge 
+                                      key={idx} 
+                                      variant="secondary" 
+                                      className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300"
+                                    >
+                                      {type}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
                         )}
                       </div>
                     )}

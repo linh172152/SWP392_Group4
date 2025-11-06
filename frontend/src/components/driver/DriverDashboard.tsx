@@ -12,6 +12,7 @@ import ServicePackages from './ServicePackages';
 import SupportTickets from './SupportTickets';
 import DriverProfile from './DriverProfile';
 import BookBatteryPage from './BookBatteryPage';
+import Wallet from './Wallet';
 
 interface DriverDashboardProps {
   user: User;
@@ -30,6 +31,7 @@ const DriverDashboard: React.FC<DriverDashboardProps> = ({ user, onLogout }) => 
         <Route path="/booking/:stationId" element={<BookingForm />} />
         <Route path="/bookings" element={<BookingHistory />} />
         <Route path="/payments" element={<PaymentInvoices />} />
+        <Route path="/wallet" element={<Wallet />} />
         <Route path="/subscriptions" element={<ServicePackages />} />
         <Route path="/profile" element={<DriverProfile user={user} />} />
       </Routes>

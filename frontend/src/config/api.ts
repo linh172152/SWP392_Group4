@@ -69,6 +69,12 @@ export const API_ENDPOINTS = {
     STATIONS: `${API_BASE_URL}/driver/stations`,
     BOOKINGS: `${API_BASE_URL}/driver/bookings`,
     TRANSACTIONS: `${API_BASE_URL}/driver/transactions`,
+    WALLET: {
+      BALANCE: `${API_BASE_URL}/driver/wallet/balance`,
+      TRANSACTIONS: `${API_BASE_URL}/driver/wallet/transactions`,
+      TOPUP: `${API_BASE_URL}/driver/wallet/topup`,
+    },
+    TOPUP_PACKAGES: `${API_BASE_URL}/driver/topup-packages`,
   },
   // Code của bạn - Subscription endpoints (giữ nguyên)
   SUBSCRIPTIONS: {
