@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { Toaster } from './components/ui/sonner';
 import LandingPage from './components/LandingPage';
 import AuthModal from './components/AuthModal';
 import GoogleCallback from './components/GoogleCallback';
@@ -121,6 +122,7 @@ function App() {
             )}
           </div>
         </div>
+        <Toaster />
       </Router>
     </ThemeProvider>
   );

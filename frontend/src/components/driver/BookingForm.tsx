@@ -40,7 +40,6 @@ interface BatteryTypeInfo {
   compatibleVehicles: Vehicle[];
 }
 
-const SERVICE_FEE = 20000; // Phí dịch vụ 20.000đ
 
 const BookingForm: React.FC = () => {
   const { stationId } = useParams<{ stationId: string }>();
@@ -78,7 +77,7 @@ const BookingForm: React.FC = () => {
 
   // Auto-select battery type và vehicle khi có data
   useEffect(() => {
-    if (stationDetails && vehicles.length > 0 && pricingList.length > 0 && !selectedBatteryType) {
+    if (stationDetails && vehicles.length > 0 && !selectedBatteryType) {
       const compatibleBatteries = getCompatibleBatteryTypes();
       if (compatibleBatteries.length > 0) {
         const firstBattery = compatibleBatteries[0];
@@ -94,6 +93,10 @@ const BookingForm: React.FC = () => {
   const loadAllData = async () => {
     if (!stationId) return;
     
+    setLoadingVehicles(true);
+    setLoadingStation(true);
+    setLoadingPricing(true);
+    
     try {
       await Promise.all([
         loadVehicles(),
@@ -102,7 +105,20 @@ const BookingForm: React.FC = () => {
       ]);
     } catch (err) {
       console.error('Error loading data:', err);
-      setError('Không thể tải dữ liệu. Vui lòng thử lại.');
+    }
+  };
+
+  const loadPricing = async () => {
+    setLoadingPricing(true);
+    try {
+      const response = await getBatteryPricing({ is_active: true, limit: 100 });
+      setPricingList(response.data.pricings);
+    } catch (err: any) {
+      console.error('Error loading pricing:', err);
+      // Không block nếu không load được pricing, sẽ hiển thị "Liên hệ"
+      setPricingList([]);
+    } finally {
+      setLoadingPricing(false);
     }
   };
 
@@ -134,18 +150,6 @@ const BookingForm: React.FC = () => {
     }
   };
 
-  const loadPricing = async () => {
-    setLoadingPricing(true);
-    try {
-      const response = await getBatteryPricing({ is_active: true, limit: 100 });
-      setPricingList(response.data.pricings);
-    } catch (err: any) {
-      console.error('Error loading pricing:', err);
-      // Không block nếu không load được pricing, sẽ dùng giá mặc định
-    } finally {
-      setLoadingPricing(false);
-    }
-  };
 
   // Lấy thông tin các loại pin tương thích
   const getCompatibleBatteryTypes = (): BatteryTypeInfo[] => {
@@ -185,9 +189,8 @@ const BookingForm: React.FC = () => {
   const selectedBatteryInfo = compatibleBatteryTypes.find(b => b.model === selectedBatteryType);
   const compatibleVehiclesForSelected = selectedBatteryInfo?.compatibleVehicles || [];
 
-  // Tính giá
+  // Tính giá (nếu có pricing)
   const batteryPrice = selectedBatteryInfo?.price || 0;
-  const totalPrice = batteryPrice + SERVICE_FEE;
 
   // Xử lý chọn battery type
   const handleBatteryTypeSelect = (model: string) => {
@@ -214,9 +217,8 @@ const BookingForm: React.FC = () => {
       time: null,
     });
     
-    // Tính toán các time slots: 30 phút, 1 giờ, 2 giờ, 3 giờ
+    // Tính toán các time slots: 1 giờ, 2 giờ, 3 giờ (đã xóa 30 phút vì minimum là 30 phút)
     const timeSlotsConfig = [
-      { minutes: 30, label: '30 phút nữa' },
       { minutes: 60, label: '1 giờ nữa' },
       { minutes: 120, label: '2 giờ nữa' },
       { minutes: 180, label: '3 giờ nữa' },
@@ -294,7 +296,7 @@ const BookingForm: React.FC = () => {
           ...bookingData,
           scheduled_at: scheduledDate.toISOString(),
         });
-        setSuccess('Đã đặt lịch hẹn thành công!');
+        setSuccess('Đã đặt lịch hẹn thành công! Bạn sẽ thanh toán khi hoàn tất đổi pin tại trạm.');
       } else if (customTime) {
         // Đặt lịch hẹn với custom time
         const scheduledDate = new Date(customTime);
@@ -305,7 +307,7 @@ const BookingForm: React.FC = () => {
           ...bookingData,
           scheduled_at: scheduledDate.toISOString(),
         });
-        setSuccess('Đã đặt lịch hẹn thành công!');
+        setSuccess('Đã đặt lịch hẹn thành công! Bạn sẽ thanh toán khi hoàn tất đổi pin tại trạm.');
       } else {
         throw new Error('Vui lòng chọn thời gian');
       }
@@ -656,33 +658,20 @@ const BookingForm: React.FC = () => {
                     </div>
 
                     <div className="space-y-3">
-                      <div className="flex justify-between text-base">
-                        <span className="text-slate-600 dark:text-slate-400">Giá thay pin</span>
-                        <span className="font-medium text-slate-900 dark:text-white">
-                          {batteryPrice > 0
-                            ? `${batteryPrice.toLocaleString('vi-VN')}₫`
-                            : 'Liên hệ'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-base">
-                        <span className="text-slate-600 dark:text-slate-400">Phí dịch vụ</span>
-                        <span className="font-medium text-slate-900 dark:text-white">
-                          {SERVICE_FEE.toLocaleString('vi-VN')}₫
-                        </span>
-                      </div>
-                      <div className="border-t border-slate-200 dark:border-slate-700 pt-3 mt-3">
-                        <div className="flex justify-between">
-                          <span className="font-semibold text-slate-900 dark:text-white text-lg">
-                            Tổng cộng
-                          </span>
-                          <span className={`font-bold text-green-600 ${
-                            totalPrice > SERVICE_FEE ? 'text-2xl' : 'text-lg'
-                          }`}>
-                            {totalPrice > SERVICE_FEE
-                              ? `${totalPrice.toLocaleString('vi-VN')}₫`
-                              : 'Liên hệ'}
+                      {batteryPrice > 0 && (
+                        <div className="flex justify-between text-base">
+                          <span className="text-slate-600 dark:text-slate-400">Giá thay pin</span>
+                          <span className="font-medium text-slate-900 dark:text-white">
+                            {batteryPrice.toLocaleString('vi-VN')}₫
                           </span>
                         </div>
+                      )}
+                      <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700">
+                        <p className="text-sm text-blue-700 dark:text-blue-300">
+                          <strong>Lưu ý:</strong> Bạn sẽ thanh toán khi hoàn tất đổi pin tại trạm. 
+                          {batteryPrice === 0 && ' Vui lòng liên hệ trạm để biết giá chi tiết.'}
+                          {batteryPrice > 0 && ' Nếu bạn có gói dịch vụ, sẽ được miễn phí.'}
+                        </p>
                       </div>
                     </div>
 

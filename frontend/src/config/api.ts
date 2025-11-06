@@ -75,6 +75,14 @@ export const API_ENDPOINTS = {
       TOPUP: `${API_BASE_URL}/driver/wallet/topup`,
     },
     TOPUP_PACKAGES: `${API_BASE_URL}/driver/topup-packages`,
+    // TODO: BE đang tạo endpoint này, sẽ cập nhật khi BE hoàn thành
+    // Pricing endpoint cho driver (chỉ đọc active pricing)
+    PRICING: `${API_BASE_URL}/driver/pricing`, // Hoặc có thể là `${API_BASE_URL}/pricing/public` tùy BE
+    NOTIFICATIONS: {
+      BASE: `${API_BASE_URL}/driver/notifications`,
+      MARK_READ: (id: string) => `${API_BASE_URL}/driver/notifications/${id}/read`,
+      MARK_ALL_READ: `${API_BASE_URL}/driver/notifications/read-all`,
+    },
   },
   // Code của bạn - Subscription endpoints (giữ nguyên)
   SUBSCRIPTIONS: {
@@ -85,6 +93,11 @@ export const API_ENDPOINTS = {
   PACKAGES: {
     BASE: `${API_BASE_URL}/packages`,
     BY_ID: (id: string) => `${API_BASE_URL}/packages/${id}`,
+  },
+  DRIVER_SUBSCRIPTIONS: {
+    BASE: `${API_BASE_URL}/driver/subscriptions`,
+    SUBSCRIBE: (packageId: string) => `${API_BASE_URL}/driver/subscriptions/packages/${packageId}/subscribe`,
+    CANCEL: (subscriptionId: string) => `${API_BASE_URL}/driver/subscriptions/${subscriptionId}/cancel`,
   },
   PUBLIC: {
     STATIONS: `${API_BASE_URL}/stations/public`,
