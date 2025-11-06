@@ -1,6 +1,49 @@
 import { API_ENDPOINTS } from "../config/api";
 import authFetch from "./apiClient";
 
+export interface DashboardStats {
+  period: string;
+  revenue: {
+    total: number;
+    by_payment_method: {
+      wallet: number;
+      cash: number;
+      vnpay: number;
+      momo: number;
+    };
+    trend: string;
+    daily_average: number;
+  };
+  bookings: {
+    total: number;
+    completed: number;
+    cancelled: number;
+    pending: number;
+    confirmed: number;
+    cancellation_rate: string;
+    trend: string;
+  };
+  transactions: {
+    total: number;
+    average_amount: number;
+    by_battery_model: Record<string, number>;
+  };
+  stations: {
+    active: number;
+    total_bookings: number;
+    most_popular: {
+      station_id: string;
+      name: string;
+      bookings_count: number;
+    } | null;
+  };
+  users: {
+    total: number;
+    active_this_month: number;
+    new_this_month: number;
+  };
+}
+
 export interface SystemReport {
   total_users: number;
   total_stations: number;
@@ -41,9 +84,16 @@ export interface SystemReport {
 }
 
 export interface ReportFilters {
+  period?: 'day' | 'week' | 'month';
   start_date?: string;
   end_date?: string;
   station_id?: string;
+}
+
+export async function getDashboardStats(period: 'day' | 'week' | 'month' = 'month') {
+  const url = `${API_ENDPOINTS.ADMIN.REPORTS}/stats?period=${period}`;
+  const res = await authFetch(url);
+  return res;
 }
 
 export async function getSystemReport(filters?: ReportFilters) {
@@ -166,6 +216,7 @@ export async function getUserActivityReport(filters?: ReportFilters) {
 }
 
 export default {
+  getDashboardStats,
   getSystemReport,
   getStationReport,
   getUserActivityReport,
