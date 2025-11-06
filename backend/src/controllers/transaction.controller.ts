@@ -390,6 +390,11 @@ export const payTransaction = asyncHandler(
         amount: transaction.amount,
         payment_method,
         payment_status: "pending",
+        payment_type: "SWAP",
+        metadata: {
+          station_id: transaction.station_id,
+          booking_id: transaction.booking_id,
+        },
       },
     });
 
@@ -402,6 +407,10 @@ export const payTransaction = asyncHandler(
         data: {
           payment_status: "completed",
           paid_at: new Date(),
+          metadata: {
+            ...((payment.metadata as Record<string, unknown> | null) ?? {}),
+            gateway: "vnpay",
+          },
         },
       });
 

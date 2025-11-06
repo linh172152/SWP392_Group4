@@ -18,21 +18,28 @@ export const getDashboardStats = asyncHandler(
 
     // Calculate period based on query
     switch (period) {
-      case "day":
+      case "day": {
         periodStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        previousPeriodStart = new Date(periodStart.getTime() - 24 * 60 * 60 * 1000);
+        previousPeriodStart = new Date(
+          periodStart.getTime() - 24 * 60 * 60 * 1000
+        );
         break;
-      case "week":
+      }
+      case "week": {
         const dayOfWeek = now.getDay();
         periodStart = new Date(now.getTime() - dayOfWeek * 24 * 60 * 60 * 1000);
         periodStart.setHours(0, 0, 0, 0);
-        previousPeriodStart = new Date(periodStart.getTime() - 7 * 24 * 60 * 60 * 1000);
+        previousPeriodStart = new Date(
+          periodStart.getTime() - 7 * 24 * 60 * 60 * 1000
+        );
         break;
+      }
       case "month":
-      default:
+      default: {
         periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
         previousPeriodStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         break;
+      }
     }
 
     // ============================================

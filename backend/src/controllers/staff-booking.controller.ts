@@ -254,7 +254,10 @@ export const confirmBooking = asyncHandler(
 
     // ✅ Verify SĐT
     if (booking.user.phone !== phone) {
-      throw new CustomError("Phone number does not match. Please verify again.", 400);
+      throw new CustomError(
+        "Phone number does not match. Please verify again.",
+        400
+      );
     }
 
     // Check if scheduled time has passed (or is_instant = true allows immediate)
@@ -278,7 +281,8 @@ export const confirmBooking = asyncHandler(
       },
     });
 
-    const hoursUntilScheduled = (scheduledTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+    const hoursUntilScheduled =
+      (scheduledTime.getTime() - now.getTime()) / (1000 * 60 * 60);
 
     const fullBatteries = await prisma.battery.count({
       where: {
@@ -288,16 +292,20 @@ export const confirmBooking = asyncHandler(
       },
     });
 
-    const chargingBatteries = hoursUntilScheduled >= 1 ? await prisma.battery.count({
-      where: {
-        station_id: booking.station_id,
-        model: booking.battery_model,
-        status: "charging",
-      },
-    }) : 0;
+    const chargingBatteries =
+      hoursUntilScheduled >= 1
+        ? await prisma.battery.count({
+            where: {
+              station_id: booking.station_id,
+              model: booking.battery_model,
+              status: "charging",
+            },
+          })
+        : 0;
 
     const totalAvailableBatteries = fullBatteries + chargingBatteries;
-    const availableBatteries = totalAvailableBatteries - confirmedBookingsAtTime;
+    const availableBatteries =
+      totalAvailableBatteries - confirmedBookingsAtTime;
 
     if (availableBatteries <= 0) {
       throw new CustomError(
@@ -503,7 +511,12 @@ export const completeBooking = asyncHandler(
   async (req: Request, res: Response) => {
     const staffId = req.user?.userId;
     const { id } = req.params;
-    const { old_battery_code, battery_model, old_battery_status = "good", notes } = req.body; // ✅ Cải tiến
+    const {
+      old_battery_code,
+      battery_model,
+      old_battery_status = "good",
+      notes,
+    } = req.body; // ✅ Cải tiến
 
     if (!staffId) {
       throw new CustomError("Staff not authenticated", 401);
@@ -524,14 +537,14 @@ export const completeBooking = asyncHandler(
       );
     }
 
-    const booking = await prisma.booking.findUnique({
+    const booking = (await prisma.booking.findUnique({
       where: { booking_id: id },
       include: {
         station: {
           select: { station_id: true },
         },
       },
-    }) as any;
+    })) as any;
 
     if (!booking) {
       throw new CustomError("Booking not found", 404);
@@ -540,7 +553,10 @@ export const completeBooking = asyncHandler(
     // ✅ Cho phép complete booking pending hoặc confirmed
     // Staff có thể complete booking pending nếu user đến sớm (verify SĐT)
     if (booking.status !== "confirmed" && booking.status !== "pending") {
-      throw new CustomError("Booking must be pending or confirmed before completion", 400);
+      throw new CustomError(
+        "Booking must be pending or confirmed before completion",
+        400
+      );
     }
 
     // ✅ Bỏ check PIN - không cần PIN nữa (đã verify SĐT khi confirm)
@@ -564,7 +580,10 @@ export const completeBooking = asyncHandler(
     });
 
     if (!oldBattery) {
-      throw new CustomError(`Battery with code "${old_battery_code}" not found`, 404);
+      throw new CustomError(
+        `Battery with code "${old_battery_code}" not found`,
+        404
+      );
     }
 
     // Check if old battery is in use (user's current battery)
@@ -611,9 +630,11 @@ export const completeBooking = asyncHandler(
       const allPricing = await tx.batteryPricing.findMany({
         where: { is_active: true },
       });
-      
+
       const pricing = allPricing.find(
-        (p) => p.battery_model.toLowerCase().trim() === booking.battery_model.toLowerCase().trim()
+        (p) =>
+          p.battery_model.toLowerCase().trim() ===
+          booking.battery_model.toLowerCase().trim()
       );
 
       if (!pricing) {
@@ -659,8 +680,8 @@ export const completeBooking = asyncHandler(
         data: { balance: walletBalance - transactionAmountNum },
       });
 
-      const paymentStatus: "completed" = "completed";
-      const paymentMethod: "wallet" = "wallet";
+      const paymentStatus = "completed" as const;
+      const paymentMethod = "wallet" as const;
 
       // Create transaction record
       const transaction = await tx.transaction.create({
@@ -684,7 +705,10 @@ export const completeBooking = asyncHandler(
       });
 
       // ✅ Xử lý pin hỏng (Old battery status)
-      if (old_battery_status === "damaged" || old_battery_status === "maintenance") {
+      if (
+        old_battery_status === "damaged" ||
+        old_battery_status === "maintenance"
+      ) {
         // Pin hỏng → KHÔNG sạc!
         await tx.battery.update({
           where: { battery_id: oldBattery.battery_id },
@@ -726,17 +750,22 @@ export const completeBooking = asyncHandler(
             payment_method: "wallet",
             payment_status: "completed",
             paid_at: new Date(),
+            payment_type: "SWAP",
+            metadata: {
+              station_id: booking.station_id,
+              booking_id: booking.booking_id,
+            },
           },
         });
       }
 
-      return { 
-        updatedBooking, 
-        transaction, 
-        payment, 
-        paymentStatus, 
-        walletBalance, 
-        transactionAmount: transactionAmountNum 
+      return {
+        updatedBooking,
+        transaction,
+        payment,
+        paymentStatus,
+        walletBalance,
+        transactionAmount: transactionAmountNum,
       };
     });
 
@@ -813,7 +842,10 @@ export const cancelBooking = asyncHandler(
     });
 
     if (!booking) {
-      throw new CustomError("Booking not found or does not belong to your station", 404);
+      throw new CustomError(
+        "Booking not found or does not belong to your station",
+        404
+      );
     }
 
     if (booking.status === "completed") {

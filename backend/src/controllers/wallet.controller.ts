@@ -83,6 +83,22 @@ export const getWalletTransactions = asyncHandler(
             name: true,
           },
         },
+        subscription: {
+          select: {
+            subscription_id: true,
+            status: true,
+            start_date: true,
+            end_date: true,
+            package: {
+              select: {
+                package_id: true,
+                name: true,
+                battery_capacity_kwh: true,
+                billing_cycle: true,
+              },
+            },
+          },
+        },
       },
       orderBy: { created_at: "desc" },
       skip,
@@ -165,6 +181,11 @@ export const topUpWallet = asyncHandler(
           payment_method: "cash",
           payment_status: "completed",
           paid_at: new Date(),
+          payment_type: "TOPUP",
+          metadata: {
+            bonus_amount: topupPackage.bonus_amount,
+            actual_amount: topupPackage.actual_amount,
+          },
         },
       });
 

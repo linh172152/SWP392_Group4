@@ -237,7 +237,7 @@ export const searchStations = asyncHandler(
     const lng = longitude ? parseFloat(longitude as string) : null;
     const searchRadius = parseFloat(radius as string);
 
-    let whereClause: any = {
+    const whereClause: any = {
       status: "active",
       OR: [
         { name: { contains: searchQuery, mode: "insensitive" } },

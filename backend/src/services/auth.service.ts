@@ -80,6 +80,7 @@ export const registerUser = async (
 
     // Remove password from response
     const { password_hash, ...userWithoutPassword } = user;
+    void password_hash;
 
     return {
       user: userWithoutPassword,
@@ -140,6 +141,7 @@ export const loginUser = async (data: LoginData): Promise<AuthResponse> => {
 
     // Remove password from response
     const { password_hash, ...userWithoutPassword } = user;
+    void password_hash;
 
     return {
       user: userWithoutPassword,
@@ -209,6 +211,7 @@ export const getUserProfile = async (
     }
 
     const { password_hash, ...userWithoutPassword } = user;
+    void password_hash;
     return userWithoutPassword;
   } catch (error) {
     if (error instanceof CustomError) {
@@ -235,6 +238,7 @@ export const updateUserProfile = async (
     });
 
     const { password_hash, ...userWithoutPassword } = user;
+    void password_hash;
     return userWithoutPassword;
   } catch (error) {
     throw new CustomError("Failed to update profile", 500);

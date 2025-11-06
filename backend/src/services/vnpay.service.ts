@@ -59,7 +59,12 @@ export const createVNPayPayment = async (data: CreatePaymentData): Promise<Payme
         payment_method: 'vnpay',
         payment_status: 'pending',
         payment_gateway_ref: orderId,
-        created_at: new Date()
+        created_at: new Date(),
+        payment_type: 'OTHER',
+        metadata: {
+          order_description: orderDescription,
+          order_type: orderType || 'other',
+        }
       }
     });
 
@@ -135,7 +140,12 @@ export const handleVNPayReturn = async (response: VNPayResponse): Promise<{
       data: {
         payment_status: 'completed',
         payment_gateway_ref: response.vnp_TransactionNo,
-        paid_at: new Date()
+        paid_at: new Date(),
+        metadata: {
+          ...((payment.metadata as Record<string, unknown> | null) ?? {}),
+          bank_code: response.vnp_BankCode,
+          card_type: response.vnp_CardType,
+        }
       }
     });
 

@@ -56,11 +56,7 @@ export const vehicleService = {
   },
 
   // Cập nhật thông tin xe
-  updateVehicle: async (
-    vehicleId: string,
-    updateData: any,
-    _userId: string
-  ) => {
+  updateVehicle: async (vehicleId: string, updateData: any) => {
     return await prisma.vehicle.update({
       where: { vehicle_id: vehicleId },
       data: updateData,

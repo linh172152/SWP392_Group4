@@ -53,6 +53,12 @@ import mapsRoutes from "./routes/maps.routes";
 // import servicePackageRoutes from "./routes/service-package.routes";
 // import subscriptionRoutes from "./routes/subscription.routes";
 import ratingRoutes from "./routes/rating.routes";
+import adminBatteryTransferRoutes from "./routes/admin-battery-transfer.routes";
+import adminSupportRoutes from "./routes/admin-support.routes";
+import adminForecastRoutes from "./routes/admin-forecast.routes";
+import packageRoutes from "./routes/package.routes";
+import adminPackageRoutes from "./routes/admin-package.routes";
+import driverSubscriptionRoutes from "./routes/driver-subscription.routes";
 
 // ✅ topupPackageRoutes is already imported and mounted in admin.routes.ts
 // import topupPackageRoutes from "./routes/topup-package.routes";
@@ -120,7 +126,7 @@ app.use(
       process.env.FRONTEND_URL || "http://localhost:5173",
       "http://localhost:3000",
       "http://localhost:5173",
-      "https://ev-battery-frontend.onrender.com"
+      "https://ev-battery-frontend.onrender.com",
     ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -186,6 +192,7 @@ app.use("/api/driver/vehicles", vehicleRoutes);
 app.use("/api/driver/stations", stationRoutes);
 app.use("/api/driver/bookings", bookingRoutes);
 app.use("/api/driver/transactions", transactionRoutes);
+app.use("/api/driver/subscriptions", driverSubscriptionRoutes);
 app.use("/api/driver", driverRoutes); // Placeholder routes last
 
 // Staff API routes - Specific routes first to avoid conflicts
@@ -197,10 +204,15 @@ app.use("/api/staff", staffRoutes); // Placeholder routes last
 app.use("/api/admin/users", adminUserRoutes);
 app.use("/api/admin/stations", adminStationRoutes);
 app.use("/api/admin/staff", adminStaffRoutes);
+app.use("/api/admin/packages", adminPackageRoutes);
+app.use("/api/admin/battery-transfers", adminBatteryTransferRoutes);
+app.use("/api/admin/support", adminSupportRoutes);
+app.use("/api/admin/forecast", adminForecastRoutes);
 app.use("/api/admin", adminRoutes); // Contains pricing and topup-packages routes
 
 // Public API routes
 app.use("/api/stations/public", publicStationRoutes);
+app.use("/api/packages", packageRoutes);
 
 // Maps API routes (Track-Asia - directions, distance, duration)
 app.use("/api/maps", mapsRoutes);
@@ -260,10 +272,15 @@ server.listen(PORT, () => {
       console.log("🔄 Running auto-cancel instant bookings check...");
       const result = await autoCancelInstantBookings();
       if (result.cancelled > 0) {
-        console.log(`✅ Auto-cancelled ${result.cancelled} expired instant booking(s)`);
+        console.log(
+          `✅ Auto-cancelled ${result.cancelled} expired instant booking(s)`
+        );
       }
     } catch (error) {
-      console.error("❌ Error in auto-cancel instant bookings cron job:", error);
+      console.error(
+        "❌ Error in auto-cancel instant bookings cron job:",
+        error
+      );
     }
   });
 
@@ -273,14 +290,18 @@ server.listen(PORT, () => {
       console.log("🔄 Running booking reminders check...");
       const result = await sendBookingReminders();
       if (result.remindersSent > 0 || result.finalRemindersSent > 0) {
-        console.log(`✅ Sent ${result.remindersSent} reminders and ${result.finalRemindersSent} final reminders`);
+        console.log(
+          `✅ Sent ${result.remindersSent} reminders and ${result.finalRemindersSent} final reminders`
+        );
       }
     } catch (error) {
       console.error("❌ Error in booking reminders cron job:", error);
     }
   });
 
-  console.log(`⏰ Cron jobs started: auto-cancel (every 5 min), auto-cancel-instant (every 5 min), reminders (every 5 min)`);
+  console.log(
+    `⏰ Cron jobs started: auto-cancel (every 5 min), auto-cancel-instant (every 5 min), reminders (every 5 min)`
+  );
 });
 
 export default app;

@@ -2,17 +2,14 @@ import { Request, Response, NextFunction } from "express";
 import { verifyAccessToken, JWTPayload } from "../utils/jwt.util";
 import { prisma } from "../server";
 
-// Extend Request interface to include user
-declare global {
-  namespace Express {
-    interface Request {
-      user?: {
-        userId: string;
-        email: string;
-        role: string;
-        user?: any;
-      };
-    }
+declare module "express-serve-static-core" {
+  interface Request {
+    user?: {
+      userId: string;
+      email: string;
+      role: string;
+      user?: Record<string, unknown>;
+    };
   }
 }
 
