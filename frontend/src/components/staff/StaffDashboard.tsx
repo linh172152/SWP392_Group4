@@ -5,7 +5,6 @@ import StaffLayout from './StaffLayout';
 import StaffHome from './StaffHome';
 import BatteryInventory from './BatteryInventory';
 import SwapTransactions from './SwapTransactions';
-import TransactionHistory from './TransactionHistory';
 import PersonalProfile from './PersonalProfile';
 import WorkSchedule from './WorkSchedule';
 
@@ -22,7 +21,6 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout }) => {
         <Route path="/home" element={<StaffHome />} />
         <Route path="/inventory" element={<BatteryInventory />} />
         <Route path="/transactions" element={<SwapTransactions />} />
-        <Route path="/history" element={<TransactionHistory />} />
         <Route path="/schedule" element={<WorkSchedule />} />
         <Route path="/profile" element={<PersonalProfile />} />
       </Routes>

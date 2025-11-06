@@ -61,6 +61,7 @@ const SwapTransactions: React.FC = () => {
   const [batteryModel, setBatteryModel] = useState('');
   const [oldBatteryStatus, setOldBatteryStatus] = useState<'good' | 'damaged' | 'maintenance'>('good');
   const [cancelReason, setCancelReason] = useState('');
+  const [cancelConfirmed, setCancelConfirmed] = useState(false);
   
   const { toast } = useToast();
 
@@ -223,6 +224,7 @@ const SwapTransactions: React.FC = () => {
   const handleOpenCancelDialog = (booking: StaffBooking) => {
     setSelectedBooking(booking);
     setCancelReason('');
+    setCancelConfirmed(false); // Reset checkbox
     setCancelDialogOpen(true);
   };
 
@@ -773,54 +775,112 @@ const SwapTransactions: React.FC = () => {
 
       {/* Cancel Booking Dialog */}
       <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Hủy booking</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <X className="h-5 w-5" />
+              Hủy booking
+            </DialogTitle>
             <DialogDescription>
-              Vui lòng nhập lý do hủy booking này
+              Vui lòng nhập lý do hủy booking này. Thông tin sẽ được gửi đến khách hàng.
             </DialogDescription>
           </DialogHeader>
           {selectedBooking && (
             <div className="space-y-4">
-              <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg">
-                <p className="text-sm">
-                  <strong>Khách hàng:</strong> {selectedBooking.user?.full_name}
-                </p>
-                <p className="text-sm">
-                  <strong>Mã booking:</strong> {selectedBooking.booking_code}
-                </p>
+              {/* Warning */}
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-red-900 dark:text-red-200">
+                      Cảnh báo: Hủy booking
+                    </p>
+                    <p className="text-sm text-red-700 dark:text-red-300">
+                      Khách hàng sẽ nhận được thông báo hủy booking này.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Booking Info */}
+              <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4 space-y-2">
+                <div>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Khách hàng</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">
+                    {selectedBooking.user?.full_name}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Mã booking</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">
+                    {selectedBooking.booking_code}
+                  </p>
+                </div>
+                {selectedBooking.user?.phone && (
+                  <div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Số điện thoại</p>
+                    <p className="font-medium text-gray-900 dark:text-white">
+                      {selectedBooking.user.phone}
+                    </p>
+                  </div>
+                )}
               </div>
               
+              {/* Cancel Reason */}
               <div className="space-y-2">
                 <Label htmlFor="cancelReason">
                   Lý do hủy <span className="text-red-500">*</span>
                 </Label>
                 <Textarea
                   id="cancelReason"
-                  placeholder="Nhập lý do hủy booking..."
+                  placeholder="Ví dụ: Trạm đang bảo trì, Hết pin tồn kho, Khách hàng không đến..."
                   value={cancelReason}
                   onChange={(e) => setCancelReason(e.target.value)}
                   rows={4}
                   disabled={actionLoading === selectedBooking.booking_id}
+                  className="resize-none"
                 />
                 <p className="text-xs text-gray-500">
-                  Lý do hủy sẽ được thông báo đến khách hàng
+                  💡 Lý do hủy sẽ được gửi thông báo đến khách hàng
                 </p>
+              </div>
+
+              {/* Confirmation Checkbox */}
+              <div className="flex items-start space-x-3 p-4 bg-slate-100 dark:bg-slate-700 rounded-lg border-2 border-slate-300 dark:border-slate-600">
+                <input
+                  type="checkbox"
+                  id="cancel-confirm"
+                  checked={cancelConfirmed}
+                  onChange={(e) => setCancelConfirmed(e.target.checked)}
+                  disabled={!cancelReason.trim() || actionLoading === selectedBooking.booking_id}
+                  className="mt-1 h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                />
+                <label 
+                  htmlFor="cancel-confirm" 
+                  className="text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer select-none"
+                >
+                  Tôi xác nhận muốn hủy booking <strong className="text-red-600 dark:text-red-400">{selectedBooking.booking_code}</strong> và đã nhập lý do hợp lệ
+                </label>
               </div>
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button 
               variant="outline" 
-              onClick={() => setCancelDialogOpen(false)}
+              onClick={() => {
+                setCancelDialogOpen(false);
+                setCancelConfirmed(false);
+              }}
               disabled={actionLoading === selectedBooking?.booking_id}
+              className="w-full sm:w-auto"
             >
               Quay lại
             </Button>
             <Button 
               variant="destructive"
               onClick={handleCancelBooking}
-              disabled={!cancelReason.trim() || actionLoading === selectedBooking?.booking_id}
+              disabled={!cancelReason.trim() || !cancelConfirmed || actionLoading === selectedBooking?.booking_id}
+              className="w-full sm:w-auto bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
             >
               {actionLoading === selectedBooking?.booking_id ? (
                 <>
@@ -830,7 +890,7 @@ const SwapTransactions: React.FC = () => {
               ) : (
                 <>
                   <X className="mr-2 h-4 w-4" />
-                  Xác nhận hủy
+                  Hủy Booking
                 </>
               )}
             </Button>

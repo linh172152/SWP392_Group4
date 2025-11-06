@@ -60,6 +60,8 @@ const BatteryInventory: React.FC = () => {
   const [selectedBattery, setSelectedBattery] = useState<BatteryType | null>(null);
   const [editLoading, setEditLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteConfirmed, setDeleteConfirmed] = useState(false);
   const [editFormData, setEditFormData] = useState<UpdateBatteryData>({
     status: 'full',
     current_charge: 100,
@@ -114,6 +116,8 @@ const BatteryInventory: React.FC = () => {
 
   const handleDelete = (battery: BatteryType) => {
     setSelectedBattery(battery);
+    setDeleteError(null); // Reset error khi mở dialog
+    setDeleteConfirmed(false); // Reset checkbox
     setDeleteDialogOpen(true);
   };
 
@@ -149,6 +153,7 @@ const BatteryInventory: React.FC = () => {
 
     try {
       setDeleteLoading(true);
+      setDeleteError(null);
       const response = await deleteBattery(selectedBattery.battery_id);
 
       if (response.success) {
@@ -160,9 +165,11 @@ const BatteryInventory: React.FC = () => {
         setDeleteDialogOpen(false);
       }
     } catch (error: any) {
+      const errorMessage = error.message || 'Không thể xóa pin';
+      setDeleteError(errorMessage);
       toast({
         title: 'Lỗi',
-        description: error.message || 'Không thể xóa pin',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -745,19 +752,39 @@ const BatteryInventory: React.FC = () => {
 
           {selectedBattery && (
             <div className="space-y-4 py-4">
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-red-900 dark:text-red-200">
-                      Cảnh báo: Xóa pin
-                    </p>
-                    <p className="text-sm text-red-700 dark:text-red-300">
-                      Bạn sắp xóa pin này khỏi hệ thống. Hành động này không thể hoàn tác.
-                    </p>
+              {/* Error Message */}
+              {deleteError && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-red-900 dark:text-red-200">
+                        Không thể xóa pin
+                      </p>
+                      <p className="text-sm text-red-700 dark:text-red-300">
+                        {deleteError}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
+
+              {/* Warning Message */}
+              {!deleteError && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-red-900 dark:text-red-200">
+                        Cảnh báo: Xóa pin
+                      </p>
+                      <p className="text-sm text-red-700 dark:text-red-300">
+                        Bạn sắp xóa pin này khỏi hệ thống. Hành động này không thể hoàn tác.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4 space-y-3">
                 <div>
@@ -800,28 +827,80 @@ const BatteryInventory: React.FC = () => {
                   💡 <strong>Lưu ý:</strong> Chỉ nên xóa pin khi đã hỏng không sửa được hoặc không còn sử dụng.
                 </p>
               </div>
+
+              {/* Checkbox xác nhận xóa */}
+              {!deleteError && (
+                <div className="flex items-start space-x-3 p-4 bg-slate-100 dark:bg-slate-700 rounded-lg border-2 border-slate-300 dark:border-slate-600">
+                  <input
+                    type="checkbox"
+                    id="delete-confirm"
+                    checked={deleteConfirmed}
+                    onChange={(e) => setDeleteConfirmed(e.target.checked)}
+                    disabled={deleteLoading}
+                    className="mt-1 h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                  />
+                  <label 
+                    htmlFor="delete-confirm" 
+                    className="text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer select-none"
+                  >
+                    Tôi xác nhận muốn xóa vĩnh viễn pin <strong className="text-red-600 dark:text-red-400">{selectedBattery?.battery_code}</strong> khỏi hệ thống
+                  </label>
+                </div>
+              )}
             </div>
           )}
 
-          <DialogFooter className="gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setDeleteDialogOpen(false)}
-              disabled={deleteLoading}
-            >
-              Hủy
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={handleDeleteConfirm}
-              disabled={deleteLoading}
-            >
-              {deleteLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              <AlertTriangle className="mr-2 h-4 w-4" />
-              Xóa Pin
-            </Button>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            {deleteError ? (
+              // Nếu có lỗi, chỉ hiện nút Đóng
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setDeleteDialogOpen(false);
+                  setDeleteError(null);
+                  setDeleteConfirmed(false);
+                }}
+                className="w-full sm:w-auto"
+              >
+                Đóng
+              </Button>
+            ) : (
+              // Nếu không có lỗi, hiện nút Hủy + Xóa Pin
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setDeleteDialogOpen(false);
+                    setDeleteConfirmed(false);
+                  }}
+                  disabled={deleteLoading}
+                  className="w-full sm:w-auto"
+                >
+                  Hủy
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={handleDeleteConfirm}
+                  disabled={!deleteConfirmed || deleteLoading}
+                  className="w-full sm:w-auto bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
+                >
+                  {deleteLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Đang xóa...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Xóa Pin
+                    </>
+                  )}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
