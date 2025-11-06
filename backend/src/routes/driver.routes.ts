@@ -5,6 +5,7 @@ import {
 } from "../middlewares/auth.middleware";
 import walletRoutes from "./wallet.routes";
 import notificationRoutes from "./notification.routes";
+import { getTopUpPackages } from "../controllers/topup-package.controller";
 
 const router = Router();
 
@@ -17,6 +18,38 @@ router.use("/wallet", walletRoutes);
 
 // Notification routes
 router.use("/notifications", notificationRoutes);
+
+/**
+ * @swagger
+ * /api/driver/topup-packages:
+ *   get:
+ *     summary: Get active top-up packages (for driver wallet topup)
+ *     tags: [Driver, Wallet]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: is_active
+ *         schema:
+ *           type: boolean
+ *         description: Filter by active status (default: true)
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Items per page
+ *     responses:
+ *       200:
+ *         description: Top-up packages retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ */
+router.get("/topup-packages", getTopUpPackages);
 
 /**
  * @swagger

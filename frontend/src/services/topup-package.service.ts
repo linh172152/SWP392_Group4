@@ -41,14 +41,21 @@ export interface SingleTopUpPackageResponse {
 
 /**
  * Get all top-up packages
+ * For drivers: use /api/driver/topup-packages
+ * For admins: use /api/admin/topup-packages
  */
-export async function getTopUpPackages(filters?: TopUpPackageFilters): Promise<TopUpPackageResponse> {
+export async function getTopUpPackages(filters?: TopUpPackageFilters & { forDriver?: boolean }): Promise<TopUpPackageResponse> {
   const qs = new URLSearchParams();
   if (filters?.is_active !== undefined) qs.set("is_active", String(filters.is_active));
   if (filters?.page) qs.set("page", String(filters.page));
   if (filters?.limit) qs.set("limit", String(filters.limit));
 
-  const url = `${API_BASE_URL}/admin/topup-packages${qs.toString() ? `?${qs.toString()}` : ""}`;
+  // Use driver endpoint if forDriver is true, otherwise use admin endpoint
+  const baseUrl = filters?.forDriver 
+    ? `${API_BASE_URL}/driver/topup-packages`
+    : `${API_BASE_URL}/admin/topup-packages`;
+  
+  const url = `${baseUrl}${qs.toString() ? `?${qs.toString()}` : ""}`;
   const res = await authFetch(url);
   return res;
 }
