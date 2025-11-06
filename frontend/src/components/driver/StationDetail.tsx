@@ -164,8 +164,15 @@ const StationDetail: React.FC = () => {
               </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
-              <Button variant="outline" size="lg" onClick={() => navigate(`/driver/station/${id}/book-battery`)} disabled={loading}>
-                Đặt Pin
+              <Button 
+                variant="outline" 
+                size="lg"
+                onClick={() => navigate(`/driver/booking/${id}`)}
+                disabled={loading}
+                className="gradient-primary text-white"
+              >
+                <Calendar className="mr-2 h-4 w-4" />
+                Đặt chỗ
               </Button>
             </div>
           </div>
