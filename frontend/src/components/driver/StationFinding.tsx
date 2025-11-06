@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -17,13 +18,11 @@ import {
 import { ImageWithFallback } from '../figma/ImageWithFallback';
 import { useDriverStations } from '../../hooks/useDriverStations';
 import { Alert, AlertDescription } from '../ui/alert';
-import BookingModal from './BookingModal';
 
 const StationFinding: React.FC = () => {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [selectedStation, setSelectedStation] = useState<any>(null);
-  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   
   const { 
@@ -399,8 +398,7 @@ const StationFinding: React.FC = () => {
                         className="flex-1 glass border-blue-200/50 dark:border-purple-400/30 hover:bg-blue-50/50 dark:hover:bg-purple-500/10" 
                         size="sm"
                         onClick={() => {
-                          setSelectedStation(station);
-                          setIsBookingModalOpen(true);
+                          navigate(`/driver/booking/${station.station_id}`);
                         }}
                       >
                         <Calendar className="mr-1 h-3 w-3" />
@@ -415,25 +413,6 @@ const StationFinding: React.FC = () => {
         )}
       </div>
 
-      {/* Booking Modal */}
-      {selectedStation && (
-        <BookingModal
-          isOpen={isBookingModalOpen}
-          onClose={() => {
-            setIsBookingModalOpen(false);
-            setSelectedStation(null);
-          }}
-          station={{
-            station_id: selectedStation.station_id,
-            name: selectedStation.name,
-            address: selectedStation.address,
-          }}
-          onSuccess={(booking) => {
-            console.log('Booking created:', booking);
-            // Có thể thêm thông báo thành công ở đây
-          }}
-        />
-      )}
     </div>
   );
 };

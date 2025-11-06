@@ -1,199 +1,196 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
-import { Alert, AlertDescription } from '../ui/alert';
 import { 
   Car, 
   Plus, 
   Edit, 
   Trash2, 
-  Zap,
-  Loader2,
-  AlertCircle,
-  CheckCircle2,
-  X
+  Zap
 } from 'lucide-react';
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../ui/select';
-import { vehicleService, type Vehicle, type CreateVehicleData } from '../../services/vehicle.service';
+import API_ENDPOINTS, { fetchWithAuth } from '../../config/api';
+import { useNavigate } from 'react-router-dom';
+
+interface VehicleItem {
+  vehicle_id: string;
+  license_plate: string;
+  vehicle_type: string;
+  make?: string;
+  model?: string;
+  year?: number;
+  battery_model: string;
+  image?: string;
+  totalSwaps?: number;
+}
 
 const VehicleManagement: React.FC = () => {
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [vehicles, setVehicles] = useState<VehicleItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string>("");
-  const [success, setSuccess] = useState<string>("");
-  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
-
-  // Form state
-  const [formData, setFormData] = useState<CreateVehicleData>({
-    license_plate: "",
-    vehicle_type: "MOTORBIKE",
-    brand: "",
-    model: "",
-    year: new Date().getFullYear(),
-    battery_capacity: 0,
-    battery_model: "",
+  const navigate = useNavigate();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({
+    make: '',
+    model: '',
+    year: '',
+    license_plate: '',
+    battery_model: '',
+    vehicle_type: 'car'
+  });
+  // Thêm mới: dùng biến form
+  const [form, setForm] = useState({
+    make: '',
+    model: '',
+    year: '',
+    license_plate: '',
+    vehicle_type: 'car',
+    battery_model: '',
   });
 
-  // Fetch vehicles khi component mount
-  useEffect(() => {
-    fetchVehicles();
-  }, []);
+  const getDaysSinceLastSwap = (lastSwapDate?: string) => {
+    if (!lastSwapDate) return undefined;
+    const today = new Date();
+    const lastSwap = new Date(lastSwapDate);
+    const diffTime = Math.abs(today.getTime() - lastSwap.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
 
-  const fetchVehicles = async () => {
+  const loadVehicles = async () => {
+    setLoading(true);
+    setError('');
     try {
-      setLoading(true);
-      setError("");
-      const data = await vehicleService.getVehicles();
-      setVehicles(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Không thể tải danh sách xe");
+      const res = await fetchWithAuth(API_ENDPOINTS.DRIVER.VEHICLES);
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Tải danh sách xe thất bại');
+      setVehicles(data.data);
+    } catch (e: any) {
+      setError(e.message || 'Có lỗi xảy ra');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAddVehicle = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
+  const addVehicle = async () => {
+    setLoading(true);
+    setError('');
     try {
-      setError("");
-      setSuccess("");
-      await vehicleService.addVehicle(formData);
-      await fetchVehicles();
-      setSuccess("Đã thêm xe thành công!");
-      setTimeout(() => {
-        setShowAddForm(false);
-        resetForm();
-        setSuccess("");
-      }, 1500);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Không thể thêm xe");
+      const body = {
+        license_plate: form.license_plate,
+        vehicle_type: form.vehicle_type,
+        battery_model: form.battery_model,
+        make: form.make || undefined,
+        model: form.model || undefined,
+        year: form.year ? Number(form.year) : undefined,
+      };
+      const res = await fetchWithAuth(API_ENDPOINTS.DRIVER.VEHICLES, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Thêm xe thất bại');
+      setShowAddForm(false);
+      setForm({ make: '', model: '', year: '', license_plate: '', vehicle_type: 'car', battery_model: '' });
+      await loadVehicles();
+    } catch (e: any) {
+      setError(e.message || 'Có lỗi xảy ra');
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
   };
 
-  const handleUpdateVehicle = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingVehicle) return;
-
-    setSubmitting(true);
+  const deleteVehicle = async (vehicleId: string) => {
+    if (!confirm('Bạn có chắc muốn xóa xe này?')) return;
+    setLoading(true);
+    setError('');
     try {
-      setError("");
-      setSuccess("");
-      await vehicleService.updateVehicle(editingVehicle.vehicle_id, formData);
-      await fetchVehicles();
-      setSuccess("Đã cập nhật xe thành công!");
-      setTimeout(() => {
-        setEditingVehicle(null);
-        setShowAddForm(false);
-        resetForm();
-        setSuccess("");
-      }, 1500);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Không thể cập nhật xe");
+      const res = await fetchWithAuth(`${API_ENDPOINTS.DRIVER.VEHICLES}/${vehicleId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Xóa xe thất bại');
+      await loadVehicles();
+    } catch (e: any) {
+      const msg = e.message || 'Có lỗi xảy ra';
+      setError(msg);
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
   };
 
-  const handleDeleteVehicle = async (vehicleId: string) => {
-    if (!confirm("Bạn có chắc chắn muốn xóa xe này?")) return;
-
-    try {
-      setError("");
-      await vehicleService.deleteVehicle(vehicleId);
-      await fetchVehicles();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Không thể xóa xe");
-    }
-  };
-
-  const handleEditClick = (vehicle: Vehicle) => {
-    setEditingVehicle(vehicle);
-    setFormData({
+  const startEdit = (vehicle: VehicleItem) => {
+    setEditingId(vehicle.vehicle_id);
+    setEditForm({
+      make: vehicle.make || '',
+      model: vehicle.model || '',
+      year: vehicle.year ? String(vehicle.year) : '',
       license_plate: vehicle.license_plate,
-      vehicle_type: vehicle.vehicle_type,
-      brand: vehicle.brand || vehicle.make || "",
-      model: vehicle.model || "",
-      year: vehicle.year,
-      battery_capacity: vehicle.battery_capacity,
-      battery_model: vehicle.battery_model || "",
+      battery_model: vehicle.battery_model,
+      vehicle_type: 'car'
     });
-    setShowAddForm(true);
   };
 
-  const resetForm = () => {
-    setFormData({
-      license_plate: "",
-      vehicle_type: "MOTORBIKE",
-      brand: "",
-      model: "",
-      year: new Date().getFullYear(),
-      battery_capacity: 0,
-      battery_model: "",
-    });
-    setEditingVehicle(null);
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditForm({ make: '', model: '', year: '', license_plate: '', battery_model: '', vehicle_type: 'car' });
   };
 
-  const handleCancelForm = () => {
-    setShowAddForm(false);
-    resetForm();
-    setError("");
-    setSuccess("");
+  const updateVehicle = async (vehicleId: string) => {
+    setLoading(true);
+    setError('');
+    try {
+      const body = {
+        license_plate: editForm.license_plate,
+        make: editForm.make || undefined,
+        model: editForm.model || undefined,
+        year: editForm.year ? Number(editForm.year) : undefined,
+        battery_model: editForm.battery_model,
+        vehicle_type: 'car'
+      };
+      const res = await fetchWithAuth(`${API_ENDPOINTS.DRIVER.VEHICLES}/${vehicleId}`, { method: 'PUT', body: JSON.stringify(body) });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Cập nhật xe thất bại');
+      setEditingId(null);
+      setEditForm({make: '', model: '', year: '', license_plate: '', battery_model: '', vehicle_type: 'car'});
+      await loadVehicles();
+    } catch (e: any) {
+      setError(e.message || 'Có lỗi xảy ra');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (loading) {
-    return (
-      <div className="p-6 flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto text-lime-500" />
-          <p className="mt-2 text-slate-600 dark:text-slate-400">Đang tải danh sách xe...</p>
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    loadVehicles();
+  }, []);
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="float">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-blue-900 dark:from-white dark:to-blue-100 bg-clip-text text-transparent">Xe của tôi</h1>
           <p className="text-slate-600 dark:text-slate-300">Quản lý thông tin xe và lịch sử thay pin</p>
         </div>
-        <Button 
-          onClick={() => {
-            resetForm();
-            setShowAddForm(true);
-          }} 
-          className="gradient-primary text-white shadow-lg hover:shadow-xl transition-all duration-300"
-        >
+        <Button onClick={() => setShowAddForm(true)} className="gradient-primary text-white shadow-lg hover:shadow-xl transition-all duration-300" disabled={loading}>
           <Plus className="mr-2 h-4 w-4" />
           Thêm Xe
         </Button>
       </div>
 
-      {/* Error Alert */}
       {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
+        <div className="text-sm text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-500/10 p-3 rounded-lg border border-red-200/50 dark:border-red-500/20">
+          {error}
+          {error.toLowerCase().includes('active bookings') && (
+            <div className="mt-2">
+              <Button size="sm" variant="outline" onClick={() => navigate('/driver/bookings')}>
+                Xem các đơn đang hoạt động
+              </Button>
+            </div>
+          )}
+        </div>
       )}
 
-      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="glass-card border-0 glow-hover group">
           <CardContent className="p-4">
@@ -216,108 +213,86 @@ const VehicleManagement: React.FC = () => {
                 <Zap className="h-5 w-5 text-white" />
               </div>
               <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Xe đã đăng ký</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{vehicles.length}</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400">Tổng lần thay pin</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">{vehicles.reduce((sum, _v) => sum + 0, 0)}</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Vehicle List */}
-      {vehicles.length === 0 ? (
-        <Card className="glass-card border-0">
-          <CardContent className="p-12 text-center">
-            <Car className="h-16 w-16 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
-              Chưa có xe nào
-            </h3>
-            <p className="text-slate-600 dark:text-slate-400 mb-4">
-              Thêm xe đầu tiên của bạn để bắt đầu sử dụng dịch vụ
-            </p>
-            <Button 
-              onClick={() => {
-                resetForm();
-                setShowAddForm(true);
-              }}
-              className="gradient-primary text-white"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Thêm Xe Ngay
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {vehicles.map((vehicle) => (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {vehicles.map((vehicle) => {
+          if (editingId === vehicle.vehicle_id) { // SHOW EDIT FORM
+            return (
+              <Card key={vehicle.vehicle_id} className="glass-card border-0 glow-hover group">
+                <CardContent className="p-6">
+                  <div className="flex-col space-y-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Hãng xe</Label>
+                        <Input value={editForm.make} onChange={e => setEditForm(f=>({...f,make:e.target.value}))} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Mẫu xe</Label>
+                        <Input value={editForm.model} onChange={e => setEditForm(f=>({...f,model:e.target.value}))} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Năm sản xuất</Label>
+                        <Input type="number" value={editForm.year} onChange={e => setEditForm(f=>({...f,year:e.target.value}))} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Biển số xe</Label>
+                        <Input value={editForm.license_plate} onChange={e=>setEditForm(f=>({...f,license_plate:e.target.value}))} />
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
+                        <Label>Model Pin</Label>
+                        <Input value={editForm.battery_model} onChange={e => setEditForm(f=>({...f,battery_model:e.target.value}))} />
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
+                        <Label>Loại xe</Label>
+                        <Input value="car" disabled />
+                      </div>
+                    </div>
+                    <div className="flex space-x-2 pt-2">
+                      <Button className="gradient-primary text-white" onClick={() => updateVehicle(vehicle.vehicle_id)} disabled={loading}>Lưu</Button>
+                      <Button variant="outline" onClick={cancelEdit}>Hủy</Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          }
+          // XÓA các thống kê dư, chỉ hiển thị đúng thông tin xe mà BE có
+          return (
             <Card key={vehicle.vehicle_id} className="glass-card border-0 glow-hover group">
               <CardContent className="p-6">
                 <div className="flex items-start space-x-4">
-                  <div className="p-4 gradient-primary rounded-lg">
-                    <Car className="h-8 w-8 text-white" />
+                  <div className="relative">
+                    <img 
+                      src={'https://images.unsplash.com/photo-1560958089-b8a1929cea89?auto=format&fit=crop&w=300&q=60'} 
+                      alt="Car" className="w-24 h-24 object-cover rounded-lg shadow-lg" />
                   </div>
-                  
-                  <div className="flex-1 space-y-3">
-                    <div>
-                      <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                        {vehicle.make || vehicle.brand} {vehicle.model}
-                      </h3>
-                      <div className="flex items-center space-x-2 text-sm text-slate-600 dark:text-slate-400">
-                        <span>Biển số: {vehicle.license_plate}</span>
-                        {vehicle.year && (
-                          <>
-                            <span>•</span>
-                            <span>{vehicle.year}</span>
-                          </>
-                        )}
-                      </div>
+                  <div className="flex-1 space-y-2">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                      {(vehicle.make || 'EV')} {vehicle.model || ''}</h3>
+                    <div className="flex items-center space-x-2 text-sm text-slate-600 dark:text-slate-400">
+                      <span>Biển số: {vehicle.license_plate}</span>
+                      {vehicle.year ? (<><span>•</span><span>{vehicle.year}</span></>) : null}
                     </div>
-
-                    {/* Thông tin xe */}
-                    <div className="space-y-2">
-                      <div className="p-3 glass rounded-lg space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-slate-600 dark:text-slate-400">Loại xe</span>
-                          <span className="text-sm font-medium text-slate-900 dark:text-white">
-                            {vehicle.vehicle_type === "MOTORBIKE" || vehicle.vehicle_type === "motorbike" ? "Xe máy" : vehicle.vehicle_type === "CAR" || vehicle.vehicle_type === "car" ? "Ô tô" : "Xe tải"}
-                          </span>
-                        </div>
-                        {vehicle.battery_model && (
-                          <div className="flex items-center justify-between pt-2 border-t border-slate-200/50 dark:border-slate-700/50">
-                            <span className="text-sm text-slate-600 dark:text-slate-400">Loại pin</span>
-                            <span className="text-sm font-medium text-slate-900 dark:text-white">
-                              {vehicle.battery_model}
-                            </span>
-                          </div>
-                        )}
-                        {vehicle.battery_capacity && vehicle.battery_capacity > 0 && (
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-slate-600 dark:text-slate-400">Dung lượng pin</span>
-                            <span className="text-sm font-medium text-slate-900 dark:text-white">
-                              {vehicle.battery_capacity} kWh
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
+                    <div className="text-sm">Model pin: {vehicle.battery_model}</div>
+                    <div className="text-sm">Loại xe: car</div>
                     <div className="flex space-x-2 pt-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleEditClick(vehicle)}
-                        className="glass border-blue-200/50 dark:border-purple-400/30 hover:bg-blue-50/50 dark:hover:bg-purple-500/10"
-                      >
-                        <Edit className="mr-1 h-3 w-3" />
-                        Sửa
+                      <Button variant="outline" size="sm" className="glass border-blue-200/50 dark:border-purple-400/30 hover:bg-blue-50/50 dark:hover:bg-purple-500/10" onClick={() => startEdit(vehicle)} disabled={loading}>
+                        Chỉnh sửa
                       </Button>
                       <Button 
                         variant="outline" 
-                        size="sm"
-                        onClick={() => handleDeleteVehicle(vehicle.vehicle_id)}
+                        size="sm" 
                         className="glass border-red-200/50 dark:border-red-400/30 hover:bg-red-50/50 dark:hover:bg-red-500/10"
+                        onClick={() => deleteVehicle(vehicle.vehicle_id)}
+                        disabled={loading}
                       >
-                        <Trash2 className="mr-1 h-3 w-3" />
                         Xóa
                       </Button>
                     </div>
@@ -325,216 +300,55 @@ const VehicleManagement: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
 
-
-
-      {/* Add/Edit Vehicle Dialog */}
-      <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
-        <DialogContent className="glass-card border-0 max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-blue-900 dark:from-white dark:to-blue-100 bg-clip-text text-transparent flex items-center gap-2">
-              <Car className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-              {editingVehicle ? "Chỉnh sửa thông tin xe" : "Thêm xe mới"}
-            </DialogTitle>
-            <DialogDescription className="text-slate-600 dark:text-slate-400">
-              {editingVehicle 
-                ? "Cập nhật thông tin xe của bạn để tiếp tục sử dụng dịch vụ"
-                : "Nhập đầy đủ thông tin xe để đăng ký sử dụng dịch vụ thay pin"
-              }
-            </DialogDescription>
-          </DialogHeader>
-
-          <form onSubmit={editingVehicle ? handleUpdateVehicle : handleAddVehicle} className="space-y-6 py-4">
-            {/* Success Message */}
-            {success && (
-              <Alert className="border-green-200 bg-green-50/50 dark:bg-green-900/20 animate-in fade-in slide-in-from-top-2">
-                <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-                <AlertDescription className="text-green-800 dark:text-green-200">
-                  {success}
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {/* Error Message */}
-            {error && (
-              <Alert className="border-red-200 bg-red-50/50 dark:bg-red-900/20 animate-in fade-in slide-in-from-top-2">
-                <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
-                <AlertDescription className="text-red-800 dark:text-red-200">
-                  {error}
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {/* Biển số xe - Full width */}
-            <div className="space-y-2">
-              <Label htmlFor="license_plate" className="text-slate-700 dark:text-slate-300 font-medium flex items-center gap-1">
-                <Car className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                Biển số xe <span className="text-red-500">*</span>
-              </Label>
-              <Input 
-                id="license_plate" 
-                placeholder="Ví dụ: 30A-12345, 51B-67890" 
-                value={formData.license_plate}
-                onChange={(e) => setFormData({...formData, license_plate: e.target.value})}
-                required
-                disabled={submitting}
-                className="glass border-slate-200/50 dark:border-slate-700/50 h-11 text-base" 
-              />
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Nhập biển số xe chính xác theo giấy tờ đăng ký
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Loại xe */}
+      {showAddForm && (
+        <Card className="glass-card border-0 glow">
+          <CardHeader>
+            <CardTitle className="text-slate-900 dark:text-white">Thêm xe mới</CardTitle>
+            <CardDescription className="text-slate-600 dark:text-slate-400">Nhập thông tin xe để đăng ký sử dụng dịch vụ thay pin</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="vehicle_type" className="text-slate-700 dark:text-slate-300 font-medium">
-                  Loại xe <span className="text-red-500">*</span>
-                </Label>
-                <Select 
-                  value={formData.vehicle_type} 
-                  onValueChange={(value: "MOTORBIKE" | "CAR" | "TRUCK") => setFormData({...formData, vehicle_type: value})}
-                  disabled={submitting}
-                >
-                  <SelectTrigger className="glass border-slate-200/50 dark:border-slate-700/50 h-11">
-                    <SelectValue placeholder="Chọn loại xe" />
-                  </SelectTrigger>
-                  <SelectContent className="glass-card border-0">
-                    <SelectItem value="MOTORBIKE">🏍️ Xe máy</SelectItem>
-                    <SelectItem value="CAR">🚗 Ô tô</SelectItem>
-                    <SelectItem value="TRUCK">🚚 Xe tải</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="make" className="text-slate-700 dark:text-slate-300">Hãng xe</Label>
+                <Input id="make" value={form.make} onChange={(e) => setForm({ ...form, make: e.target.value })} placeholder="Tesla, BYD, VinFast..." className="glass border-slate-200/50 dark:border-slate-700/50" />
               </div>
-
-              {/* Hãng xe */}
               <div className="space-y-2">
-                <Label htmlFor="brand" className="text-slate-700 dark:text-slate-300 font-medium">
-                  Hãng xe
-                </Label>
-                <Input 
-                  id="brand" 
-                  placeholder="Ví dụ: Honda, Toyota, VinFast" 
-                  value={formData.brand}
-                  onChange={(e) => setFormData({...formData, brand: e.target.value})}
-                  disabled={submitting}
-                  className="glass border-slate-200/50 dark:border-slate-700/50 h-11" 
-                />
+                <Label htmlFor="model" className="text-slate-700 dark:text-slate-300">Mẫu xe</Label>
+                <Input id="model" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} placeholder="Model 3, Tang EV..." className="glass border-slate-200/50 dark:border-slate-700/50" />
               </div>
-
-              {/* Dòng xe */}
               <div className="space-y-2">
-                <Label htmlFor="model" className="text-slate-700 dark:text-slate-300 font-medium">
-                  Dòng xe
-                </Label>
-                <Input 
-                  id="model" 
-                  placeholder="Ví dụ: Vision, Vios, VF8" 
-                  value={formData.model}
-                  onChange={(e) => setFormData({...formData, model: e.target.value})}
-                  disabled={submitting}
-                  className="glass border-slate-200/50 dark:border-slate-700/50 h-11" 
-                />
+                <Label htmlFor="year" className="text-slate-700 dark:text-slate-300">Năm sản xuất</Label>
+                <Input id="year" type="number" value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} placeholder="2023" className="glass border-slate-200/50 dark:border-slate-700/50" />
               </div>
-
-              {/* Năm sản xuất */}
               <div className="space-y-2">
-                <Label htmlFor="year" className="text-slate-700 dark:text-slate-300 font-medium">
-                  Năm sản xuất
-                </Label>
-                <Input 
-                  id="year" 
-                  type="number" 
-                  placeholder="2024" 
-                  value={formData.year || ""}
-                  onChange={(e) => setFormData({...formData, year: e.target.value ? parseInt(e.target.value) : undefined})}
-                  min="1900"
-                  max={new Date().getFullYear() + 1}
-                  disabled={submitting}
-                  className="glass border-slate-200/50 dark:border-slate-700/50 h-11" 
-                />
+                <Label htmlFor="plate" className="text-slate-700 dark:text-slate-300">Biển số xe</Label>
+                <Input id="plate" value={form.license_plate} onChange={(e) => setForm({ ...form, license_plate: e.target.value })} placeholder="30A-12345" className="glass border-slate-200/50 dark:border-slate-700/50" />
               </div>
-
-              {/* Dung lượng pin */}
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="battery_capacity" className="text-slate-700 dark:text-slate-300 font-medium flex items-center gap-1">
-                  <Zap className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-                  Dung lượng pin (kWh)
-                </Label>
-                <Input 
-                  id="battery_capacity" 
-                  type="number" 
-                  placeholder="75" 
-                  value={formData.battery_capacity || ""}
-                  onChange={(e) => setFormData({...formData, battery_capacity: e.target.value ? parseFloat(e.target.value) : undefined})}
-                  min="0"
-                  step="0.1"
-                  disabled={submitting}
-                  className="glass border-slate-200/50 dark:border-slate-700/50 h-11" 
-                />
+                <Label htmlFor="bmodel" className="text-slate-700 dark:text-slate-300">Model Pin</Label>
+                <Input id="bmodel" value={form.battery_model} onChange={(e) => setForm({ ...form, battery_model: e.target.value })} placeholder="VD: Standard-75kWh" className="glass border-slate-200/50 dark:border-slate-700/50" />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="vtype" className="text-slate-700 dark:text-slate-300">Loại xe</Label>
+                <Input id="vtype" value={form.vehicle_type} disabled className="glass border-slate-200/50 dark:border-slate-700/50" />
               </div>
             </div>
-
-            {/* Loại pin - Full width */}
-            <div className="space-y-2">
-              <Label htmlFor="battery_model" className="text-slate-700 dark:text-slate-300 font-medium flex items-center gap-1">
-                <Zap className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                Loại pin <span className="text-red-500">*</span>
-              </Label>
-              <Input 
-                id="battery_model" 
-                placeholder="Ví dụ: Standard 60kWh, Long Range 100kWh, Performance Plus" 
-                value={formData.battery_model || ""}
-                onChange={(e) => setFormData({...formData, battery_model: e.target.value})}
-                required
-                disabled={submitting}
-                className="glass border-slate-200/50 dark:border-slate-700/50 h-11 text-base" 
-              />
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Nhập loại pin tương thích với xe của bạn (ví dụ: Standard 60kWh, Long Range, Performance)
-              </p>
+            <div className="flex space-x-4 pt-4">
+              <Button className="gradient-primary text-white shadow-lg" onClick={addVehicle} disabled={loading}>
+                <Plus className="mr-2 h-4 w-4" />
+                Thêm xe
+              </Button>
+              <Button variant="outline" onClick={() => setShowAddForm(false)} className="glass border-slate-200/50 dark:border-slate-700/50">
+                Hủy
+              </Button>
             </div>
-
-            <DialogFooter className="gap-2 pt-4">
-              <Button 
-                type="button"
-                variant="outline" 
-                onClick={handleCancelForm} 
-                disabled={submitting}
-                className="glass border-slate-200/50 dark:border-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-800"
-              >
-                <X className="mr-2 h-4 w-4" />
-                Hủy bỏ
-              </Button>
-              <Button 
-                type="submit" 
-                disabled={submitting}
-                className="gradient-primary text-white shadow-lg hover:shadow-xl transition-all duration-300 min-w-[140px]"
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Đang xử lý...
-                  </>
-                ) : editingVehicle ? (
-                  <>
-                    <Edit className="mr-2 h-4 w-4" />
-                    Cập nhật xe
-                  </>
-                ) : (
-                  <>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Thêm xe mới
-                  </>
-                )}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

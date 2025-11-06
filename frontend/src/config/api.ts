@@ -8,8 +8,12 @@ export const API_ENDPOINTS = {
     REFRESH: `${API_BASE_URL}/auth/refresh`,
     LOGOUT: `${API_BASE_URL}/auth/logout`,
     PROFILE: `${API_BASE_URL}/auth/me`,
+    UPDATE_PROFILE: `${API_BASE_URL}/auth/profile`,
+    CHANGE_PASSWORD: `${API_BASE_URL}/auth/change-password`,
+    UPLOAD_AVATAR: `${API_BASE_URL}/auth/upload-avatar`,
     VERIFY: `${API_BASE_URL}/auth/verify`,
   },
+  // Code mới từ team (Updated upstream)
   GOOGLE: {
     AUTH: `${API_BASE_URL}/google/auth`,
     CALLBACK: `${API_BASE_URL}/google/callback`,
@@ -59,11 +63,25 @@ export const API_ENDPOINTS = {
     LIST: `${API_BASE_URL}/support`,
     REPLY: (id: string) => `${API_BASE_URL}/support/${id}/reply`,
   },
+  // Code của bạn - Driver endpoints (giữ nguyên)
   DRIVER: {
     VEHICLES: `${API_BASE_URL}/driver/vehicles`,
     STATIONS: `${API_BASE_URL}/driver/stations`,
     BOOKINGS: `${API_BASE_URL}/driver/bookings`,
     TRANSACTIONS: `${API_BASE_URL}/driver/transactions`,
+  },
+  // Code của bạn - Subscription endpoints (giữ nguyên)
+  SUBSCRIPTIONS: {
+    BASE: `${API_BASE_URL}/subscriptions`,
+    BY_ID: (id: string) => `${API_BASE_URL}/subscriptions/${id}`,
+    CANCEL: (id: string) => `${API_BASE_URL}/subscriptions/${id}/cancel`,
+  },
+  PACKAGES: {
+    BASE: `${API_BASE_URL}/packages`,
+    BY_ID: (id: string) => `${API_BASE_URL}/packages/${id}`,
+  },
+  PUBLIC: {
+    STATIONS: `${API_BASE_URL}/stations/public`,
   },
   STAFF: {
     BOOKINGS: `${API_BASE_URL}/staff/bookings`,
@@ -82,5 +100,19 @@ export const API_ENDPOINTS = {
   },
   HEALTH: `${API_BASE_URL}/health`,
 };
+
+export async function fetchWithAuth(input: RequestInfo | URL, init: RequestInit = {}) {
+  const accessToken = localStorage.getItem("accessToken");
+  const headers: HeadersInit = {
+    ...(init.headers || {}),
+    "Content-Type": (init.headers as any)?.["Content-Type"] || "application/json",
+  };
+  if (accessToken) {
+    (headers as any).Authorization = `Bearer ${accessToken}`;
+  }
+  const response = await fetch(input, { ...init, headers });
+  // Optionally, handle 401 to refresh token here if needed
+  return response;
+}
 
 export default API_ENDPOINTS;

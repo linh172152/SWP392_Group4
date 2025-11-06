@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -7,7 +7,7 @@ import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { Label } from '../ui/label';
-import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
+import { Avatar, AvatarFallback } from '../ui/avatar';
 import { 
   HelpCircle, 
   Plus, 
@@ -16,86 +16,21 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
-  Phone,
-  Mail,
-  FileText,
   Send
 } from 'lucide-react';
+import API_ENDPOINTS, { fetchWithAuth } from '../../config/api';
 
-// Mock support data
-const mockTickets = [
-  {
-    id: 'SUPP-2024-001',
-    subject: 'Battery swap failed at Downtown Hub',
-    category: 'Technical Issue',
-    priority: 'high',
-    status: 'open',
-    createdDate: '2024-01-05',
-    lastUpdated: '2024-01-05',
-    assignedTo: 'Sarah Johnson',
-    messages: [
-      {
-        id: '1',
-        sender: 'You',
-        message: 'The battery swap process started but failed midway. The system showed an error and I had to wait 15 minutes before trying again.',
-        timestamp: '2024-01-05 14:30',
-        isStaff: false
-      },
-      {
-        id: '2',
-        sender: 'Sarah Johnson',
-        message: 'Hi! I\'m sorry to hear about this issue. I\'ve reviewed the station logs and found the error. We\'ve fixed the mechanical issue and credited your account $28.50 for the inconvenience.',
-        timestamp: '2024-01-05 15:45',
-        isStaff: true
-      }
-    ]
-  },
-  {
-    id: 'SUPP-2024-002',
-    subject: 'Billing discrepancy on invoice INV-2024-001',
-    category: 'Billing',
-    priority: 'medium',
-    status: 'resolved',
-    createdDate: '2024-01-03',
-    lastUpdated: '2024-01-04',
-    assignedTo: 'Mike Chen',
-    messages: [
-      {
-        id: '1',
-        sender: 'You',
-        message: 'I was charged $35 instead of the expected $28.50 for a standard battery swap.',
-        timestamp: '2024-01-03 10:15',
-        isStaff: false
-      },
-      {
-        id: '2',
-        sender: 'Mike Chen',
-        message: 'I\'ve reviewed your account and the charge was correct - you used a Long Range battery instead of Standard. However, I see this wasn\'t clearly communicated. I\'ve refunded the difference.',
-        timestamp: '2024-01-04 09:30',
-        isStaff: true
-      }
-    ]
-  },
-  {
-    id: 'SUPP-2024-003',
-    subject: 'Request for new station location',
-    category: 'Feature Request',
-    priority: 'low',
-    status: 'in-progress',
-    createdDate: '2024-01-01',
-    lastUpdated: '2024-01-02',
-    assignedTo: 'Alex Thompson',
-    messages: [
-      {
-        id: '1',
-        sender: 'You',
-        message: 'Could you please consider adding a station near the university campus? There are many EV owners there.',
-        timestamp: '2024-01-01 16:20',
-        isStaff: false
-      }
-    ]
-  }
-];
+interface TicketItem {
+  ticket_id: string;
+  ticket_number: string;
+  subject: string;
+  description?: string;
+  category?: string;
+  priority: 'low' | 'medium' | 'high' | 'urgent' | string;
+  status: 'open' | 'in_progress' | 'resolved' | 'closed' | string;
+  created_at: string;
+}
+interface ReplyItem { reply_id: string; message: string; is_staff_reply: boolean; created_at: string; user?: { full_name?: string } }
 
 const categories = [
   'Technical Issue',
@@ -111,13 +46,17 @@ const SupportTickets: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [selectedTicket, setSelectedTicket] = useState<typeof mockTickets[0] | null>(null);
+  const [selectedTicket, setSelectedTicket] = useState<TicketItem | null>(null);
+  const [replies, setReplies] = useState<ReplyItem[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [tickets, setTickets] = useState<TicketItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'open': return 'bg-red-100 text-red-800';
-      case 'in-progress': return 'bg-yellow-100 text-yellow-800';
+      case 'in_progress': return 'bg-yellow-100 text-yellow-800';
       case 'resolved': return 'bg-green-100 text-green-800';
       case 'closed': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
@@ -137,31 +76,88 @@ const SupportTickets: React.FC = () => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'open': return <AlertCircle className="h-4 w-4" />;
-      case 'in-progress': return <Clock className="h-4 w-4" />;
+      case 'in_progress': return <Clock className="h-4 w-4" />;
       case 'resolved': return <CheckCircle className="h-4 w-4" />;
       case 'closed': return <CheckCircle className="h-4 w-4" />;
       default: return <HelpCircle className="h-4 w-4" />;
     }
   };
 
-  const filteredTickets = mockTickets.filter(ticket => {
-    const matchesSearch = ticket.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         ticket.id.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || ticket.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
-
-  const handleSendMessage = () => {
-    if (newMessage.trim() && selectedTicket) {
-      // In a real app, this would send the message to the backend
-      console.log('Sending message:', newMessage);
-      setNewMessage('');
+  const loadTickets = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const url = new URL(API_ENDPOINTS.SUPPORT);
+      if (statusFilter !== 'all') url.searchParams.set('status', statusFilter.toUpperCase());
+      const res = await fetchWithAuth(url.toString());
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Tải ticket thất bại');
+      setTickets(data.data);
+    } catch (e: any) {
+      setError(e.message || 'Có lỗi xảy ra');
+    } finally {
+      setLoading(false);
     }
   };
 
+  const openTicket = async (t: TicketItem) => {
+    setSelectedTicket(t);
+    setReplies([]);
+    try {
+      const res = await fetchWithAuth(`${API_ENDPOINTS.SUPPORT}/${t.ticket_id}/replies`);
+      const data = await res.json();
+      if (res.ok && data.success) setReplies(data.data);
+    } catch {}
+  };
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !selectedTicket) return;
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetchWithAuth(`${API_ENDPOINTS.SUPPORT}/${selectedTicket.ticket_id}/replies`, { method: 'POST', body: JSON.stringify({ message: newMessage }) });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Gửi tin nhắn thất bại');
+      setNewMessage('');
+      await openTicket(selectedTicket);
+    } catch (e: any) {
+      setError(e.message || 'Có lỗi xảy ra');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createTicket = async (form: { subject: string; description: string; priority?: string }) => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetchWithAuth(API_ENDPOINTS.SUPPORT, { method: 'POST', body: JSON.stringify(form) });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Tạo ticket thất bại');
+      setIsCreateDialogOpen(false);
+      await loadTickets();
+    } catch (e: any) {
+      setError(e.message || 'Có lỗi xảy ra');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadTickets(); }, [statusFilter]);
+
+  const filteredTickets = tickets.filter(ticket => {
+    const s = searchQuery.toLowerCase();
+    const matchesSearch = ticket.subject.toLowerCase().includes(s) || ticket.ticket_number.toLowerCase().includes(s);
+    return matchesSearch;
+  });
+
+  const [newSubject, setNewSubject] = useState('');
+  const [newCategory, setNewCategory] = useState('');
+  const [newPriority, setNewPriority] = useState('medium');
+  const [newDescription, setNewDescription] = useState('');
+
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Support & Help</h1>
@@ -182,48 +178,40 @@ const SupportTickets: React.FC = () => {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="subject">Subject</Label>
-                  <Input id="subject" placeholder="Brief description of your issue" />
+                  <Input id="subject" placeholder="Brief description of your issue" value={newSubject} onChange={(e) => setNewSubject(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="category">Category</Label>
-                  <Select>
+                  <Select value={newCategory} onValueChange={setNewCategory}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
                       {categories.map((category) => (
-                        <SelectItem key={category} value={category.toLowerCase().replace(' ', '-')}>
-                          {category}
-                        </SelectItem>
+                        <SelectItem key={category} value={category.toLowerCase().replace(' ', '-')}>{category}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="priority">Priority</Label>
-                  <Select>
+                  <Select value={newPriority} onValueChange={setNewPriority}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select priority" />
                     </SelectTrigger>
                     <SelectContent>
                       {priorities.map((priority) => (
-                        <SelectItem key={priority} value={priority}>
-                          {priority.charAt(0).toUpperCase() + priority.slice(1)}
-                        </SelectItem>
+                        <SelectItem key={priority} value={priority}>{priority.charAt(0).toUpperCase() + priority.slice(1)}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="description">Description</Label>
-                  <Textarea 
-                    id="description" 
-                    placeholder="Please provide detailed information about your issue..."
-                    rows={4}
-                  />
+                  <Textarea id="description" placeholder="Please provide detailed information about your issue..." rows={4} value={newDescription} onChange={(e) => setNewDescription(e.target.value)} />
                 </div>
                 <div className="flex space-x-2 pt-4">
-                  <Button className="flex-1" onClick={() => setIsCreateDialogOpen(false)}>
+                  <Button className="flex-1" onClick={() => createTicket({ subject: newSubject, description: newDescription, priority: newPriority })} disabled={loading || !newSubject || !newDescription}>
                     Create Ticket
                   </Button>
                   <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
@@ -236,37 +224,10 @@ const SupportTickets: React.FC = () => {
         </div>
       </div>
 
-      {/* Quick Contact Options */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="cursor-pointer hover:shadow-md transition-shadow">
-          <CardContent className="p-4 text-center">
-            <Phone className="h-8 w-8 text-blue-600 mx-auto mb-3" />
-            <h3 className="font-semibold mb-1">Call Support</h3>
-            <p className="text-sm text-gray-600 mb-3">24/7 phone support</p>
-            <p className="text-sm font-medium">+1 (555) 123-4567</p>
-          </CardContent>
-        </Card>
+      {error && (
+        <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg border border-red-200">{error}</div>
+      )}
 
-        <Card className="cursor-pointer hover:shadow-md transition-shadow">
-          <CardContent className="p-4 text-center">
-            <Mail className="h-8 w-8 text-green-600 mx-auto mb-3" />
-            <h3 className="font-semibold mb-1">Email Support</h3>
-            <p className="text-sm text-gray-600 mb-3">Get help via email</p>
-            <p className="text-sm font-medium">support@evswap.com</p>
-          </CardContent>
-        </Card>
-
-        <Card className="cursor-pointer hover:shadow-md transition-shadow">
-          <CardContent className="p-4 text-center">
-            <MessageCircle className="h-8 w-8 text-purple-600 mx-auto mb-3" />
-            <h3 className="font-semibold mb-1">Live Chat</h3>
-            <p className="text-sm text-gray-600 mb-3">Chat with an agent</p>
-            <Badge className="bg-green-100 text-green-800">Online</Badge>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters */}
       <Card>
         <CardContent className="p-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -286,7 +247,7 @@ const SupportTickets: React.FC = () => {
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="open">Open</SelectItem>
-                <SelectItem value="in-progress">In Progress</SelectItem>
+                <SelectItem value="in_progress">In Progress</SelectItem>
                 <SelectItem value="resolved">Resolved</SelectItem>
                 <SelectItem value="closed">Closed</SelectItem>
               </SelectContent>
@@ -295,11 +256,10 @@ const SupportTickets: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Tickets List */}
       <div className="space-y-4">
         {filteredTickets.map((ticket) => (
-          <Card key={ticket.id} className="cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => setSelectedTicket(ticket)}>
+          <Card key={ticket.ticket_id} className="cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => openTicket(ticket)}>
             <CardContent className="p-6">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div className="flex-1">
@@ -310,7 +270,7 @@ const SupportTickets: React.FC = () => {
                       </div>
                       <div>
                         <h3 className="font-semibold text-lg">{ticket.subject}</h3>
-                        <p className="text-sm text-gray-600">#{ticket.id}</p>
+                        <p className="text-sm text-gray-600">#{ticket.ticket_number}</p>
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -326,27 +286,15 @@ const SupportTickets: React.FC = () => {
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                     <div>
-                      <p className="text-gray-500">Category</p>
-                      <p className="font-medium">{ticket.category}</p>
-                    </div>
-                    <div>
                       <p className="text-gray-500">Created</p>
-                      <p className="font-medium">{new Date(ticket.createdDate).toLocaleDateString()}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500">Last Updated</p>
-                      <p className="font-medium">{new Date(ticket.lastUpdated).toLocaleDateString()}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500">Assigned To</p>
-                      <p className="font-medium">{ticket.assignedTo}</p>
+                      <p className="font-medium">{new Date(ticket.created_at).toLocaleDateString()}</p>
                     </div>
                   </div>
                 </div>
 
                 <div className="flex items-center space-x-2">
                   <MessageCircle className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm text-gray-600">{ticket.messages.length} messages</span>
+                  <span className="text-sm text-gray-600">Chi tiết</span>
                 </div>
               </div>
             </CardContent>
@@ -354,15 +302,14 @@ const SupportTickets: React.FC = () => {
         ))}
       </div>
 
-      {/* Empty State */}
-      {filteredTickets.length === 0 && (
+      {filteredTickets.length === 0 && !loading && (
         <Card className="p-12 text-center">
           <HelpCircle className="mx-auto h-12 w-12 text-gray-400 mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No tickets found</h3>
           <p className="text-gray-500 mb-4">
             {searchQuery || statusFilter !== 'all' 
               ? 'Try adjusting your search or filter criteria.'
-              : 'You haven\'t created any support tickets yet.'
+              : 'You\'t created any support tickets yet.'
             }
           </p>
           <Button onClick={() => setIsCreateDialogOpen(true)}>
@@ -372,7 +319,6 @@ const SupportTickets: React.FC = () => {
         </Card>
       )}
 
-      {/* Ticket Detail Dialog */}
       {selectedTicket && (
         <Dialog open={!!selectedTicket} onOpenChange={() => setSelectedTicket(null)}>
           <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
@@ -380,7 +326,7 @@ const SupportTickets: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <DialogTitle>{selectedTicket.subject}</DialogTitle>
-                  <p className="text-sm text-gray-600">#{selectedTicket.id}</p>
+                  <p className="text-sm text-gray-600">#{selectedTicket.ticket_number}</p>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Badge className={getPriorityColor(selectedTicket.priority)}>
@@ -394,19 +340,18 @@ const SupportTickets: React.FC = () => {
               </div>
             </DialogHeader>
 
-            {/* Messages */}
             <div className="flex-1 overflow-y-auto py-4 space-y-4">
-              {selectedTicket.messages.map((message) => (
-                <div key={message.id} className={`flex ${message.isStaff ? 'justify-start' : 'justify-end'}`}>
-                  <div className={`max-w-[70%] ${message.isStaff ? 'bg-gray-100' : 'bg-blue-100'} rounded-lg p-4`}>
+              {replies.map((message) => (
+                <div key={message.reply_id} className={`flex ${message.is_staff_reply ? 'justify-start' : 'justify-end'}`}>
+                  <div className={`max-w-[70%] ${message.is_staff_reply ? 'bg-gray-100' : 'bg-blue-100'} rounded-lg p-4`}>
                     <div className="flex items-center space-x-2 mb-2">
                       <Avatar className="h-6 w-6">
                         <AvatarFallback className="text-xs">
-                          {message.sender.split(' ').map(n => n[0]).join('')}
+                          {(message.user?.full_name || (message.is_staff_reply ? 'Staff' : 'You')).split(' ').map(n => n[0]).join('')}
                         </AvatarFallback>
                       </Avatar>
-                      <span className="text-sm font-medium">{message.sender}</span>
-                      <span className="text-xs text-gray-500">{message.timestamp}</span>
+                      <span className="text-sm font-medium">{message.user?.full_name || (message.is_staff_reply ? 'Staff' : 'You')}</span>
+                      <span className="text-xs text-gray-500">{new Date(message.created_at).toLocaleString()}</span>
                     </div>
                     <p className="text-sm">{message.message}</p>
                   </div>
@@ -414,7 +359,6 @@ const SupportTickets: React.FC = () => {
               ))}
             </div>
 
-            {/* Message Input */}
             {selectedTicket.status !== 'closed' && selectedTicket.status !== 'resolved' && (
               <div className="border-t pt-4">
                 <div className="flex space-x-2">
@@ -425,7 +369,7 @@ const SupportTickets: React.FC = () => {
                     rows={3}
                     className="flex-1"
                   />
-                  <Button onClick={handleSendMessage} disabled={!newMessage.trim()}>
+                  <Button onClick={handleSendMessage} disabled={!newMessage.trim() || loading}>
                     <Send className="h-4 w-4" />
                   </Button>
                 </div>

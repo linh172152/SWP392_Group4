@@ -15,7 +15,8 @@ import {
   LogOut,
   Zap,
   Menu,
-  X
+  X,
+  Package
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -30,6 +31,7 @@ const navigation = [
   { name: 'Tìm trạm thay pin', href: '/driver/stations', icon: MapPin },
   { name: 'Lịch sử thay pin', href: '/driver/bookings', icon: Calendar },
   { name: 'Hóa đơn', href: '/driver/payments', icon: CreditCard },
+  { name: 'Gói dịch vụ', href: '/driver/subscriptions', icon: Package },
   { name: 'Hồ sơ', href: '/driver/profile', icon: Settings },
 ];
 
