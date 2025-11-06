@@ -32,13 +32,11 @@ import {
   Calendar
 } from 'lucide-react';
 import { 
-  StaffBooking, 
+  type StaffBooking,
   getStationBookings,
   confirmBooking,
   completeBooking,
   cancelBooking,
-  ConfirmBookingData,
-  CompleteBookingData
 } from '../../services/staff.service';
 import { useToast } from '../../hooks/use-toast';
 
@@ -62,6 +60,7 @@ const SwapTransactions: React.FC = () => {
   const [oldBatteryStatus, setOldBatteryStatus] = useState<'good' | 'damaged' | 'maintenance'>('good');
   const [cancelReason, setCancelReason] = useState('');
   const [cancelConfirmed, setCancelConfirmed] = useState(false);
+  const [completeError, setCompleteError] = useState<string | null>(null);
   
   const { toast } = useToast();
 
@@ -179,6 +178,7 @@ const SwapTransactions: React.FC = () => {
     setOldBatteryCode('');
     setBatteryModel(booking.battery_model || '');
     setOldBatteryStatus('good');
+    setCompleteError(null); // Reset error
     setCompleteDialogOpen(true);
   };
 
@@ -195,6 +195,8 @@ const SwapTransactions: React.FC = () => {
 
     try {
       setActionLoading(selectedBooking.booking_id);
+      setCompleteError(null); // Reset error trước khi submit
+      
       const response = await completeBooking(selectedBooking.booking_id, {
         old_battery_code: oldBatteryCode,
         battery_model: batteryModel,
@@ -207,12 +209,16 @@ const SwapTransactions: React.FC = () => {
           description: `Hoàn thành đổi pin. ${response.data?.message || ''}`,
         });
         setCompleteDialogOpen(false);
+        setCompleteError(null);
         fetchBookings(); // Refresh list
       }
     } catch (error: any) {
+      const errorMessage = error.message || 'Không thể hoàn thành booking';
+      setCompleteError(errorMessage); // Hiển thị lỗi trong dialog
+      
       toast({
         title: 'Lỗi',
-        description: error.message || 'Không thể hoàn thành booking',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -699,32 +705,78 @@ const SwapTransactions: React.FC = () => {
                 </p>
               </div>
               
+              {/* Error Message */}
+              {completeError && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-red-900 dark:text-red-200">
+                        Lỗi khi hoàn thành booking
+                      </p>
+                      <p className="text-sm text-red-700 dark:text-red-300">
+                        {completeError}
+                      </p>
+                      {completeError.includes('not found') && (
+                        <p className="text-xs text-red-600 dark:text-red-400 mt-2">
+                          💡 Kiểm tra lại mã pin cũ. Mã pin phải tồn tại trong hệ thống kho pin.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Info Box - Giải thích */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                  <div className="text-xs text-blue-800 dark:text-blue-200">
+                    <p className="font-semibold mb-1">Lưu ý quan trọng:</p>
+                    <p>• <strong>Mã pin cũ:</strong> Mã riêng trên từng viên pin (VD: BAT-TD03, BAT-VF001)</p>
+                    <p>• <strong>Model pin:</strong> Loại/dòng pin (VD: Tesla Model 3, VinFast VF8 Battery)</p>
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-2">
-                <Label htmlFor="oldBatteryCode">
+                <Label htmlFor="oldBatteryCode" className="flex items-center gap-2">
+                  <Battery className="h-4 w-4 text-orange-600" />
                   Mã pin cũ <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   id="oldBatteryCode"
                   type="text"
-                  placeholder="Nhập mã pin cũ của khách hàng"
+                  placeholder="VD: BAT-TD03, BAT-VF001, BAT-123"
                   value={oldBatteryCode}
-                  onChange={(e) => setOldBatteryCode(e.target.value)}
+                  onChange={(e) => {
+                    setOldBatteryCode(e.target.value);
+                    if (completeError) setCompleteError(null); // Clear error khi user nhập lại
+                  }}
                   disabled={actionLoading === selectedBooking.booking_id}
+                  className={`font-mono ${completeError && completeError.includes('not found') ? 'border-red-500 focus:border-red-500' : ''}`}
                 />
+                <p className="text-xs text-gray-500">
+                  💡 Nhập mã trên nhãn pin cũ của khách hàng (không phải tên model)
+                </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="batteryModel">
+                <Label htmlFor="batteryModel" className="flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-green-600" />
                   Model pin mới <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   id="batteryModel"
                   type="text"
-                  placeholder="Nhập model pin mới"
+                  placeholder="VD: Tesla Model 3, VinFast VF8 Battery, BMW I3"
                   value={batteryModel}
                   onChange={(e) => setBatteryModel(e.target.value)}
                   disabled={actionLoading === selectedBooking.booking_id}
                 />
+                <p className="text-xs text-gray-500">
+                  💡 Nhập loại/dòng pin mới sẽ thay thế
+                </p>
               </div>
 
               <div className="space-y-2">
