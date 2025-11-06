@@ -8,7 +8,6 @@ import {
   Home, 
   Battery, 
   Zap, 
-  History, 
   Users, 
   LogOut,
   Settings,
@@ -29,7 +28,6 @@ const navigation = [
   { name: 'Kho pin', href: '/staff/inventory', icon: Battery },
   { name: 'Giao dịch thay pin', href: '/staff/transactions', icon: Zap },
   { name: 'Lịch làm việc', href: '/staff/schedule', icon: Calendar },
-  { name: 'Lịch sử ca làm', href: '/staff/history', icon: History },
   { name: 'Hồ sơ cá nhân', href: '/staff/profile', icon: Users },
 ];
 

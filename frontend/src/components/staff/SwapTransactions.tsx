@@ -1,8 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
 import { 
   Zap, 
   Clock, 
@@ -12,112 +23,279 @@ import {
   Battery,
   ArrowRight,
   RefreshCw,
-  X
+  X,
+  Loader2,
+  Eye,
+  Phone,
+  User,
+  MapPin,
+  Calendar
 } from 'lucide-react';
-
-// Mock queue data
-const mockQueue = [
-  {
-    id: 'Q-001',
-    customerName: 'John Smith',
-    customerPhone: '+1 (555) 123-4567',
-    vehicle: 'Tesla Model 3',
-    licensePlate: 'ABC-123',
-    batteryType: 'Standard Range',
-    estimatedTime: '3 minutes',
-    waitTime: '5 minutes',
-    status: 'waiting',
-    bay: null,
-    reservationTime: '14:30'
-  },
-  {
-    id: 'Q-002',
-    customerName: 'Sarah Wilson',
-    customerPhone: '+1 (555) 987-6543',
-    vehicle: 'BYD Tang EV',
-    licensePlate: 'XYZ-789',
-    batteryType: 'Long Range',
-    estimatedTime: '3.5 minutes',
-    waitTime: '2 minutes',
-    status: 'in-progress',
-    bay: 'Bay 2',
-    startTime: '14:25',
-    batteryOut: 'LR-003',
-    batteryIn: 'LR-012'
-  },
-  {
-    id: 'Q-003',
-    customerName: 'Mike Johnson',
-    customerPhone: '+1 (555) 456-7890',
-    vehicle: 'Tesla Model Y',
-    licensePlate: 'DEF-456',
-    batteryType: 'Performance',
-    estimatedTime: '4 minutes',
-    waitTime: '0 minutes',
-    status: 'ready',
-    bay: 'Bay 1',
-    batteryAssigned: 'PERF-005'
-  }
-];
+import { 
+  StaffBooking, 
+  getStationBookings,
+  confirmBooking,
+  completeBooking,
+  cancelBooking,
+  ConfirmBookingData,
+  CompleteBookingData
+} from '../../services/staff.service';
+import { useToast } from '../../hooks/use-toast';
 
 const SwapTransactions: React.FC = () => {
-  const [selectedTransaction, setSelectedTransaction] = useState<typeof mockQueue[0] | null>(null);
+  const [bookings, setBookings] = useState<StaffBooking[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [selectedBooking, setSelectedBooking] = useState<StaffBooking | null>(null);
+  
+  // Dialog states
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  
+  // Form states
+  const [phoneInput, setPhoneInput] = useState('');
+  const [oldBatteryCode, setOldBatteryCode] = useState('');
+  const [batteryModel, setBatteryModel] = useState('');
+  const [oldBatteryStatus, setOldBatteryStatus] = useState<'good' | 'damaged' | 'maintenance'>('good');
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelConfirmed, setCancelConfirmed] = useState(false);
+  
+  const { toast } = useToast();
+
+  // Fetch bookings
+  const fetchBookings = async () => {
+    try {
+      setRefreshing(true);
+      const response = await getStationBookings({
+        limit: 50,
+      });
+      
+      if (response.success && response.data?.bookings) {
+        // Filter chỉ lấy booking chưa hoàn thành hoặc hủy
+        const activeBookings = response.data.bookings.filter(
+          (b: StaffBooking) => ['pending', 'confirmed'].includes(b.status)
+        );
+        setBookings(activeBookings);
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Lỗi',
+        description: error.message || 'Không thể tải danh sách booking',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBookings();
+  }, []);
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'waiting': return 'bg-yellow-100 text-yellow-800';
-      case 'ready': return 'bg-blue-100 text-blue-800';
-      case 'in-progress': return 'bg-purple-100 text-purple-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'confirmed': return 'bg-blue-100 text-blue-800';
       case 'completed': return 'bg-green-100 text-green-800';
-      case 'failed': return 'bg-red-100 text-red-800';
+      case 'cancelled': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'waiting': return <Clock className="h-4 w-4" />;
-      case 'ready': return <CheckCircle className="h-4 w-4" />;
-      case 'in-progress': return <RefreshCw className="h-4 w-4" />;
+      case 'pending': return <Clock className="h-4 w-4" />;
+      case 'confirmed': return <CheckCircle className="h-4 w-4" />;
       case 'completed': return <CheckCircle className="h-4 w-4" />;
-      case 'failed': return <X className="h-4 w-4" />;
+      case 'cancelled': return <X className="h-4 w-4" />;
       default: return <Clock className="h-4 w-4" />;
     }
   };
 
-  const handleStartSwap = (transaction: typeof mockQueue[0]) => {
-    console.log('Starting swap for:', transaction.id);
-    // In a real app, this would call the API to start the swap process
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'pending': return 'Chờ xác nhận';
+      case 'confirmed': return 'Đã xác nhận';
+      case 'completed': return 'Hoàn thành';
+      case 'cancelled': return 'Đã hủy';
+      default: return status;
+    }
   };
 
-  const handleCompleteSwap = (transaction: typeof mockQueue[0]) => {
-    console.log('Completing swap for:', transaction.id);
-    // In a real app, this would call the API to complete the swap
+  // Open detail dialog
+  const handleViewDetail = (booking: StaffBooking) => {
+    setSelectedBooking(booking);
+    setDetailDialogOpen(true);
   };
 
-  const handleCancelSwap = (transaction: typeof mockQueue[0]) => {
-    console.log('Cancelling swap for:', transaction.id);
-    // In a real app, this would call the API to cancel the swap
+  // Open confirm dialog
+  const handleOpenConfirmDialog = (booking: StaffBooking) => {
+    setSelectedBooking(booking);
+    setPhoneInput('');
+    setConfirmDialogOpen(true);
   };
+
+  // Confirm booking - Verify phone
+  const handleConfirmBooking = async () => {
+    if (!selectedBooking || !phoneInput.trim()) {
+      toast({
+        title: 'Lỗi',
+        description: 'Vui lòng nhập số điện thoại',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setActionLoading(selectedBooking.booking_id);
+      const response = await confirmBooking(selectedBooking.booking_id, { phone: phoneInput });
+      
+      if (response.success) {
+        toast({
+          title: 'Thành công',
+          description: 'Đã xác nhận booking',
+        });
+        setConfirmDialogOpen(false);
+        fetchBookings(); // Refresh list
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Lỗi',
+        description: error.message || 'Không thể xác nhận booking',
+        variant: 'destructive',
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Open complete dialog
+  const handleOpenCompleteDialog = (booking: StaffBooking) => {
+    setSelectedBooking(booking);
+    setOldBatteryCode('');
+    setBatteryModel(booking.battery_model || '');
+    setOldBatteryStatus('good');
+    setCompleteDialogOpen(true);
+  };
+
+  // Complete booking - Swap battery
+  const handleCompleteBooking = async () => {
+    if (!selectedBooking || !oldBatteryCode.trim() || !batteryModel.trim()) {
+      toast({
+        title: 'Lỗi',
+        description: 'Vui lòng điền đầy đủ thông tin',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setActionLoading(selectedBooking.booking_id);
+      const response = await completeBooking(selectedBooking.booking_id, {
+        old_battery_code: oldBatteryCode,
+        battery_model: batteryModel,
+        old_battery_status: oldBatteryStatus,
+      });
+      
+      if (response.success) {
+        toast({
+          title: 'Thành công',
+          description: `Hoàn thành đổi pin. ${response.data?.message || ''}`,
+        });
+        setCompleteDialogOpen(false);
+        fetchBookings(); // Refresh list
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Lỗi',
+        description: error.message || 'Không thể hoàn thành booking',
+        variant: 'destructive',
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Open cancel dialog
+  const handleOpenCancelDialog = (booking: StaffBooking) => {
+    setSelectedBooking(booking);
+    setCancelReason('');
+    setCancelConfirmed(false); // Reset checkbox
+    setCancelDialogOpen(true);
+  };
+
+  // Cancel booking
+  const handleCancelBooking = async () => {
+    if (!selectedBooking || !cancelReason.trim()) {
+      toast({
+        title: 'Lỗi',
+        description: 'Vui lòng nhập lý do hủy',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setActionLoading(selectedBooking.booking_id);
+      const response = await cancelBooking(selectedBooking.booking_id, { reason: cancelReason });
+      
+      if (response.success) {
+        toast({
+          title: 'Thành công',
+          description: 'Đã hủy booking',
+        });
+        setCancelDialogOpen(false);
+        fetchBookings(); // Refresh list
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Lỗi',
+        description: error.message || 'Không thể hủy booking',
+        variant: 'destructive',
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Swap Queue</h1>
-          <p className="text-gray-600">Manage active battery swap transactions</p>
+          <h1 className="text-3xl font-bold text-gray-900">Hàng đợi đổi pin</h1>
+          <p className="text-gray-600">Quản lý các giao dịch đổi pin đang hoạt động</p>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline">
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh Queue
+          <Button 
+            variant="outline" 
+            onClick={fetchBookings}
+            disabled={refreshing}
+          >
+            {refreshing ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-2 h-4 w-4" />
+            )}
+            Làm mới
           </Button>
         </div>
       </div>
 
       {/* Queue Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-3">
@@ -125,8 +303,8 @@ const SwapTransactions: React.FC = () => {
                 <Clock className="h-5 w-5 text-yellow-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Waiting</p>
-                <p className="text-2xl font-bold">{mockQueue.filter(q => q.status === 'waiting').length}</p>
+                <p className="text-sm text-gray-600">Chờ xác nhận</p>
+                <p className="text-2xl font-bold">{bookings.filter(b => b.status === 'pending').length}</p>
               </div>
             </div>
           </CardContent>
@@ -139,22 +317,8 @@ const SwapTransactions: React.FC = () => {
                 <CheckCircle className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Ready</p>
-                <p className="text-2xl font-bold">{mockQueue.filter(q => q.status === 'ready').length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Zap className="h-5 w-5 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">In Progress</p>
-                <p className="text-2xl font-bold">{mockQueue.filter(q => q.status === 'in-progress').length}</p>
+                <p className="text-sm text-gray-600">Đã xác nhận</p>
+                <p className="text-2xl font-bold">{bookings.filter(b => b.status === 'confirmed').length}</p>
               </div>
             </div>
           </CardContent>
@@ -163,21 +327,25 @@ const SwapTransactions: React.FC = () => {
 
       {/* Active Queue */}
       <div className="space-y-4">
-        {mockQueue.map((transaction) => (
-          <Card key={transaction.id} className="overflow-hidden">
+        {bookings.map((booking) => (
+          <Card key={booking.booking_id} className="overflow-hidden">
             <CardContent className="p-6">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 {/* Customer & Vehicle Info */}
                 <div className="flex items-center space-x-4">
                   <Avatar>
-                    <AvatarFallback>{transaction.customerName.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                    <AvatarFallback>
+                      {booking.user?.full_name?.split(' ').map(n => n[0]).join('') || 'U'}
+                    </AvatarFallback>
                   </Avatar>
                   <div>
-                    <h3 className="font-semibold text-lg">{transaction.customerName}</h3>
-                    <p className="text-sm text-gray-600">{transaction.customerPhone}</p>
+                    <h3 className="font-semibold text-lg">{booking.user?.full_name || 'Khách hàng'}</h3>
+                    <p className="text-sm text-gray-600">{booking.user?.phone || booking.user?.email}</p>
                     <div className="flex items-center space-x-2 mt-1">
                       <Car className="h-4 w-4 text-gray-400" />
-                      <span className="text-sm">{transaction.vehicle} • {transaction.licensePlate}</span>
+                      <span className="text-sm">
+                        {booking.vehicle?.make} {booking.vehicle?.model} • {booking.vehicle?.license_plate}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -185,104 +353,103 @@ const SwapTransactions: React.FC = () => {
                 {/* Transaction Details */}
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                   <div>
-                    <p className="text-gray-500">Battery Type</p>
-                    <p className="font-medium">{transaction.batteryType}</p>
+                    <p className="text-gray-500">Loại pin</p>
+                    <p className="font-medium">{booking.battery_model}</p>
                   </div>
                   <div>
-                    <p className="text-gray-500">Wait Time</p>
-                    <p className="font-medium">{transaction.waitTime}</p>
+                    <p className="text-gray-500">Mã booking</p>
+                    <p className="font-medium">{booking.booking_code}</p>
                   </div>
                   <div>
-                    <p className="text-gray-500">Est. Duration</p>
-                    <p className="font-medium">{transaction.estimatedTime}</p>
+                    <p className="text-gray-500">Thời gian đặt</p>
+                    <p className="font-medium">
+                      {new Date(booking.scheduled_at).toLocaleString('vi-VN')}
+                    </p>
                   </div>
-                  {transaction.bay && (
+                  {booking.checked_in_by_staff && (
                     <div>
-                      <p className="text-gray-500">Bay</p>
-                      <p className="font-medium">{transaction.bay}</p>
-                    </div>
-                  )}
-                  {transaction.reservationTime && (
-                    <div>
-                      <p className="text-gray-500">Reserved</p>
-                      <p className="font-medium">{transaction.reservationTime}</p>
+                      <p className="text-gray-500">Xác nhận bởi</p>
+                      <p className="font-medium">{booking.checked_in_by_staff.full_name}</p>
                     </div>
                   )}
                 </div>
 
                 {/* Status & Actions */}
                 <div className="flex flex-col items-end space-y-3">
-                  <Badge className={getStatusColor(transaction.status)}>
-                    {getStatusIcon(transaction.status)}
-                    <span className="ml-1 capitalize">{transaction.status.replace('-', ' ')}</span>
+                  <Badge className={getStatusColor(booking.status)}>
+                    {getStatusIcon(booking.status)}
+                    <span className="ml-1">{getStatusText(booking.status)}</span>
                   </Badge>
 
                   <div className="flex space-x-2">
-                    {transaction.status === 'waiting' && (
-                      <Button size="sm" onClick={() => handleStartSwap(transaction)}>
-                        <Zap className="mr-1 h-3 w-3" />
-                        Start Swap
+                    {booking.status === 'pending' && (
+                      <Button 
+                        size="sm" 
+                        onClick={() => handleOpenConfirmDialog(booking)}
+                        disabled={actionLoading === booking.booking_id}
+                      >
+                        {actionLoading === booking.booking_id ? (
+                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        ) : (
+                          <CheckCircle className="mr-1 h-3 w-3" />
+                        )}
+                        Xác nhận
                       </Button>
                     )}
-                    {transaction.status === 'ready' && (
-                      <Button size="sm" onClick={() => handleStartSwap(transaction)}>
-                        <Zap className="mr-1 h-3 w-3" />
-                        Begin Process
-                      </Button>
-                    )}
-                    {transaction.status === 'in-progress' && (
-                      <Button size="sm" onClick={() => handleCompleteSwap(transaction)}>
-                        <CheckCircle className="mr-1 h-3 w-3" />
-                        Complete
+                    {booking.status === 'confirmed' && (
+                      <Button 
+                        size="sm" 
+                        onClick={() => handleOpenCompleteDialog(booking)}
+                        disabled={actionLoading === booking.booking_id}
+                      >
+                        {actionLoading === booking.booking_id ? (
+                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        ) : (
+                          <Zap className="mr-1 h-3 w-3" />
+                        )}
+                        Đổi pin
                       </Button>
                     )}
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      onClick={() => setSelectedTransaction(transaction)}
+                      onClick={() => handleViewDetail(booking)}
                     >
-                      Details
+                      <Eye className="mr-1 h-3 w-3" />
+                      Chi tiết
                     </Button>
                     <Button 
                       variant="outline" 
                       size="sm" 
                       className="text-red-600 hover:text-red-700"
-                      onClick={() => handleCancelSwap(transaction)}
+                      onClick={() => handleOpenCancelDialog(booking)}
+                      disabled={actionLoading === booking.booking_id}
                     >
-                      <X className="h-3 w-3" />
+                      {actionLoading === booking.booking_id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <X className="h-3 w-3" />
+                      )}
                     </Button>
                   </div>
                 </div>
               </div>
 
-              {/* Battery Exchange Info (for in-progress) */}
-              {transaction.status === 'in-progress' && transaction.batteryOut && transaction.batteryIn && (
+              {/* Transaction Info */}
+              {booking.transaction && (
                 <div className="mt-4 pt-4 border-t">
                   <div className="flex items-center justify-center space-x-4 text-sm">
-                    <div className="flex items-center space-x-2 bg-red-50 px-3 py-2 rounded-lg">
-                      <Battery className="h-4 w-4 text-red-600" />
-                      <span className="font-medium">Out: {transaction.batteryOut}</span>
+                    <div className="flex items-center space-x-2 bg-blue-50 px-3 py-2 rounded-lg">
+                      <Battery className="h-4 w-4 text-blue-600" />
+                      <span className="font-medium">
+                        Mã giao dịch: {booking.transaction.transaction_code}
+                      </span>
                     </div>
-                    <ArrowRight className="h-4 w-4 text-gray-400" />
                     <div className="flex items-center space-x-2 bg-green-50 px-3 py-2 rounded-lg">
-                      <Battery className="h-4 w-4 text-green-600" />
-                      <span className="font-medium">In: {transaction.batteryIn}</span>
+                      <span className="font-medium">
+                        Số tiền: {Number(booking.transaction.amount).toLocaleString('vi-VN')}đ
+                      </span>
                     </div>
-                  </div>
-                  {transaction.startTime && (
-                    <div className="text-center mt-2">
-                      <p className="text-xs text-gray-500">Started at {transaction.startTime}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Battery Assignment (for ready) */}
-              {transaction.status === 'ready' && transaction.batteryAssigned && (
-                <div className="mt-4 pt-4 border-t">
-                  <div className="flex items-center justify-center space-x-2 text-sm">
-                    <Battery className="h-4 w-4 text-blue-600" />
-                    <span className="font-medium">Assigned Battery: {transaction.batteryAssigned}</span>
                   </div>
                 </div>
               )}
@@ -292,12 +459,12 @@ const SwapTransactions: React.FC = () => {
       </div>
 
       {/* Empty State */}
-      {mockQueue.length === 0 && (
+      {bookings.length === 0 && (
         <Card className="p-12 text-center">
           <Zap className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No active transactions</h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Không có giao dịch đang hoạt động</h3>
           <p className="text-gray-500">
-            The swap queue is empty. New customers will appear here when they arrive.
+            Hàng đợi trống. Khách hàng mới sẽ xuất hiện tại đây khi họ đến.
           </p>
         </Card>
       )}
@@ -305,30 +472,431 @@ const SwapTransactions: React.FC = () => {
       {/* Quick Actions */}
       <Card>
         <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>Emergency controls and system management</CardDescription>
+          <CardTitle>Thao tác nhanh</CardTitle>
+          <CardDescription>Điều khiển khẩn cấp và quản lý hệ thống</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Button variant="outline" className="h-16 flex-col">
-              <AlertCircle className="h-6 w-6 mb-2 text-red-600" />
-              <span className="text-sm">Emergency Stop</span>
-            </Button>
-            <Button variant="outline" className="h-16 flex-col">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <Button 
+              variant="outline" 
+              className="h-16 flex-col"
+              onClick={fetchBookings}
+            >
               <RefreshCw className="h-6 w-6 mb-2" />
-              <span className="text-sm">Reset Bay</span>
-            </Button>
-            <Button variant="outline" className="h-16 flex-col">
-              <CheckCircle className="h-6 w-6 mb-2" />
-              <span className="text-sm">Manual Override</span>
+              <span className="text-sm">Làm mới danh sách</span>
             </Button>
             <Button variant="outline" className="h-16 flex-col">
               <Clock className="h-6 w-6 mb-2" />
-              <span className="text-sm">Pause Queue</span>
+              <span className="text-sm">Lịch sử</span>
+            </Button>
+            <Button variant="outline" className="h-16 flex-col">
+              <AlertCircle className="h-6 w-6 mb-2 text-red-600" />
+              <span className="text-sm">Khẩn cấp</span>
             </Button>
           </div>
         </CardContent>
       </Card>
+
+      {/* Detail Dialog */}
+      <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Chi tiết giao dịch thay pin</DialogTitle>
+            <DialogDescription>
+              Thông tin chi tiết về booking và khách hàng
+            </DialogDescription>
+          </DialogHeader>
+          {selectedBooking && (
+            <div className="space-y-4">
+              {/* Customer Info */}
+              <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded-lg space-y-3">
+                <h3 className="font-semibold flex items-center">
+                  <User className="h-4 w-4 mr-2" />
+                  Thông tin khách hàng
+                </h3>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-gray-500">Họ tên:</span>
+                    <p className="font-medium">{selectedBooking.user?.full_name || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Số điện thoại:</span>
+                    <p className="font-medium flex items-center">
+                      <Phone className="h-3 w-3 mr-1" />
+                      {selectedBooking.user?.phone || 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Email:</span>
+                    <p className="font-medium">{selectedBooking.user?.email || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Trạng thái:</span>
+                    <Badge className={getStatusColor(selectedBooking.status)}>
+                      {getStatusText(selectedBooking.status)}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              {/* Vehicle Info */}
+              <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded-lg space-y-3">
+                <h3 className="font-semibold flex items-center">
+                  <Car className="h-4 w-4 mr-2" />
+                  Thông tin xe
+                </h3>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-gray-500">Hãng xe:</span>
+                    <p className="font-medium">{selectedBooking.vehicle?.make || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Mẫu xe:</span>
+                    <p className="font-medium">{selectedBooking.vehicle?.model || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Biển số:</span>
+                    <p className="font-medium">{selectedBooking.vehicle?.license_plate || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Loại pin:</span>
+                    <p className="font-medium">{selectedBooking.battery_model || 'N/A'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Booking Info */}
+              <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded-lg space-y-3">
+                <h3 className="font-semibold flex items-center">
+                  <Calendar className="h-4 w-4 mr-2" />
+                  Thông tin đặt lịch
+                </h3>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-gray-500">Mã booking:</span>
+                    <p className="font-medium">{selectedBooking.booking_code}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Thời gian đặt:</span>
+                    <p className="font-medium">
+                      {new Date(selectedBooking.scheduled_at).toLocaleString('vi-VN')}
+                    </p>
+                  </div>
+                  {selectedBooking.checked_in_by_staff && (
+                    <div>
+                      <span className="text-gray-500">Xác nhận bởi:</span>
+                      <p className="font-medium">{selectedBooking.checked_in_by_staff.full_name}</p>
+                    </div>
+                  )}
+                  {selectedBooking.transaction && (
+                    <>
+                      <div>
+                        <span className="text-gray-500">Mã giao dịch:</span>
+                        <p className="font-medium">{selectedBooking.transaction.transaction_code}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Số tiền:</span>
+                        <p className="font-medium text-green-600">
+                          {Number(selectedBooking.transaction.amount).toLocaleString('vi-VN')}đ
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetailDialogOpen(false)}>
+              Đóng
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Booking Dialog */}
+      <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Xác nhận khách hàng</DialogTitle>
+            <DialogDescription>
+              Nhập số điện thoại của khách hàng để xác nhận booking
+            </DialogDescription>
+          </DialogHeader>
+          {selectedBooking && (
+            <div className="space-y-4">
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
+                <p className="text-sm">
+                  <strong>Khách hàng:</strong> {selectedBooking.user?.full_name}
+                </p>
+                <p className="text-sm">
+                  <strong>Mã booking:</strong> {selectedBooking.booking_code}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone">
+                  Số điện thoại <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  placeholder="Nhập số điện thoại khách hàng"
+                  value={phoneInput}
+                  onChange={(e) => setPhoneInput(e.target.value)}
+                  disabled={actionLoading === selectedBooking.booking_id}
+                />
+                <p className="text-xs text-gray-500">
+                  Số điện thoại phải khớp với thông tin đăng ký của khách hàng
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setConfirmDialogOpen(false)}
+              disabled={actionLoading === selectedBooking?.booking_id}
+            >
+              Hủy
+            </Button>
+            <Button 
+              onClick={handleConfirmBooking}
+              disabled={!phoneInput.trim() || actionLoading === selectedBooking?.booking_id}
+            >
+              {actionLoading === selectedBooking?.booking_id ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Đang xác nhận...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  Xác nhận
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Complete Booking Dialog */}
+      <Dialog open={completeDialogOpen} onOpenChange={setCompleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Hoàn thành đổi pin</DialogTitle>
+            <DialogDescription>
+              Nhập thông tin pin để hoàn tất giao dịch
+            </DialogDescription>
+          </DialogHeader>
+          {selectedBooking && (
+            <div className="space-y-4">
+              <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
+                <p className="text-sm">
+                  <strong>Khách hàng:</strong> {selectedBooking.user?.full_name}
+                </p>
+                <p className="text-sm">
+                  <strong>Mã booking:</strong> {selectedBooking.booking_code}
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="oldBatteryCode">
+                  Mã pin cũ <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="oldBatteryCode"
+                  type="text"
+                  placeholder="Nhập mã pin cũ của khách hàng"
+                  value={oldBatteryCode}
+                  onChange={(e) => setOldBatteryCode(e.target.value)}
+                  disabled={actionLoading === selectedBooking.booking_id}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="batteryModel">
+                  Model pin mới <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="batteryModel"
+                  type="text"
+                  placeholder="Nhập model pin mới"
+                  value={batteryModel}
+                  onChange={(e) => setBatteryModel(e.target.value)}
+                  disabled={actionLoading === selectedBooking.booking_id}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="oldBatteryStatus">
+                  Tình trạng pin cũ <span className="text-red-500">*</span>
+                </Label>
+                <select
+                  id="oldBatteryStatus"
+                  className="w-full border rounded-md p-2 bg-white dark:bg-slate-900"
+                  value={oldBatteryStatus}
+                  onChange={(e) => setOldBatteryStatus(e.target.value as any)}
+                  disabled={actionLoading === selectedBooking.booking_id}
+                >
+                  <option value="good">Tốt</option>
+                  <option value="damaged">Hư hỏng</option>
+                  <option value="maintenance">Cần bảo trì</option>
+                </select>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setCompleteDialogOpen(false)}
+              disabled={actionLoading === selectedBooking?.booking_id}
+            >
+              Hủy
+            </Button>
+            <Button 
+              onClick={handleCompleteBooking}
+              disabled={!oldBatteryCode.trim() || !batteryModel.trim() || actionLoading === selectedBooking?.booking_id}
+            >
+              {actionLoading === selectedBooking?.booking_id ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Đang xử lý...
+                </>
+              ) : (
+                <>
+                  <Zap className="mr-2 h-4 w-4" />
+                  Hoàn thành
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Booking Dialog */}
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <X className="h-5 w-5" />
+              Hủy booking
+            </DialogTitle>
+            <DialogDescription>
+              Vui lòng nhập lý do hủy booking này. Thông tin sẽ được gửi đến khách hàng.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedBooking && (
+            <div className="space-y-4">
+              {/* Warning */}
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-red-900 dark:text-red-200">
+                      Cảnh báo: Hủy booking
+                    </p>
+                    <p className="text-sm text-red-700 dark:text-red-300">
+                      Khách hàng sẽ nhận được thông báo hủy booking này.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Booking Info */}
+              <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4 space-y-2">
+                <div>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Khách hàng</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">
+                    {selectedBooking.user?.full_name}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Mã booking</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">
+                    {selectedBooking.booking_code}
+                  </p>
+                </div>
+                {selectedBooking.user?.phone && (
+                  <div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Số điện thoại</p>
+                    <p className="font-medium text-gray-900 dark:text-white">
+                      {selectedBooking.user.phone}
+                    </p>
+                  </div>
+                )}
+              </div>
+              
+              {/* Cancel Reason */}
+              <div className="space-y-2">
+                <Label htmlFor="cancelReason">
+                  Lý do hủy <span className="text-red-500">*</span>
+                </Label>
+                <Textarea
+                  id="cancelReason"
+                  placeholder="Ví dụ: Trạm đang bảo trì, Hết pin tồn kho, Khách hàng không đến..."
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  rows={4}
+                  disabled={actionLoading === selectedBooking.booking_id}
+                  className="resize-none"
+                />
+                <p className="text-xs text-gray-500">
+                  💡 Lý do hủy sẽ được gửi thông báo đến khách hàng
+                </p>
+              </div>
+
+              {/* Confirmation Checkbox */}
+              <div className="flex items-start space-x-3 p-4 bg-slate-100 dark:bg-slate-700 rounded-lg border-2 border-slate-300 dark:border-slate-600">
+                <input
+                  type="checkbox"
+                  id="cancel-confirm"
+                  checked={cancelConfirmed}
+                  onChange={(e) => setCancelConfirmed(e.target.checked)}
+                  disabled={!cancelReason.trim() || actionLoading === selectedBooking.booking_id}
+                  className="mt-1 h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                />
+                <label 
+                  htmlFor="cancel-confirm" 
+                  className="text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer select-none"
+                >
+                  Tôi xác nhận muốn hủy booking <strong className="text-red-600 dark:text-red-400">{selectedBooking.booking_code}</strong> và đã nhập lý do hợp lệ
+                </label>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setCancelDialogOpen(false);
+                setCancelConfirmed(false);
+              }}
+              disabled={actionLoading === selectedBooking?.booking_id}
+              className="w-full sm:w-auto"
+            >
+              Quay lại
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={handleCancelBooking}
+              disabled={!cancelReason.trim() || !cancelConfirmed || actionLoading === selectedBooking?.booking_id}
+              className="w-full sm:w-auto bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
+            >
+              {actionLoading === selectedBooking?.booking_id ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Đang hủy...
+                </>
+              ) : (
+                <>
+                  <X className="mr-2 h-4 w-4" />
+                  Hủy Booking
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

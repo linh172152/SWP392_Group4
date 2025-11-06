@@ -459,39 +459,29 @@ model Wallet {
 
 1. ✅ Vehicle thuộc user
 2. ✅ Station tồn tại và active
-3. ✅ Battery model khớp với vehicle
-4. ✅ `scheduled_at` phải trong tương lai
-5. ✅ **Tối thiểu 30 phút** từ bây giờ
-6. ✅ **Tối đa 12 giờ** từ bây giờ
-7. ✅ Có pin available tại thời điểm `scheduled_at`
+3. ✅ **Battery model khớp với vehicle (case-insensitive)** - So sánh không phân biệt hoa/thường
+4. ✅ **UUID format validation** - Validate `vehicle_id` và `station_id` là UUID hợp lệ
+5. ✅ **Date format validation** - `scheduled_at` phải là ISO 8601 format hợp lệ
+6. ✅ `scheduled_at` phải trong tương lai
+7. ✅ **Tối thiểu 30 phút** từ bây giờ
+8. ✅ **Tối đa 12 giờ** từ bây giờ
+9. ✅ Có pin available tại thời điểm `scheduled_at` (case-insensitive matching)
 
 **Logic check pin available:**
 
-```typescript
-// Đếm pin full
-const fullBatteries = count({
-  station_id,
-  model: battery_model,
-  status: "full"
-});
-
-// Đếm pin charging sẽ ready (nếu scheduled >= 1h sau)
-const hoursUntilScheduled = (scheduled_at - now) / (1000 * 60 * 60);
-const chargingBatteries = hoursUntilScheduled >= 1
-  ? count({ status: "charging", model: battery_model })
-  : 0;
-
-// Đếm bookings đã reserve (pending/confirmed) trong khoảng ±30 phút
-const reservedBookings = count({
-  scheduled_at: {
-    gte: scheduled_at - 30min,
-    lte: scheduled_at + 30min
-  },
-  status: { in: ["pending", "confirmed"] }
-});
-
-const available = (fullBatteries + chargingBatteries) - reservedBookings;
-```
+1. **Normalize battery_model** (case-insensitive, trim) để so sánh
+2. **Fetch tất cả batteries** tại station và filter theo model (case-insensitive)
+3. **Nếu không tìm thấy model** → Error message hiển thị available models tại station
+4. **Đếm pin available:**
+   - `fullBatteries` = số pin có `status = "full"` (sẵn sàng ngay)
+   - `chargingBatteries` = số pin có `status = "charging"` (chỉ tính nếu scheduled >= 1h sau)
+   - `totalAvailable = fullBatteries + chargingBatteries`
+5. **Đếm bookings đã reserve** (pending/confirmed) trong khoảng ±30 phút của scheduled_at, filter theo battery_model (case-insensitive)
+6. **Tính available:**
+   - `available = totalAvailable - reservedBookings`
+7. **Nếu available <= 0** → Error message chi tiết:
+   - Nếu không có pin ready → "No batteries are ready (X full, Y charging)"
+   - Nếu tất cả pin đã reserve → "All X available batteries are reserved (N bookings)"
 
 **Response:**
 
@@ -537,16 +527,33 @@ await notificationService.sendRealTimeNotification(userId, notification);
 }
 ```
 
+**Validation:**
+
+1. ✅ Vehicle thuộc user
+2. ✅ Station tồn tại và active
+3. ✅ **Battery model khớp với vehicle (case-insensitive)**
+4. ✅ **UUID format validation** - Validate `vehicle_id` và `station_id`
+5. ✅ Có pin `full` available ngay (case-insensitive matching)
+
 **Logic:**
 
-1. Không cần `scheduled_at` (hoặc `scheduled_at = now + 5 phút`)
-2. Reserve pin ngay lập tức trong **15 phút**
-3. Tạo booking với:
+1. ✅ Normalize `battery_model` (case-insensitive, trim)
+2. ✅ Fetch tất cả batteries và filter trong memory
+3. ✅ Check pin `full` available ngay (không tính pin charging)
+4. ✅ Check instant bookings đã reserve trong 15 phút tới
+5. Không cần `scheduled_at` (hoặc `scheduled_at = now + 15 phút`)
+6. Reserve pin ngay lập tức trong **15 phút**
+7. Tạo booking với:
    - `status = "pending"`
-   - `scheduled_at = now` (hoặc `now + 5 phút`)
-   - `is_instant = true` (optional flag)
-4. Staff thấy booking trong danh sách "Đang đến ngay" (ưu tiên)
-5. Auto-cancel sau 15 phút nếu chưa check-in
+   - `scheduled_at = now + 15 phút`
+   - `is_instant = true`
+8. Staff thấy booking trong danh sách "Đang đến ngay" (ưu tiên)
+9. Auto-cancel sau 15 phút nếu chưa check-in
+
+**✅ Error Messages:**
+
+- Nếu không tìm thấy model → Hiển thị available models tại station
+- Nếu không đủ pin → Hiển thị số pin full và số bookings đã reserve
 
 **Response:**
 
@@ -574,53 +581,14 @@ await notificationService.sendRealTimeNotification(userId, notification);
 
 **Logic:**
 
-```typescript
-const now = new Date();
-const scheduledTime = new Date(booking.scheduled_at);
-const minutesUntilScheduled =
-  (scheduledTime.getTime() - now.getTime()) / (1000 * 60);
-
-if (minutesUntilScheduled < 15 && minutesUntilScheduled > 0) {
-  // Hủy muộn (< 15 phút trước giờ hẹn) → Trừ phí 20k
-  const cancellationFee = 20000;
-
-  const wallet = await prisma.wallet.findUnique({
-    where: { user_id: booking.user_id },
-  });
-
-  if ((wallet?.balance || 0) < cancellationFee) {
-    throw new CustomError(
-      "Không thể hủy booking. Số dư ví không đủ để trả phí hủy muộn (20,000đ).",
-      400
-    );
-  }
-
-  // Trừ phí
-  await prisma.wallet.update({
-    where: { user_id: booking.user_id },
-    data: {
-      balance: (wallet.balance || 0) - cancellationFee,
-    },
-  });
-
-  // Tạo transaction ghi lại phí hủy
-  await prisma.transaction.create({
-    data: {
-      transaction_code: `CANCEL-${Date.now()}`,
-      user_id: booking.user_id,
-      amount: cancellationFee,
-      payment_status: "completed",
-      notes: "Phí hủy booking muộn (trong vòng 15 phút trước giờ hẹn)",
-    },
-  });
-}
-
-// Cho phép hủy (miễn phí nếu >= 15 phút trước, hoặc đã trừ phí)
-await prisma.booking.update({
-  where: { booking_id: id },
-  data: { status: "cancelled" },
-});
-```
+1. **Tính thời gian** còn lại trước giờ hẹn: `minutesUntilScheduled = scheduled_at - now`
+2. **Nếu < 15 phút và > 0** (hủy muộn):
+   - Phí hủy: 20,000đ
+   - Check wallet balance có đủ phí không
+   - Nếu không đủ → Lỗi: "Số dư ví không đủ để trả phí hủy muộn"
+   - Nếu đủ → Trừ phí từ wallet và tạo transaction ghi lại
+3. **Cho phép hủy** (miễn phí nếu >= 15 phút trước, hoặc đã trừ phí)
+4. **Update booking status = "cancelled"**
 
 #### 3.2.8 Nhận Thông báo (In-App)
 
@@ -814,155 +782,54 @@ await prisma.notification.create({
 
 - ✅ Check staff thuộc trạm
 - ✅ Check `status = "pending"` hoặc `"confirmed"` (✅ Cho phép complete booking pending nếu user đến sớm)
-- ✅ Tìm old battery từ code:
+- ✅ **Tìm old battery từ code:**
 
-  ```typescript
-  const oldBattery = await prisma.battery.findUnique({
-    where: { battery_code: old_battery_code },
-  });
+  - Query `battery_code = old_battery_code`
+  - Check `status = "in_use"` (pin đang được user dùng)
+  - Nếu không hợp lệ → Error: "Pin cũ không hợp lệ hoặc không đang được sử dụng"
 
-  if (!oldBattery || oldBattery.status !== "in_use") {
-    throw new CustomError(
-      "Pin cũ không hợp lệ hoặc không đang được sử dụng",
-      400
-    );
-  }
-  ```
+- ✅ **Tự động assign new battery từ `battery_model`:**
+  - Query pin có `model = battery_model`, `status = "full"` tại station (case-insensitive)
+  - Sort theo `last_charged_at ASC` (pin cũ nhất sạc trước)
+  - Nếu không tìm thấy → Error: "Không có pin sẵn sàng cho loại này"
 
-- ✅ Tự động assign new battery từ `battery_model`:
+**2. Transaction (trong 1 transaction atomic):**
 
-  ```typescript
-  const newBattery = await prisma.battery.findFirst({
-    where: {
-      station_id: booking.station_id,
-      model: battery_model,
-      status: "full",
-    },
-    orderBy: { last_charged_at: "asc" }, // Pin cũ nhất sạc trước
-  });
+1. **Update booking** `status = "completed"`
 
-  if (!newBattery) {
-    throw new CustomError("Không có pin sẵn sàng cho loại này", 400);
-  }
-  ```
+2. **Tính giá từ BatteryPricing** (case-insensitive matching):
 
-**2. Transaction:**
+   - Query tất cả pricing `is_active = true`
+   - Filter theo `battery_model` (case-insensitive)
+   - Lấy `price` từ pricing matching
 
-```typescript
-await prisma.$transaction(async (tx) => {
-  // 1. Update booking
-  await tx.booking.update({
-    where: { booking_id },
-    data: { status: "completed" },
-  });
+3. **Check Wallet balance:**
 
-  // 2. Tính giá từ BatteryPricing
-  const pricing = await tx.batteryPricing.findFirst({
-    where: {
-      battery_model: booking.battery_model,
-      is_active: true,
-    },
-  });
-  const amount = pricing?.price || 50000; // Default 50k
+   - Nếu `walletBalance < amount` → **KHÔNG cho complete**
+   - Error: "Số dư ví không đủ. Cần Xđ, hiện có Yđ. Vui lòng nạp thêm Zđ vào ví"
+   - Nếu `walletBalance >= amount` → Tự động trừ ví, `paymentStatus = "completed"`
 
-  // 3. Check Wallet balance
-  const wallet = await tx.wallet.findUnique({
-    where: { user_id: booking.user_id },
-  });
-  const walletBalance = wallet?.balance || 0;
+4. **Create Transaction record** với:
 
-  // 4. Thanh toán tự động (xem 2.2 Flow Thanh toán)
-  let paymentStatus = "pending";
-  if (walletBalance >= amount) {
-    // Đủ tiền → Tự động trừ ví
-    await tx.wallet.update({
-      where: { user_id: booking.user_id },
-      data: { balance: walletBalance - amount },
-    });
-    paymentStatus = "completed";
-  } else {
-    // KHÔNG đủ tiền → KHÔNG cho complete booking
-    // User phải nạp thêm tiền vào ví trước
-    throw new CustomError(
-      `Số dư ví không đủ. Cần ${amount.toLocaleString(
-        "vi-VN"
-      )}đ, hiện có ${walletBalance.toLocaleString(
-        "vi-VN"
-      )}đ. Vui lòng nạp thêm ${(amount - walletBalance).toLocaleString(
-        "vi-VN"
-      )}đ vào ví.`,
-      400
-    );
-  }
+   - `old_battery_id` (từ `old_battery_code`)
+   - `new_battery_id` (tự động assign từ `battery_model`)
+   - `amount`, `payment_status`
 
-  // 5. Create Transaction
-  const transaction = await tx.transaction.create({
-    data: {
-      transaction_code: `TXN${Date.now()}`,
-      booking_id,
-      user_id: booking.user_id,
-      vehicle_id: booking.vehicle_id,
-      station_id: booking.station_id,
-      old_battery_id: oldBattery.battery_id,
-      new_battery_id: newBattery.battery_id,
-      staff_id: staffId,
-      amount,
-      payment_status: paymentStatus,
-    },
-  });
+5. **Update old battery status** (✅ XỬ LÝ PIN HỎNG):
 
-  // 6. Update old battery status (✅ XỬ LÝ PIN HỎNG)
-  if (
-    old_battery_status === "damaged" ||
-    old_battery_status === "maintenance"
-  ) {
-    // Pin hỏng → KHÔNG sạc!
-    await tx.battery.update({
-      where: { battery_id: oldBattery.battery_id },
-      data: {
-        status: old_battery_status, // "maintenance" hoặc "damaged"
-        station_id: booking.station_id,
-        // KHÔNG set last_charged_at
-      },
-    });
-  } else {
-    // Pin tốt → Sạc bình thường
-    await tx.battery.update({
-      where: { battery_id: oldBattery.battery_id },
-      data: {
-        status: "charging",
-        station_id: booking.station_id,
-        current_charge: oldBattery.current_charge || 0,
-        last_charged_at: null,
-      },
-    });
-  }
+   - Nếu `old_battery_status = "damaged"` hoặc `"maintenance"`:
+     - Update `status = old_battery_status` (KHÔNG sạc!)
+     - KHÔNG set `last_charged_at`
+   - Nếu `old_battery_status = "good"`:
+     - Update `status = "charging"` (sạc bình thường)
 
-  // 7. Update new battery status
-  await tx.battery.update({
-    where: { battery_id: newBattery.battery_id },
-    data: {
-      status: "in_use", // User đang dùng
-    },
-  });
+6. **Update new battery status:**
 
-  // 8. Create Payment record (nếu đã thanh toán)
-  if (paymentStatus === "completed") {
-    await tx.payment.create({
-      data: {
-        transaction_id: transaction.transaction_id,
-        user_id: booking.user_id,
-        amount,
-        payment_method: "wallet",
-        payment_status: "completed",
-        paid_at: new Date(),
-      },
-    });
-  }
+   - `status = "in_use"` (user đang dùng)
 
-  return { transaction, paymentStatus };
-});
-```
+7. **Create Payment record** (nếu đã thanh toán):
+   - `payment_method = "wallet"`
+   - `payment_status = "completed"`
 
 **Response:**
 
@@ -986,22 +853,10 @@ await prisma.$transaction(async (tx) => {
 
 **UI cho Staff (đề xuất):**
 
-```
-[Hoàn tất đổi pin]
-├── Booking: BK1705123456ABC
-├── User: Nguyễn Văn B (0901234567)
-├── Vehicle: 51A-12345
-│
-├── Pin cũ: [Quét mã: PIN001] [Kiểm tra tình trạng:]
-│   ├── ( ) Pin tốt → Sạc bình thường
-│   ├── ( ) Pin hỏng → Bảo trì
-│   └── ( ) Pin cần kiểm tra → Chờ kiểm tra
-│
-├── Pin mới: [Chọn loại: Pin loại V ▼]
-│   └── System tự động assign pin full cũ nhất
-│
-└── [Xác nhận]
-```
+- Quét mã pin cũ: `old_battery_code` (PIN001)
+- Chọn tình trạng pin cũ: `old_battery_status` ("good" | "damaged" | "maintenance")
+- Chọn loại pin mới: `battery_model` (System tự động assign pin full cũ nhất)
+- Xác nhận hoàn tất
 
 #### 3.3.5 Hủy Booking
 
@@ -1222,122 +1077,81 @@ model Booking {
 
 #### 6.1.1 Auto-cancel Expired Bookings
 
-```typescript
-const now = new Date();
-const tenMinutesAgo = new Date(now.getTime() - 10 * 60 * 1000);
+**Logic:**
 
-const expiredBookings = await prisma.booking.findMany({
-  where: {
-    status: "confirmed",
-    scheduled_at: { lte: tenMinutesAgo },
-    checked_in_at: null, // ✅ Đã sửa: dùng checked_in_at thay vì pin_verified_at (PIN đã bỏ)
-  },
-});
+1. **Tìm bookings đã hết hạn:**
 
-for (const booking of expiredBookings) {
-  await prisma.booking.update({
-    where: { booking_id: booking.booking_id },
-    data: {
-      status: "cancelled",
-      notes:
-        "Auto-cancelled: User did not check in within 10 minutes of scheduled time.",
-    },
-  });
+   - Status = "confirmed"
+   - `scheduled_at <= now - 10 phút`
+   - `checked_in_at = null` (chưa check-in)
 
-  // Tạo notification (KHÔNG gửi email/SMS)
-  await prisma.notification.create({
-    data: {
-      user_id: booking.user_id,
-      type: "booking_cancelled",
-      title: "Đặt chỗ đã bị hủy tự động",
-      message: `Đặt chỗ của bạn tại ${booking.station.name} đã bị hủy do không check-in đúng giờ.`,
-      data: { booking_id: booking.booking_id },
-    },
-  });
-}
-```
+2. **Cancel từng booking:**
+
+   - Update `status = "cancelled"`
+   - Thêm note: "Auto-cancelled: User did not check in within 10 minutes"
+
+3. **Tạo In-App Notification** cho user (KHÔNG gửi email/SMS)
 
 #### 6.1.2 Auto-cancel Instant Bookings ✅ IMPLEMENTED
 
-```typescript
-const now = new Date();
-const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000);
+**Logic:**
 
-const expiredInstantBookings = await prisma.booking.findMany({
-  where: {
-    status: { in: ["pending", "confirmed"] },
-    is_instant: true,
-    scheduled_at: { lte: fifteenMinutesAgo },
-    checked_in_at: null, // User hasn't checked in
-  },
-});
+1. **Tìm instant bookings đã hết hạn:**
 
-// Cancel và tạo notification cho user
-for (const booking of expiredInstantBookings) {
-  await prisma.booking.update({
-    where: { booking_id: booking.booking_id },
-    data: {
-      status: "cancelled",
-      notes:
-        "Auto-cancelled: Instant booking expired - User did not arrive within 15 minutes.",
-    },
-  });
+   - Status = "pending" hoặc "confirmed"
+   - `is_instant = true`
+   - `scheduled_at <= now - 15 phút`
+   - `checked_in_at = null` (chưa check-in)
 
-  // Tạo notification (KHÔNG gửi email/SMS)
-  await prisma.notification.create({
-    data: {
-      user_id: booking.user_id,
-      type: "booking_cancelled",
-      title: "Đặt chỗ ngay đã bị hủy tự động",
-      message: `Đặt chỗ ngay của bạn tại ${booking.station.name} đã bị hủy tự động do bạn không có mặt trong vòng 15 phút.`,
-      data: { booking_id: booking.booking_id },
-    },
-  });
-}
-```
+2. **Cancel từng booking:**
+
+   - Update `status = "cancelled"`
+   - Thêm note: "Auto-cancelled: Instant booking expired - User did not arrive within 15 minutes"
+
+3. **Tạo In-App Notification** cho user (KHÔNG gửi email/SMS)
 
 **✅ Status:** Đã implement trong `booking-auto-cancel.service.ts`, cron job chạy mỗi 5 phút trong `server.ts`
 
 #### 6.1.3 Send Booking Reminders
 
-```typescript
-const now = new Date();
-const thirtyMinutesFromNow = new Date(now.getTime() + 30 * 60 * 1000);
-const tenMinutesFromNow = new Date(now.getTime() + 10 * 60 * 1000);
+**Logic:**
 
-// 30 phút trước
-const thirtyMinReminders = await prisma.booking.findMany({
-  where: {
-    status: "confirmed",
-    scheduled_at: {
-      gte: new Date(thirtyMinutesFromNow.getTime() - 5 * 60 * 1000),
-      lte: thirtyMinutesFromNow,
-    },
-  },
-});
+1. **Tìm bookings sắp đến:**
 
-// 10 phút trước
-const tenMinReminders = await prisma.booking.findMany({
-  where: {
-    status: "confirmed",
-    scheduled_at: {
-      gte: new Date(tenMinutesFromNow.getTime() - 5 * 60 * 1000),
-      lte: tenMinutesFromNow,
-    },
-  },
-});
+   - Status = "confirmed"
+   - 30 phút trước: `scheduled_at` trong khoảng 25-30 phút từ bây giờ
+   - 10 phút trước: `scheduled_at` trong khoảng 5-10 phút từ bây giờ
 
-// Tạo notification cho từng booking (KHÔNG gửi email/SMS)
-```
+2. **Tạo In-App Notification** cho từng booking (KHÔNG gửi email/SMS)
 
 ### 6.2 Logic quan trọng
 
-#### 6.2.1 Booking Validation
+#### 6.2.1 Booking Validation ✅ IMPROVED
 
-- Tối thiểu 30 phút trước giờ hẹn
-- Tối đa 12 giờ trước giờ hẹn
-- Check pin available (full + charging sẽ ready)
-- Trừ bookings đã reserve (±30 phút)
+**Validation Rules:**
+
+1. ✅ **UUID Format Validation** - `vehicle_id` và `station_id` phải là UUID hợp lệ
+2. ✅ **Date Format Validation** - `scheduled_at` phải là ISO 8601 format hợp lệ
+3. ✅ **Case-Insensitive Battery Model Matching** - So sánh `battery_model` không phân biệt hoa/thường
+4. ✅ **Vehicle Ownership Check** - Vehicle phải thuộc user
+5. ✅ **Station Status Check** - Station phải tồn tại và `status = "active"`
+6. ✅ **Battery Model Compatibility** - `battery_model` phải khớp với `vehicle.battery_model` (case-insensitive)
+7. ✅ **Time Validation:**
+   - `scheduled_at` phải trong tương lai
+   - Tối thiểu 30 phút từ bây giờ
+   - Tối đa 12 giờ từ bây giờ
+8. ✅ **Battery Availability Check:**
+   - Fetch tất cả batteries tại station (case-insensitive filtering)
+   - Check pin available (full + charging sẽ ready)
+   - Trừ bookings đã reserve (±30 phút, case-insensitive)
+   - Error message chi tiết nếu không đủ pin (hiển thị available models, số pin full/charging, số bookings)
+
+**✅ Error Messages Improvements:**
+
+- UUID format error → "Invalid vehicle ID format" / "Invalid station ID format"
+- Date format error → "Invalid date format for scheduled_at. Please use ISO 8601 format (e.g., 2024-01-15T14:00:00Z)"
+- Battery model not found → "No batteries of model 'X' found. Available models: A, B, C"
+- No available batteries → "No available batteries. No batteries are ready (X full, Y charging)" hoặc "All Z available batteries are reserved (N bookings)"
 
 #### 6.2.2 Chính sách hủy
 
@@ -1594,6 +1408,9 @@ const tenMinReminders = await prisma.booking.findMany({
 - ✅ Phone verification thay PIN code ✅
 - ✅ Battery inventory format (available, charging, total per model) ✅
 - ✅ Complete pending booking (cho phép complete booking pending nếu user đến sớm) ✅
+- ✅ Case-insensitive battery model matching (không phân biệt hoa/thường) ✅
+- ✅ Improved error messages (hiển thị available models, số pin, số bookings) ✅
+- ✅ UUID và date format validation (tránh lỗi database) ✅
 
 ### 📊 Tổng Kết Kỹ Thuật:
 
@@ -1620,6 +1437,8 @@ const tenMinReminders = await prisma.booking.findMany({
 8. **Battery Inventory:** Đã thêm format `battery_inventory` vào tất cả station responses ✅
 9. **Maps APIs:** Đã thêm 4 endpoints cho Track-Asia API (directions, distance, calculate-distance, test) ✅
 10. **Code Optimization:** Prisma singleton pattern, utility functions (station.util.ts), parallel queries với Promise.all() ✅
+11. **Case-Insensitive Validation:** Battery model matching không phân biệt hoa/thường, fetch all batteries và filter trong memory ✅
+12. **Improved Error Handling:** UUID validation, date format validation, error messages chi tiết với available models và số pin ✅
 
 ### 🎯 FINAL STATUS:
 

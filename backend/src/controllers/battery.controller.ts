@@ -10,10 +10,13 @@ const prisma = new PrismaClient();
  */
 export const getStationBatteries = asyncHandler(
   async (req: Request, res: Response) => {
-    const { stationId } = req.params;
-    const { status, model } = req.query;
+    const { station_id, status, model } = req.query;
 
-    const whereClause: any = { station_id: stationId };
+    const whereClause: any = {};
+    
+    if (station_id) {
+      whereClause.station_id = station_id;
+    }
     if (status) {
       whereClause.status = status;
     }
@@ -47,8 +50,8 @@ export const getStationBatteries = asyncHandler(
  * Add new battery
  */
 export const addBattery = asyncHandler(async (req: Request, res: Response) => {
-  const { stationId } = req.params;
   const {
+    station_id,
     battery_code,
     model,
     capacity_kwh,
@@ -57,13 +60,13 @@ export const addBattery = asyncHandler(async (req: Request, res: Response) => {
     status = "full",
   } = req.body;
 
-  if (!battery_code || !model) {
-    throw new CustomError("Battery code and model are required", 400);
+  if (!battery_code || !model || !station_id) {
+    throw new CustomError("Battery code, model, and station_id are required", 400);
   }
 
   // Check if station exists
   const station = await prisma.station.findUnique({
-    where: { station_id: stationId },
+    where: { station_id },
   });
 
   if (!station) {
@@ -81,7 +84,7 @@ export const addBattery = asyncHandler(async (req: Request, res: Response) => {
 
   // ✅ Capacity Warning Logic (theo DOC)
   const currentBatteryCount = await prisma.battery.count({
-    where: { station_id: stationId },
+    where: { station_id },
   });
 
   const capacityPercentage = (currentBatteryCount / Number(station.capacity)) * 100;
@@ -103,7 +106,7 @@ export const addBattery = asyncHandler(async (req: Request, res: Response) => {
   const battery = await prisma.battery.create({
     data: {
       battery_code,
-      station_id: stationId,
+      station_id,
       model,
       capacity_kwh,
       voltage,

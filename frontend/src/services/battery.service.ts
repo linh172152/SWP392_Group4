@@ -1,143 +1,153 @@
-import { API_BASE_URL } from "../config/api";
-import authFetch from "./apiClient";
+import { API_ENDPOINTS } from '../config/api';
+import authFetch from './apiClient';
 
-export interface StationInfo {
-  station_id: string;
-  name?: string;
-  address?: string;
-}
-
+// Battery interfaces
 export interface Battery {
   battery_id: string;
   battery_code: string;
   station_id: string;
-  model?: string;
+  model: string;
+  capacity_kwh?: number;
+  voltage?: number;
+  current_charge: number;
+  health_percentage?: number;
+  status: 'full' | 'charging' | 'in_use' | 'maintenance' | 'damaged';
+  last_charged_at?: string;
+  created_at: string;
+  updated_at: string;
+  station?: {
+    station_id: string;
+    name: string;
+    address: string;
+    capacity?: number;
+  };
+}
+
+export interface AddBatteryData {
+  station_id: string;  // Required by backend
+  battery_code: string;
+  model: string;
   capacity_kwh?: number;
   voltage?: number;
   current_charge?: number;
-  status?: string;
-  health_percentage?: number;
-  last_charged_at?: string | null;
-  created_at?: string;
-  station?: StationInfo;
+  status?: 'full' | 'charging' | 'in_use' | 'maintenance' | 'damaged';
 }
 
-export interface BatteryFilters {
-  station_id?: string;
-  status?: string;
-  model?: string;
-}
-
-export async function getBatteries(filters?: BatteryFilters) {
-  const qs = new URLSearchParams();
-  if (filters?.station_id) qs.set("station_id", filters.station_id);
-  if (filters?.status) qs.set("status", filters.status);
-  if (filters?.model) qs.set("model", filters.model);
-
-  const url = `${API_BASE_URL}/staff/batteries${qs.toString() ? `?${qs.toString()}` : ""}`;
-
-  // Try calling backend (requires auth + STAFF role). Caller should handle errors/fallbacks.
-  const res = await authFetch(url);
-  return res; // expected { success, message, data }
-}
-
-export async function addBattery(payload: {
-  station_id: string;
-  battery_code: string;
-  model: string;
-  capacity_kwh: number;
-  voltage?: number;
+export interface UpdateBatteryData {
+  status?: 'full' | 'charging' | 'in_use' | 'maintenance' | 'damaged';
   current_charge?: number;
   health_percentage?: number;
+}
+
+export interface BatteryTransferLog {
+  transfer_id: string;
+  battery_id: string;
+  from_station_id: string;
+  to_station_id: string;
+  transfer_reason: string;
+  transferred_by: string;
+  transferred_at: string;
+  notes?: string;
+  from_station?: {
+    station_id: string;
+    name: string;
+    address: string;
+  };
+  to_station?: {
+    station_id: string;
+    name: string;
+    address: string;
+  };
+  transferred_by_user?: {
+    user_id: string;
+    full_name: string;
+    email: string;
+  };
+}
+
+/**
+ * Lấy danh sách pin của trạm (cho staff)
+ */
+export async function getStationBatteries(params?: {
+  status?: string;
+  model?: string;
 }) {
-  const url = `${API_BASE_URL}/staff/batteries`;
-  const res = await authFetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  return res;
-}
-
-export async function updateBattery(id: string, payload: { status?: string; current_charge?: number; health_percentage?: number }) {
-  const url = `${API_BASE_URL}/staff/batteries/${id}`;
-  const res = await authFetch(url, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  return res;
-}
-
-export async function getBatteryHistory(batteryId: string, page = 1, limit = 10) {
   const qs = new URLSearchParams();
-  qs.set("page", String(page));
-  qs.set("limit", String(limit));
-  const url = `${API_BASE_URL}/staff/batteries/${batteryId}/history?${qs.toString()}`;
+  if (params?.status) qs.set('status', params.status);
+  if (params?.model) qs.set('model', params.model);
+
+  const url = `${API_ENDPOINTS.STAFF.BATTERIES}${qs.toString() ? `?${qs.toString()}` : ''}`;
   const res = await authFetch(url);
-  return res; // expected { success, message, data: { history, pagination } }
+  return res; // { success, message, data: Battery[] }
 }
 
+/**
+ * Lấy chi tiết pin
+ */
 export async function getBatteryDetails(batteryId: string) {
-  const url = `${API_BASE_URL}/staff/batteries/${batteryId}`;
+  const url = API_ENDPOINTS.STAFF.BATTERY_DETAILS(batteryId);
   const res = await authFetch(url);
-  return res; // expected { success, message, data }
+  return res; // { success, message, data: Battery with transfer_logs }
 }
 
-export function getBatteriesMock(): Promise<{ success: true; data: Battery[] }> {
-  const mock: Battery[] = [
-    {
-      battery_id: "BAT-001",
-      battery_code: "STD-001",
-      station_id: "ST001",
-      model: "Standard Range",
-      capacity_kwh: 40,
-      voltage: 400,
-      current_charge: 86,
-      status: "AVAILABLE",
-      health_percentage: 98,
-      last_charged_at: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-      station: { station_id: "ST001", name: "Trạm Thành phố", address: "123 Đường Chính" },
-    },
-    {
-      battery_id: "BAT-002",
-      battery_code: "LR-002",
-      station_id: "ST002",
-      model: "Long Range",
-      capacity_kwh: 60,
-      voltage: 400,
-      current_charge: 34,
-      status: "CHARGING",
-      health_percentage: 92,
-      last_charged_at: new Date(Date.now() - 3600 * 1000 * 5).toISOString(),
-      created_at: new Date().toISOString(),
-      station: { station_id: "ST002", name: "Trung tâm TM", address: "456 Đại lộ Mua sắm" },
-    },
-    {
-      battery_id: "BAT-003",
-      battery_code: "MT-003",
-      station_id: "ST003",
-      model: "Standard Range",
-      capacity_kwh: 40,
-      voltage: 400,
-      current_charge: 12,
-      status: "MAINTENANCE",
-      health_percentage: 75,
-      last_charged_at: null,
-      created_at: new Date().toISOString(),
-      station: { station_id: "ST003", name: "Trạm Cao tốc", address: "Km 42" },
-    },
-  ];
+/**
+ * Lấy lịch sử chuyển trạm của pin
+ */
+export async function getBatteryHistory(batteryId: string, params?: {
+  page?: number;
+  limit?: number;
+}) {
+  const qs = new URLSearchParams();
+  if (params?.page) qs.set('page', String(params.page));
+  if (params?.limit) qs.set('limit', String(params.limit));
 
-  return Promise.resolve({ success: true, data: mock });
+  const url = `${API_ENDPOINTS.STAFF.BATTERY_HISTORY(batteryId)}${qs.toString() ? `?${qs.toString()}` : ''}`;
+  const res = await authFetch(url);
+  return res; // { success, message, data: { history, pagination } }
+}
+
+/**
+ * Thêm pin mới
+ */
+export async function addBattery(data: AddBatteryData) {
+  const url = API_ENDPOINTS.STAFF.ADD_BATTERY;
+  const res = await authFetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return res; // { success, message, data: Battery with capacity_info }
+}
+
+/**
+ * Cập nhật trạng thái pin
+ */
+export async function updateBatteryStatus(batteryId: string, data: UpdateBatteryData) {
+  const url = API_ENDPOINTS.STAFF.UPDATE_BATTERY(batteryId);
+  const res = await authFetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return res; // { success, message, data: Battery }
+}
+
+/**
+ * Xóa pin
+ */
+export async function deleteBattery(batteryId: string) {
+  const url = API_ENDPOINTS.STAFF.DELETE_BATTERY(batteryId);
+  const res = await authFetch(url, {
+    method: 'DELETE',
+  });
+  return res; // { success, message }
 }
 
 export default {
-  getBatteries,
-  getBatteriesMock,
-  addBattery,
-  updateBattery,
-  getBatteryHistory,
+  getStationBatteries,
   getBatteryDetails,
+  getBatteryHistory,
+  addBattery,
+  updateBatteryStatus,
+  deleteBattery,
 };

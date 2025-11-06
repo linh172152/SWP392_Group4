@@ -19,7 +19,15 @@ import {
 } from "./ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import type { User } from "../App";
-import { Zap } from "lucide-react";
+import { 
+  Zap, 
+  Eye, 
+  EyeOff, 
+  Mail, 
+  Lock, 
+  User as UserIcon, 
+  Phone
+} from "lucide-react";
 import { API_ENDPOINTS } from "../config/api";
 
 interface AuthModalProps {
@@ -43,6 +51,8 @@ const AuthModal: React.FC<AuthModalProps> = ({
   const [role, setRole] = useState<"driver" | "staff" | "admin">("driver");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Simple password validation function
   const validatePassword = (password: string): string[] => {
@@ -232,43 +242,62 @@ const AuthModal: React.FC<AuthModalProps> = ({
               <div className="space-y-2">
                 <Label
                   htmlFor="email"
-                  className="text-slate-700 dark:text-slate-300"
+                  className="text-slate-700 dark:text-slate-300 font-medium"
                 >
                   Email
                 </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="email@example.com"
-                  value={email}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    setEmail(e.target.value)
-                  }
-                  required
-                  className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 focus:border-blue-500 dark:focus:border-blue-400"
-                />
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="email@example.com"
+                    value={email}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                      setEmail(e.target.value)
+                    }
+                    required
+                    className="pl-10 glass border-slate-200/50 dark:border-slate-700/50 focus:border-lime-400 dark:focus:border-lime-400"
+                    autoComplete="email"
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label
                   htmlFor="password"
-                  className="text-slate-700 dark:text-slate-300"
+                  className="text-slate-700 dark:text-slate-300 font-medium"
                 >
                   Mật khẩu
                 </Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Nhập mật khẩu"
-                  value={password}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    setPassword(e.target.value)
-                  }
-                  required
-                  className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 focus:border-blue-500 dark:focus:border-blue-400"
-                />
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••"
+                    value={password}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                      setPassword(e.target.value)
+                    }
+                    required
+                    className="pl-10 pr-10 glass border-slate-200/50 dark:border-slate-700/50 focus:border-lime-400 dark:focus:border-lime-400"
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
               {error && (
-                <div className="text-sm text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-500/10 p-3 rounded-lg border border-red-200/50 dark:border-red-500/20">
+                <div className="text-sm text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-500/10 p-3 rounded-lg border border-red-200/50 dark:border-red-500/20 animate-in fade-in slide-in-from-top-2">
                   {error}
                 </div>
               )}
@@ -277,7 +306,14 @@ const AuthModal: React.FC<AuthModalProps> = ({
                 className="w-full gradient-primary text-white shadow-lg hover:shadow-xl transition-all duration-300"
                 disabled={loading}
               >
-                {loading ? "Đang đăng nhập..." : "Đăng nhập"}
+                {loading ? (
+                  <>
+                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Đang đăng nhập...
+                  </>
+                ) : (
+                  "Đăng nhập"
+                )}
               </Button>
             </form>
           </TabsContent>
@@ -287,78 +323,111 @@ const AuthModal: React.FC<AuthModalProps> = ({
               <div className="space-y-2">
                 <Label
                   htmlFor="reg-name"
-                  className="text-slate-700 dark:text-slate-300"
+                  className="text-slate-700 dark:text-slate-300 font-medium"
                 >
                   Họ và tên
                 </Label>
-                <Input
-                  id="reg-name"
-                  type="text"
-                  placeholder="Nhập họ và tên của bạn"
-                  value={name}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    setName(e.target.value)
-                  }
-                  required
-                  className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 focus:border-blue-500 dark:focus:border-blue-400"
-                />
+                <div className="relative">
+                  <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    id="reg-name"
+                    type="text"
+                    placeholder="Nguyễn Văn A"
+                    value={name}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                      setName(e.target.value)
+                    }
+                    required
+                    className="pl-10 glass border-slate-200/50 dark:border-slate-700/50 focus:border-lime-400 dark:focus:border-lime-400"
+                    autoComplete="name"
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label
                   htmlFor="reg-email"
-                  className="text-slate-700 dark:text-slate-300"
+                  className="text-slate-700 dark:text-slate-300 font-medium"
                 >
                   Email
                 </Label>
-                <Input
-                  id="reg-email"
-                  type="email"
-                  placeholder="email@example.com"
-                  value={email}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    setEmail(e.target.value)
-                  }
-                  required
-                  className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 focus:border-blue-500 dark:focus:border-blue-400"
-                />
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    id="reg-email"
+                    type="email"
+                    placeholder="email@example.com"
+                    value={email}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                      setEmail(e.target.value)
+                    }
+                    required
+                    className="pl-10 glass border-slate-200/50 dark:border-slate-700/50 focus:border-lime-400 dark:focus:border-lime-400"
+                    autoComplete="email"
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label
                   htmlFor="reg-phone"
-                  className="text-slate-700 dark:text-slate-300"
+                  className="text-slate-700 dark:text-slate-300 font-medium"
                 >
                   Số điện thoại
                 </Label>
-                <Input
-                  id="reg-phone"
-                  type="tel"
-                  placeholder="Nhập số điện thoại (ít nhất 10 số)"
-                  value={phone}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    setPhone(e.target.value)
-                  }
-                  required
-                  className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 focus:border-blue-500 dark:focus:border-blue-400"
-                />
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    id="reg-phone"
+                    type="tel"
+                    placeholder="0123456789"
+                    value={phone}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                      setPhone(e.target.value)
+                    }
+                    required
+                    className="pl-10 glass border-slate-200/50 dark:border-slate-700/50 focus:border-lime-400 dark:focus:border-lime-400"
+                    autoComplete="tel"
+                  />
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Tối thiểu 10 số
+                </p>
               </div>
               <div className="space-y-2">
                 <Label
                   htmlFor="reg-password"
-                  className="text-slate-700 dark:text-slate-300"
+                  className="text-slate-700 dark:text-slate-300 font-medium"
                 >
                   Mật khẩu
                 </Label>
-                <Input
-                  id="reg-password"
-                  type="password"
-                  placeholder="Tạo mật khẩu (ít nhất 6 ký tự)"
-                  value={password}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    setPassword(e.target.value)
-                  }
-                  required
-                  className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 focus:border-blue-500 dark:focus:border-blue-400"
-                />
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    id="reg-password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••"
+                    value={password}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                      setPassword(e.target.value)
+                    }
+                    required
+                    className="pl-10 pr-10 glass border-slate-200/50 dark:border-slate-700/50 focus:border-lime-400 dark:focus:border-lime-400"
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Tối thiểu 6 ký tự
+                </p>
               </div>
               <div className="space-y-2">
                 <Label
@@ -384,7 +453,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
                 </Select>
               </div>
               {error && (
-                <div className="text-sm text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-500/10 p-3 rounded-lg border border-red-200/50 dark:border-red-500/20">
+                <div className="text-sm text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-500/10 p-3 rounded-lg border border-red-200/50 dark:border-red-500/20 animate-in fade-in slide-in-from-top-2">
                   {error}
                 </div>
               )}
@@ -393,7 +462,14 @@ const AuthModal: React.FC<AuthModalProps> = ({
                 className="w-full gradient-primary text-white shadow-lg hover:shadow-xl transition-all duration-300"
                 disabled={loading}
               >
-                {loading ? "Đang tạo tài khoản..." : "Tạo tài khoản"}
+                {loading ? (
+                  <>
+                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Đang tạo tài khoản...
+                  </>
+                ) : (
+                  "Tạo tài khoản"
+                )}
               </Button>
             </form>
           </TabsContent>
