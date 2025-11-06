@@ -1,8 +1,6 @@
 import { Request, Response } from "express";
-import { PrismaClient } from "@prisma/client";
-import { asyncHandler } from "../middlewares/error.middleware";
-
-const prisma = new PrismaClient();
+import { asyncHandler, CustomError } from "../middlewares/error.middleware";
+import { prisma } from "../server";
 
 /**
  * Get system overview
@@ -336,11 +334,19 @@ export const getUsageStatistics = asyncHandler(
  */
 export const getBatteryReports = asyncHandler(
   async (req: Request, res: Response) => {
-    const { station_id } = req.query;
+    const { station_id, health_threshold = 70 } = req.query;
 
     const whereClause: any = {};
     if (station_id) {
       whereClause.station_id = station_id;
+    }
+
+    const threshold = Number(health_threshold);
+    if (Number.isNaN(threshold) || threshold < 0 || threshold > 100) {
+      throw new CustomError(
+        "health_threshold must be a number between 0 and 100",
+        400
+      );
     }
 
     const batteries = await prisma.battery.findMany({
@@ -398,6 +404,36 @@ export const getBatteryReports = asyncHandler(
       {} as Record<string, any>
     );
 
+    const healthValues = batteries
+      .map((battery) =>
+        battery.health_percentage !== null
+          ? Number(battery.health_percentage)
+          : null
+      )
+      .filter(
+        (value): value is number => value !== null && !Number.isNaN(value)
+      );
+
+    const cycleValues = batteries
+      .map((battery) => battery.cycle_count ?? null)
+      .filter(
+        (value): value is number => value !== null && !Number.isNaN(value)
+      );
+
+    const average = (values: number[]): number =>
+      values.length === 0
+        ? 0
+        : Number(
+            (
+              values.reduce((sum, value) => sum + value, 0) / values.length
+            ).toFixed(2)
+          );
+
+    const lowHealthBatteries = batteries.filter((battery) => {
+      if (battery.health_percentage === null) return false;
+      return Number(battery.health_percentage) < threshold;
+    });
+
     res.status(200).json({
       success: true,
       message: "Battery reports retrieved successfully",
@@ -406,6 +442,15 @@ export const getBatteryReports = asyncHandler(
         status_breakdown: statusBreakdown,
         model_breakdown: modelBreakdown,
         station_breakdown: Object.values(stationBreakdown),
+        health_metrics: {
+          average_health: average(healthValues),
+          average_cycle_count: Math.round(average(cycleValues)),
+          low_health_threshold: threshold,
+          low_health_battery_ids: lowHealthBatteries.map(
+            (battery) => battery.battery_id
+          ),
+          low_health_count: lowHealthBatteries.length,
+        },
       },
     });
   }

@@ -97,7 +97,8 @@ export const createBooking = asyncHandler(
     }
 
     // Validate UUIDs format (basic check)
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(vehicle_id)) {
       throw new CustomError("Invalid vehicle ID format", 400);
     }
@@ -130,7 +131,10 @@ export const createBooking = asyncHandler(
     }
 
     // Check if battery model is compatible with vehicle (case-insensitive)
-    if (vehicle.battery_model.toLowerCase().trim() !== battery_model.toLowerCase().trim()) {
+    if (
+      vehicle.battery_model.toLowerCase().trim() !==
+      battery_model.toLowerCase().trim()
+    ) {
       throw new CustomError(
         `Battery model "${battery_model}" is not compatible with your vehicle (requires "${vehicle.battery_model}")`,
         400
@@ -160,10 +164,7 @@ export const createBooking = asyncHandler(
 
     const now = new Date();
     if (scheduledTime <= now) {
-      throw new CustomError(
-        "Scheduled time must be in the future",
-        400
-      );
+      throw new CustomError("Scheduled time must be in the future", 400);
     }
 
     // Option 3: Strict validation
@@ -206,7 +207,9 @@ export const createBooking = asyncHandler(
 
     if (batteriesOfModel.length === 0) {
       // Get unique models for error message
-      const availableModels = [...new Set(allBatteriesAtStation.map((b) => b.model))];
+      const availableModels = [
+        ...new Set(allBatteriesAtStation.map((b) => b.model)),
+      ];
       throw new CustomError(
         `No batteries of model "${battery_model}" found at this station. Available models: ${availableModels.join(", ") || "none"}.`,
         400
@@ -236,31 +239,37 @@ export const createBooking = asyncHandler(
     ).length;
 
     // Get time difference in hours
-    const hoursUntilScheduled = (scheduledTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+    const hoursUntilScheduled =
+      (scheduledTime.getTime() - now.getTime()) / (1000 * 60 * 60);
 
     // Check total available batteries:
     // 1. Batteries with status = "full" (ready now)
-    const fullBatteries = batteriesOfModel.filter((b) => b.status === "full").length;
+    const fullBatteries = batteriesOfModel.filter(
+      (b) => b.status === "full"
+    ).length;
 
     // 2. Batteries with status = "charging" that will be ready by scheduled time
     // Estimate: if battery is charging and scheduled time is >= 1 hour away,
     // assume it will be ready (conservative estimate: charging takes 1-2 hours typically)
-    const chargingBatteries = hoursUntilScheduled >= 1
-      ? batteriesOfModel.filter((b) => b.status === "charging").length
-      : 0;
+    const chargingBatteries =
+      hoursUntilScheduled >= 1
+        ? batteriesOfModel.filter((b) => b.status === "charging").length
+        : 0;
 
     // Total available = full batteries + charging batteries that will be ready
     const totalAvailableBatteries = fullBatteries + chargingBatteries;
 
     // Available batteries = total - reserved for other bookings
-    const availableBatteries = totalAvailableBatteries - confirmedBookingsAtTime;
+    const availableBatteries =
+      totalAvailableBatteries - confirmedBookingsAtTime;
 
     if (availableBatteries <= 0) {
       // Provide detailed error message
-      const reason = totalAvailableBatteries === 0
-        ? `No batteries are ready (${fullBatteries} full, ${chargingBatteries} charging)`
-        : `All ${totalAvailableBatteries} available batteries are reserved by other bookings (${confirmedBookingsAtTime} bookings in ±30 min window)`;
-      
+      const reason =
+        totalAvailableBatteries === 0
+          ? `No batteries are ready (${fullBatteries} full, ${chargingBatteries} charging)`
+          : `All ${totalAvailableBatteries} available batteries are reserved by other bookings (${confirmedBookingsAtTime} bookings in ±30 min window)`;
+
       throw new CustomError(
         `No available batteries for model "${battery_model}" at this station at ${scheduledTime.toLocaleString()}. ${reason}. Please choose another time or station.`,
         400
@@ -493,7 +502,8 @@ export const createInstantBooking = asyncHandler(
     }
 
     // Validate UUIDs format (basic check)
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(vehicle_id)) {
       throw new CustomError("Invalid vehicle ID format", 400);
     }
@@ -526,7 +536,10 @@ export const createInstantBooking = asyncHandler(
     }
 
     // Check if battery model is compatible (case-insensitive)
-    if (vehicle.battery_model.toLowerCase().trim() !== battery_model.toLowerCase().trim()) {
+    if (
+      vehicle.battery_model.toLowerCase().trim() !==
+      battery_model.toLowerCase().trim()
+    ) {
       throw new CustomError(
         `Battery model "${battery_model}" is not compatible with your vehicle (requires "${vehicle.battery_model}")`,
         400
@@ -558,7 +571,9 @@ export const createInstantBooking = asyncHandler(
 
     if (batteriesOfModel.length === 0) {
       // Get unique models for error message
-      const availableModels = [...new Set(allBatteriesAtStation.map((b) => b.model))];
+      const availableModels = [
+        ...new Set(allBatteriesAtStation.map((b) => b.model)),
+      ];
       throw new CustomError(
         `No batteries of model "${battery_model}" found at this station. Available models: ${availableModels.join(", ") || "none"}.`,
         400
@@ -566,7 +581,9 @@ export const createInstantBooking = asyncHandler(
     }
 
     // Check if there are available batteries RIGHT NOW (full batteries)
-    const fullBatteries = batteriesOfModel.filter((b) => b.status === "full").length;
+    const fullBatteries = batteriesOfModel.filter(
+      (b) => b.status === "full"
+    ).length;
 
     // Also check instant bookings that might reserve batteries
     const allInstantBookingsAtStation = await prisma.booking.findMany({
@@ -592,10 +609,11 @@ export const createInstantBooking = asyncHandler(
     const availableBatteries = fullBatteries - instantBookingsAtStation;
 
     if (availableBatteries <= 0) {
-      const reason = fullBatteries === 0
-        ? `No full batteries available (${batteriesOfModel.length} total batteries of this model)`
-        : `All ${fullBatteries} full batteries are reserved by other instant bookings (${instantBookingsAtStation} bookings in next 15 min)`;
-      
+      const reason =
+        fullBatteries === 0
+          ? `No full batteries available (${batteriesOfModel.length} total batteries of this model)`
+          : `All ${fullBatteries} full batteries are reserved by other instant bookings (${instantBookingsAtStation} bookings in next 15 min)`;
+
       throw new CustomError(
         `Không có pin sẵn sàng ngay. ${reason}. Vui lòng đặt lịch hẹn cho thời gian khác.`,
         400
@@ -664,7 +682,8 @@ export const createInstantBooking = asyncHandler(
 
     res.status(201).json({
       success: true,
-      message: "Instant booking created successfully. Battery reserved for 15 minutes.",
+      message:
+        "Instant booking created successfully. Battery reserved for 15 minutes.",
       data: {
         ...booking,
         reservation_expires_at: scheduledTime,
@@ -721,10 +740,11 @@ export const cancelBooking = asyncHandler(
     // ✅ Chính sách hủy muộn
     const scheduledTime = new Date(booking.scheduled_at);
     const now = new Date();
-    const minutesUntilScheduled = (scheduledTime.getTime() - now.getTime()) / (1000 * 60);
-    
-    let cancellationFee = 0;
-    let cancelMessage = "Booking cancelled successfully";
+    const minutesUntilScheduled =
+      (scheduledTime.getTime() - now.getTime()) / (1000 * 60);
+
+    const cancellationFee = 0;
+    const cancelMessage = "Booking cancelled successfully";
 
     // Nếu hủy trong vòng 15 phút trước giờ hẹn → Không cho hủy HOẶC phạt phí
     if (minutesUntilScheduled < 15 && minutesUntilScheduled > 0) {
@@ -786,9 +806,10 @@ export const cancelBooking = asyncHandler(
         type: "booking_cancelled",
         userId: userId,
         title: "Đã hủy đặt chỗ",
-        message: cancellationFee > 0
-          ? `Đã hủy đặt chỗ. Phí hủy muộn: ${cancellationFee.toLocaleString("vi-VN")}đ`
-          : "Đã hủy đặt chỗ thành công",
+        message:
+          cancellationFee > 0
+            ? `Đã hủy đặt chỗ. Phí hủy muộn: ${cancellationFee.toLocaleString("vi-VN")}đ`
+            : "Đã hủy đặt chỗ thành công",
         data: {
           booking_id: booking.booking_id,
           booking_code: booking.booking_code,
@@ -805,10 +826,15 @@ export const cancelBooking = asyncHandler(
       data: {
         booking: result.updatedBooking,
         cancellation_fee: result.cancellationFee,
-        wallet_balance: cancellationFee > 0 ? await prisma.wallet.findUnique({
-          where: { user_id: userId },
-          select: { balance: true },
-        }).then(w => w?.balance || 0) : null,
+        wallet_balance:
+          cancellationFee > 0
+            ? await prisma.wallet
+                .findUnique({
+                  where: { user_id: userId },
+                  select: { balance: true },
+                })
+                .then((w) => w?.balance || 0)
+            : null,
       },
     });
   }

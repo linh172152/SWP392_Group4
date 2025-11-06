@@ -91,6 +91,8 @@ model Battery {
   capacity_kwh     Decimal?             @db.Decimal(6, 2)
   voltage          Decimal?             @db.Decimal(6, 2)
   current_charge   Int                  @default(100)
+  health_percentage Decimal?            @db.Decimal(5, 2)
+  cycle_count      Int?                 @default(0)
   status           BatteryStatus        @default(full)
   last_charged_at  DateTime?
   created_at       DateTime             @default(now())
@@ -170,6 +172,8 @@ model Payment {
   payment_status      PaymentStatus     @default(pending)
   payment_gateway_ref String?           @db.VarChar(100)
   paid_at             DateTime?
+  payment_type        PaymentType       @default(OTHER)
+  metadata            Json?
   created_at          DateTime          @default(now())
   subscription        UserSubscription? @relation(fields: [subscription_id], references: [subscription_id], onDelete: Cascade)
   topup_package       TopUpPackage?     @relation(fields: [topup_package_id], references: [package_id], onDelete: Cascade)
@@ -184,9 +188,13 @@ model ServicePackage {
   name           String             @db.VarChar(100)
   description    String?
   price          Decimal            @db.Decimal(10, 2)
+  battery_capacity_kwh Int
   swap_limit     Int?
   duration_days  Int
-  battery_models Json
+  battery_models Json?
+  benefits       Json?
+  billing_cycle  PackageBillingCycle @default(monthly)
+  metadata       Json?
   is_active      Boolean            @default(true)
   created_at     DateTime           @default(now())
   updated_at     DateTime           @updatedAt
@@ -204,6 +212,9 @@ model UserSubscription {
   remaining_swaps Int?
   status          SubscriptionStatus @default(active)
   auto_renew      Boolean            @default(false)
+  cancelled_at    DateTime?
+  cancellation_reason String?
+  metadata        Json?
   created_at      DateTime           @default(now())
   updated_at      DateTime           @updatedAt
   payments        Payment[]
@@ -271,12 +282,20 @@ model BatteryTransferLog {
   transferred_by      String   @db.Uuid
   transferred_at      DateTime @default(now())
   notes               String?
+  transfer_status     TransferStatus     @default(completed)
   battery             Battery  @relation(fields: [battery_id], references: [battery_id])
   from_station        Station  @relation("TransferFromStation", fields: [from_station_id], references: [station_id])
   to_station          Station  @relation("TransferToStation", fields: [to_station_id], references: [station_id])
   transferred_by_user User     @relation(fields: [transferred_by], references: [user_id])
 
   @@map("battery_transfer_logs")
+}
+
+enum TransferStatus {
+  pending
+  in_transit
+  completed
+  cancelled
 }
 
 
@@ -390,10 +409,27 @@ enum PaymentMethod {
   credit_card
 }
 
+enum PaymentType {
+  TOPUP
+  SWAP
+  SUBSCRIPTION
+  REFUND
+  OTHER
+  PACKAGE_PURCHASE
+  PACKAGE_REFUND
+  PENALTY
+}
+
 enum SubscriptionStatus {
   active
   expired
   cancelled
+}
+
+enum PackageBillingCycle {
+  monthly
+  yearly
+  custom
 }
 
 enum TicketCategory {

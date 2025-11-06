@@ -1,9 +1,7 @@
 import { Request, Response } from "express";
-import { PrismaClient } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
-
-const prisma = new PrismaClient();
+import { prisma } from "../server";
 
 /**
  * Get station batteries
@@ -13,7 +11,7 @@ export const getStationBatteries = asyncHandler(
     const { station_id, status, model } = req.query;
 
     const whereClause: any = {};
-    
+
     if (station_id) {
       whereClause.station_id = station_id;
     }
@@ -58,10 +56,15 @@ export const addBattery = asyncHandler(async (req: Request, res: Response) => {
     voltage,
     current_charge = 100,
     status = "full",
+    health_percentage = 100,
+    cycle_count = 0,
   } = req.body;
 
   if (!battery_code || !model || !station_id) {
-    throw new CustomError("Battery code, model, and station_id are required", 400);
+    throw new CustomError(
+      "Battery code, model, and station_id are required",
+      400
+    );
   }
 
   // Check if station exists
@@ -87,7 +90,8 @@ export const addBattery = asyncHandler(async (req: Request, res: Response) => {
     where: { station_id },
   });
 
-  const capacityPercentage = (currentBatteryCount / Number(station.capacity)) * 100;
+  const capacityPercentage =
+    (currentBatteryCount / Number(station.capacity)) * 100;
 
   // >= 100% → Không cho thêm pin mới
   if (capacityPercentage >= 100) {
@@ -103,6 +107,16 @@ export const addBattery = asyncHandler(async (req: Request, res: Response) => {
     warningMessage = `Cảnh báo: Trạm sắp đầy (${Math.round(capacityPercentage)}%). Chỉ còn ${station.capacity - currentBatteryCount} slot.`;
   }
 
+  const healthValue = Number(health_percentage);
+  if (Number.isNaN(healthValue) || healthValue < 0 || healthValue > 100) {
+    throw new CustomError("health_percentage must be between 0 and 100", 400);
+  }
+
+  const cycleValue = Number(cycle_count);
+  if (Number.isNaN(cycleValue) || cycleValue < 0) {
+    throw new CustomError("cycle_count must be a non-negative number", 400);
+  }
+
   const battery = await prisma.battery.create({
     data: {
       battery_code,
@@ -113,6 +127,8 @@ export const addBattery = asyncHandler(async (req: Request, res: Response) => {
       current_charge,
       status,
       last_charged_at: status === "full" ? new Date() : null,
+      health_percentage: healthValue,
+      cycle_count: cycleValue,
     },
     include: {
       station: {
@@ -133,8 +149,16 @@ export const addBattery = asyncHandler(async (req: Request, res: Response) => {
       capacity_info: {
         current_count: currentBatteryCount + 1,
         capacity: Number(station.capacity),
-        capacity_percentage: Math.round(((currentBatteryCount + 1) / Number(station.capacity)) * 100),
-        warning: capacityPercentage >= 90 ? { level: "almost_full", percentage: Math.round(capacityPercentage) } : null,
+        capacity_percentage: Math.round(
+          ((currentBatteryCount + 1) / Number(station.capacity)) * 100
+        ),
+        warning:
+          capacityPercentage >= 90
+            ? {
+                level: "almost_full",
+                percentage: Math.round(capacityPercentage),
+              }
+            : null,
       },
     },
   });
@@ -206,7 +230,7 @@ export const getBatteryDetails = asyncHandler(
 export const updateBatteryStatus = asyncHandler(
   async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { status, current_charge } = req.body;
+    const { status, current_charge, health_percentage, cycle_count } = req.body;
 
     if (!status) {
       throw new CustomError("Status is required", 400);
@@ -224,6 +248,22 @@ export const updateBatteryStatus = asyncHandler(
 
     if (current_charge !== undefined) {
       updateData.current_charge = current_charge;
+    }
+
+    if (health_percentage !== undefined) {
+      const healthValue = Number(health_percentage);
+      if (Number.isNaN(healthValue) || healthValue < 0 || healthValue > 100) {
+        throw new CustomError("health_percentage must be between 0 and 100", 400);
+      }
+      updateData.health_percentage = healthValue;
+    }
+
+    if (cycle_count !== undefined) {
+      const cycleValue = Number(cycle_count);
+      if (Number.isNaN(cycleValue) || cycleValue < 0) {
+        throw new CustomError("cycle_count must be a non-negative number", 400);
+      }
+      updateData.cycle_count = cycleValue;
     }
 
     if (status === "full" && current_charge === 100) {

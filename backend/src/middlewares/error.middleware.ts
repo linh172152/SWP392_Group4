@@ -28,6 +28,7 @@ export const errorHandler = (
   error: AppError,
   req: Request,
   res: Response,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _next: NextFunction
 ) => {
   let { statusCode = 500, message } = error;
@@ -101,7 +102,13 @@ export const errorHandler = (
 /**
  * Async error wrapper
  */
-export const asyncHandler = (fn: Function) => {
+type AsyncRouteHandler = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => Promise<unknown> | void;
+
+export const asyncHandler = (fn: AsyncRouteHandler) => {
   return (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };

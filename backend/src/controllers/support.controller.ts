@@ -1,9 +1,7 @@
 import { Request, Response } from "express";
-import { PrismaClient } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
-
-const prisma = new PrismaClient();
+import { prisma } from "../server";
 
 /**
  * Get user tickets
@@ -313,6 +311,264 @@ export const getTicketReplies = asyncHandler(
           pages: Math.ceil(total / parseInt(limit as string)),
         },
       },
+    });
+  }
+);
+
+/**
+ * Admin: list all tickets with filters
+ */
+export const adminListTickets = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { status, priority, category, assigned, page = 1, limit = 10 } =
+      req.query;
+
+    const whereClause: any = {};
+
+    if (status) whereClause.status = status;
+    if (priority) whereClause.priority = priority;
+    if (category) whereClause.category = category;
+    if (assigned === "true") whereClause.assigned_to_staff_id = { not: null };
+    if (assigned === "false") whereClause.assigned_to_staff_id = null;
+
+    const take = Math.max(1, parseInt(limit as string, 10));
+    const skip = (Math.max(1, parseInt(page as string, 10)) - 1) * take;
+
+    const [tickets, total] = await prisma.$transaction([
+      prisma.supportTicket.findMany({
+        where: whereClause,
+        include: {
+          user: {
+            select: {
+              user_id: true,
+              full_name: true,
+              email: true,
+              phone: true,
+            },
+          },
+          assigned_to_staff: {
+            select: {
+              user_id: true,
+              full_name: true,
+              email: true,
+            },
+          },
+        },
+        orderBy: { created_at: "desc" },
+        skip,
+        take,
+      }),
+      prisma.supportTicket.count({ where: whereClause }),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      message: "Tickets retrieved successfully",
+      data: {
+        tickets,
+        pagination: {
+          page: Math.max(1, parseInt(page as string, 10)),
+          limit: take,
+          total,
+          pages: Math.ceil(total / take) || 1,
+        },
+      },
+    });
+  }
+);
+
+/**
+ * Admin: get detailed ticket info
+ */
+export const adminGetTicketDetails = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+
+    const ticket = await prisma.supportTicket.findUnique({
+      where: { ticket_id: id },
+      include: {
+        user: {
+          select: {
+            user_id: true,
+            full_name: true,
+            email: true,
+            phone: true,
+          },
+        },
+        assigned_to_staff: {
+          select: {
+            user_id: true,
+            full_name: true,
+            email: true,
+          },
+        },
+        replies: {
+          include: {
+            user: {
+              select: {
+                user_id: true,
+                full_name: true,
+                role: true,
+              },
+            },
+          },
+          orderBy: { created_at: "asc" },
+        },
+      },
+    });
+
+    if (!ticket) {
+      throw new CustomError("Ticket not found", 404);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Ticket details retrieved successfully",
+      data: ticket,
+    });
+  }
+);
+
+/**
+ * Admin: assign ticket to staff
+ */
+export const adminAssignTicket = asyncHandler(
+  async (req: Request, res: Response) => {
+    const adminId = req.user?.userId;
+    const { id } = req.params;
+    const { staff_id } = req.body;
+
+    if (!adminId) {
+      throw new CustomError("Admin not authenticated", 401);
+    }
+
+    if (!staff_id) {
+      throw new CustomError("staff_id is required", 400);
+    }
+
+    const staff = await prisma.user.findFirst({
+      where: { user_id: staff_id, role: "STAFF" },
+    });
+
+    if (!staff) {
+      throw new CustomError("Staff not found", 404);
+    }
+
+    const ticket = await prisma.supportTicket.findUnique({
+      where: { ticket_id: id },
+    });
+
+    if (!ticket) {
+      throw new CustomError("Ticket not found", 404);
+    }
+
+    const updated = await prisma.supportTicket.update({
+      where: { ticket_id: id },
+      data: {
+        assigned_to_staff_id: staff_id,
+        status: ticket.status === "open" ? "in_progress" : ticket.status,
+      },
+      include: {
+        assigned_to_staff: {
+          select: {
+            user_id: true,
+            full_name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Ticket assigned successfully",
+      data: updated,
+    });
+  }
+);
+
+/**
+ * Admin: update ticket status
+ */
+export const adminUpdateTicketStatus = asyncHandler(
+  async (req: Request, res: Response) => {
+    const adminId = req.user?.userId;
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!adminId) {
+      throw new CustomError("Admin not authenticated", 401);
+    }
+
+    if (!status) {
+      throw new CustomError("status is required", 400);
+    }
+
+    const allowedStatuses = ["open", "in_progress", "resolved", "closed"];
+    if (!allowedStatuses.includes(status)) {
+      throw new CustomError("Invalid ticket status", 400);
+    }
+
+    const updated = await prisma.supportTicket.update({
+      where: { ticket_id: id },
+      data: { status },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Ticket status updated successfully",
+      data: updated,
+    });
+  }
+);
+
+/**
+ * Admin: reply to ticket
+ */
+export const adminReplyTicket = asyncHandler(
+  async (req: Request, res: Response) => {
+    const adminId = req.user?.userId;
+    const { id } = req.params;
+    const { message } = req.body;
+
+    if (!adminId) {
+      throw new CustomError("Admin not authenticated", 401);
+    }
+
+    if (!message || typeof message !== "string") {
+      throw new CustomError("message is required", 400);
+    }
+
+    const ticket = await prisma.supportTicket.findUnique({
+      where: { ticket_id: id },
+    });
+
+    if (!ticket) {
+      throw new CustomError("Ticket not found", 404);
+    }
+
+    const reply = await prisma.ticketReply.create({
+      data: {
+        ticket_id: id,
+        user_id: adminId,
+        message,
+        is_staff: true,
+      },
+      include: {
+        user: {
+          select: {
+            user_id: true,
+            full_name: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Reply added successfully",
+      data: reply,
     });
   }
 );

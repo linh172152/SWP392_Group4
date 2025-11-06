@@ -424,6 +424,15 @@ async function main() {
 
   // Station 1 - District 1 (50 capacity)
   for (let i = 1; i <= 15; i++) {
+    const status = i <= 8 ? "full" : i <= 12 ? "charging" : "maintenance";
+    const health_percentage =
+      status === "full"
+        ? Math.random() * 5 + 95
+        : status === "charging"
+          ? Math.random() * 10 + 85
+          : Math.random() * 15 + 70;
+    const cycle_count = Math.floor(Math.random() * 120) + 60;
+
     batteryPromises.push(
       prisma.battery.create({
         data: {
@@ -438,10 +447,12 @@ async function main() {
           capacity_kwh: i <= 5 ? 87.7 : i <= 10 ? 75 : 60.48,
           voltage: i <= 5 ? 400 : i <= 10 ? 350 : 400,
           current_charge: Math.floor(Math.random() * 40) + 60, // 60-100%
-          status: i <= 8 ? "full" : i <= 12 ? "charging" : "maintenance",
+          status,
           last_charged_at: new Date(
             Date.now() - Math.random() * 24 * 60 * 60 * 1000
           ),
+          health_percentage,
+          cycle_count,
         },
       })
     );
@@ -449,6 +460,15 @@ async function main() {
 
   // Station 2 - District 7 (40 capacity)
   for (let i = 1; i <= 12; i++) {
+    const status = i <= 6 ? "full" : i <= 10 ? "charging" : "in_use";
+    const health_percentage =
+      status === "full"
+        ? Math.random() * 5 + 95
+        : status === "charging"
+          ? Math.random() * 10 + 85
+          : Math.random() * 15 + 65;
+    const cycle_count = Math.floor(Math.random() * 140) + 80;
+
     batteryPromises.push(
       prisma.battery.create({
         data: {
@@ -463,10 +483,12 @@ async function main() {
           capacity_kwh: i <= 4 ? 87.7 : i <= 8 ? 60.48 : 72.6,
           voltage: i <= 4 ? 400 : i <= 8 ? 400 : 400,
           current_charge: Math.floor(Math.random() * 30) + 70, // 70-100%
-          status: i <= 6 ? "full" : i <= 10 ? "charging" : "in_use",
+          status,
           last_charged_at: new Date(
             Date.now() - Math.random() * 12 * 60 * 60 * 1000
           ),
+          health_percentage,
+          cycle_count,
         },
       })
     );
@@ -474,6 +496,15 @@ async function main() {
 
   // Station 3 - Thu Duc (60 capacity)
   for (let i = 1; i <= 18; i++) {
+    const status = i <= 10 ? "full" : i <= 15 ? "charging" : "maintenance";
+    const health_percentage =
+      status === "full"
+        ? Math.random() * 5 + 96
+        : status === "charging"
+          ? Math.random() * 8 + 88
+          : Math.random() * 20 + 60;
+    const cycle_count = Math.floor(Math.random() * 160) + 90;
+
     batteryPromises.push(
       prisma.battery.create({
         data: {
@@ -490,10 +521,12 @@ async function main() {
           capacity_kwh: i <= 6 ? 75 : i <= 12 ? 87.7 : i <= 15 ? 60.48 : 80,
           voltage: i <= 6 ? 350 : i <= 12 ? 400 : i <= 15 ? 400 : 400,
           current_charge: Math.floor(Math.random() * 25) + 75, // 75-100%
-          status: i <= 10 ? "full" : i <= 15 ? "charging" : "maintenance",
+          status,
           last_charged_at: new Date(
             Date.now() - Math.random() * 6 * 60 * 60 * 1000
           ),
+          health_percentage,
+          cycle_count,
         },
       })
     );
@@ -505,84 +538,83 @@ async function main() {
   // ===========================================
   // CREATE SERVICE PACKAGES
   // ===========================================
-  const servicePackages = await Promise.all([
-    prisma.servicePackage.create({
-      data: {
-        name: "Basic Monthly Plan",
-        description: "Unlimited battery swaps for 1 month",
-        price: 500000,
-        swap_limit: null, // unlimited
-        duration_days: 30,
-        battery_models: [
-          "VinFast VF8 Battery",
-          "Tesla Model 3 Battery",
-          "BYD Atto 3 Battery",
-        ],
-        is_active: true,
-      },
-    }),
-    prisma.servicePackage.create({
-      data: {
-        name: "Premium Monthly Plan",
-        description:
-          "Unlimited battery swaps for 1 month with priority support",
-        price: 800000,
-        swap_limit: null, // unlimited
-        duration_days: 30,
-        battery_models: [
-          "VinFast VF8 Battery",
-          "Tesla Model 3 Battery",
-          "BYD Atto 3 Battery",
-          "BMW iX3 Battery",
-        ],
-        is_active: true,
-      },
-    }),
-    prisma.servicePackage.create({
-      data: {
-        name: "Pay Per Swap",
-        description: "Pay for each battery swap individually",
-        price: 0,
-        swap_limit: null, // unlimited
-        duration_days: 365,
-        battery_models: [
-          "VinFast VF8 Battery",
-          "Tesla Model 3 Battery",
-          "BYD Atto 3 Battery",
-          "BMW iX3 Battery",
-          "Hyundai IONIQ 5 Battery",
-        ],
-        is_active: true,
-      },
-    }),
-    prisma.servicePackage.create({
-      data: {
-        name: "Student Plan",
-        description: "Special discount for students - 20 swaps per month",
-        price: 300000,
-        swap_limit: 20,
-        duration_days: 30,
-        battery_models: ["VinFast VF8 Battery", "BYD Atto 3 Battery"],
-        is_active: true,
-      },
-    }),
-    prisma.servicePackage.create({
-      data: {
-        name: "Corporate Plan",
-        description: "Bulk plan for companies - 100 swaps per month",
-        price: 2000000,
-        swap_limit: 100,
-        duration_days: 30,
-        battery_models: [
-          "VinFast VF8 Battery",
-          "Tesla Model 3 Battery",
-          "BYD Atto 3 Battery",
-          "BMW iX3 Battery",
-        ],
-        is_active: true,
-      },
-    }),
-  ]);
+  const packageDefinitions = [
+    {
+      name: "75kWh Flex Monthly",
+      description: "Không giới hạn đổi pin 75kWh trong 30 ngày",
+      battery_capacity_kwh: 75,
+      duration_days: 30,
+      price: 590000,
+      billing_cycle: "monthly" as const,
+      benefits: [
+        "Ưu tiên đặt lịch tại giờ cao điểm",
+        "Miễn phí đổi pin tiêu chuẩn 75kWh",
+        "Giảm 10% phụ phí đổi pin nhanh",
+      ],
+    },
+    {
+      name: "75kWh Flex Annual",
+      description: "Tiết kiệm 2 tháng phí khi trả trước 1 năm",
+      battery_capacity_kwh: 75,
+      duration_days: 365,
+      price: 5900000,
+      billing_cycle: "yearly" as const,
+      benefits: [
+        "Bao gồm toàn bộ quyền lợi gói tháng",
+        "Tặng kèm 2 lượt vệ sinh pin tại trạm",
+        "Ưu đãi 5% khi mua phụ kiện",
+      ],
+    },
+    {
+      name: "100kWh Pro Monthly",
+      description: "Gói cho xe dung lượng lớn với quyền lợi VIP",
+      battery_capacity_kwh: 100,
+      duration_days: 30,
+      price: 830000,
+      billing_cycle: "monthly" as const,
+      benefits: [
+        "Không giới hạn đổi pin 100kWh",
+        "Ưu tiên xử lý tại quầy VIP",
+        "Miễn phí 1 lần hỗ trợ cứu hộ/năm",
+      ],
+    },
+    {
+      name: "100kWh Pro Annual",
+      description: "Dành cho fleet cao cấp – bao trọn năm",
+      battery_capacity_kwh: 100,
+      duration_days: 365,
+      price: 8300000,
+      billing_cycle: "yearly" as const,
+      benefits: [
+        "Bao gồm toàn bộ quyền lợi gói tháng",
+        "Hỗ trợ kỹ thuật định kỳ 6 tháng/lần",
+        "Ưu đãi 7% phí đổi pin tại trạm đối tác",
+      ],
+    },
+  ];
+
+  const servicePackages = await Promise.all(
+    packageDefinitions.map((pkg) =>
+      prisma.servicePackage.create({
+        data: {
+          name: pkg.name,
+          description: pkg.description,
+          battery_capacity_kwh: pkg.battery_capacity_kwh,
+          duration_days: pkg.duration_days,
+          price: pkg.price,
+          billing_cycle: pkg.billing_cycle,
+          benefits: pkg.benefits,
+          swap_limit: null,
+          battery_models: null,
+          metadata: {
+            currency: "VND",
+            createdBy: "seed",
+          },
+          is_active: true,
+        },
+      })
+    )
+  );
   console.log("✅ Created service packages:", servicePackages.length);
 
   // ===========================================
@@ -598,6 +630,10 @@ async function main() {
         remaining_swaps: null,
         status: "active",
         auto_renew: true,
+        metadata: {
+          payment_method: "wallet",
+          price_paid: packageDefinitions[0].price,
+        },
       },
     }),
     prisma.userSubscription.create({
@@ -605,10 +641,14 @@ async function main() {
         user_id: drivers[1].user_id,
         package_id: servicePackages[1].package_id,
         start_date: new Date(),
-        end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        end_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
         remaining_swaps: null,
         status: "active",
         auto_renew: false,
+        metadata: {
+          payment_method: "vnpay",
+          price_paid: packageDefinitions[1].price,
+        },
       },
     }),
     prisma.userSubscription.create({
@@ -616,32 +656,14 @@ async function main() {
         user_id: drivers[2].user_id,
         package_id: servicePackages[2].package_id,
         start_date: new Date(),
-        end_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         remaining_swaps: null,
         status: "active",
         auto_renew: false,
-      },
-    }),
-    prisma.userSubscription.create({
-      data: {
-        user_id: drivers[3].user_id,
-        package_id: servicePackages[3].package_id,
-        start_date: new Date(),
-        end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        remaining_swaps: 15,
-        status: "active",
-        auto_renew: false,
-      },
-    }),
-    prisma.userSubscription.create({
-      data: {
-        user_id: drivers[4].user_id,
-        package_id: servicePackages[4].package_id,
-        start_date: new Date(),
-        end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        remaining_swaps: 80,
-        status: "active",
-        auto_renew: true,
+        metadata: {
+          payment_method: "wallet",
+          price_paid: packageDefinitions[2].price,
+        },
       },
     }),
   ]);
