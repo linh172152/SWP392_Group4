@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,7 @@ import {
 import { Loader2, AlertCircle } from 'lucide-react';
 import { addBattery, AddBatteryData } from '../../services/battery.service';
 import { useToast } from '../../hooks/use-toast';
+import { API_ENDPOINTS } from '../../config/api';
 
 interface AddBatteryDialogProps {
   open: boolean;
@@ -34,9 +35,38 @@ const AddBatteryDialog: React.FC<AddBatteryDialogProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [warningMessage, setWarningMessage] = useState<string | null>(null);
+  const [stationId, setStationId] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const [formData, setFormData] = useState<AddBatteryData>({
+  // Fetch user profile to get station_id
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const accessToken = localStorage.getItem('accessToken');
+        if (!accessToken) return;
+
+        const response = await fetch(API_ENDPOINTS.AUTH.PROFILE, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        const data = await response.json();
+        if (data.success && data.data.user.station?.station_id) {
+          setStationId(data.data.user.station.station_id);
+        }
+      } catch (error) {
+        console.error('Failed to fetch user profile:', error);
+      }
+    };
+
+    if (open) {
+      fetchUserProfile();
+    }
+  }, [open]);
+
+  const [formData, setFormData] = useState<Partial<AddBatteryData>>({
     battery_code: '',
     model: '',
     capacity_kwh: undefined,
@@ -92,18 +122,28 @@ const AddBatteryDialog: React.FC<AddBatteryDialogProps> = ({
       return;
     }
 
+    if (!stationId) {
+      toast({
+        title: 'Lỗi',
+        description: 'Không tìm thấy thông tin trạm. Vui lòng đăng nhập lại.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       setLoading(true);
       setWarningMessage(null);
 
-      // Prepare data - remove undefined values
+      // Prepare data - remove undefined values and add station_id
       const submitData: AddBatteryData = {
-        battery_code: formData.battery_code.trim(),
-        model: formData.model.trim(),
+        station_id: stationId,  // ✅ Thêm station_id
+        battery_code: formData.battery_code?.trim() || '',
+        model: formData.model?.trim() || '',
         ...(formData.capacity_kwh && { capacity_kwh: Number(formData.capacity_kwh) }),
         ...(formData.voltage && { voltage: Number(formData.voltage) }),
-        current_charge: Number(formData.current_charge),
-        status: formData.status,
+        current_charge: Number(formData.current_charge || 100),
+        status: formData.status || 'full',
       };
 
       const response = await addBattery(submitData);

@@ -24,6 +24,7 @@ export interface Battery {
 }
 
 export interface AddBatteryData {
+  station_id: string;  // Required by backend
   battery_code: string;
   model: string;
   capacity_kwh?: number;
