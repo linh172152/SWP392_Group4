@@ -76,11 +76,12 @@ export const API_ENDPOINTS = {
     },
     TOPUP_PACKAGES: `${API_BASE_URL}/driver/topup-packages`,
   },
-  // Code của bạn - Subscription endpoints (giữ nguyên)
+  // Code của bạn - Subscription endpoints (cập nhật theo BE)
   SUBSCRIPTIONS: {
-    BASE: `${API_BASE_URL}/subscriptions`,
-    BY_ID: (id: string) => `${API_BASE_URL}/subscriptions/${id}`,
-    CANCEL: (id: string) => `${API_BASE_URL}/subscriptions/${id}/cancel`,
+    BASE: `${API_BASE_URL}/driver/subscriptions`,
+    BY_ID: (id: string) => `${API_BASE_URL}/driver/subscriptions/${id}`,
+    SUBSCRIBE: (packageId: string) => `${API_BASE_URL}/driver/subscriptions/packages/${packageId}/subscribe`,
+    CANCEL: (subscriptionId: string) => `${API_BASE_URL}/driver/subscriptions/${subscriptionId}/cancel`,
   },
   PACKAGES: {
     BASE: `${API_BASE_URL}/packages`,
@@ -88,6 +89,7 @@ export const API_ENDPOINTS = {
   },
   PUBLIC: {
     STATIONS: `${API_BASE_URL}/stations/public`,
+    PRICING: `${API_BASE_URL}/pricing`,
   },
   STAFF: {
     BOOKINGS: `${API_BASE_URL}/staff/bookings`,
