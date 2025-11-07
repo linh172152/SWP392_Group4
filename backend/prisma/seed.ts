@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 import { hashPassword } from "../src/utils/bcrypt.util";
 
 const prisma = new PrismaClient();
@@ -228,6 +228,45 @@ async function main() {
     }),
   ]);
   console.log("✅ Created staff users:", staffs.length);
+
+  // ===========================================
+  // CREATE STAFF SCHEDULES (demo data)
+  // ===========================================
+  const schedulePromises: Promise<any>[] = [];
+  const now = new Date();
+  const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+
+  staffs.forEach((staff, index) => {
+    if (!staff) return;
+
+    const baseStationId = staff.station_id ?? stations[0]?.station_id ?? null;
+    for (let dayOffset = 1; dayOffset <= 5; dayOffset++) {
+      const shiftDate = new Date(startOfToday.getTime() + dayOffset * 24 * 60 * 60 * 1000);
+      const shiftStart = new Date(shiftDate);
+      shiftStart.setUTCHours(7 + index % 2 * 4, 0, 0, 0); // 07:00 or 11:00 UTC
+      const shiftEnd = new Date(shiftStart);
+      shiftEnd.setUTCHours(shiftStart.getUTCHours() + 8, 0, 0, 0);
+
+      schedulePromises.push(
+        prisma.staffSchedule.create({
+          data: {
+            staff_id: staff.user_id,
+            station_id: baseStationId,
+            shift_date: shiftDate,
+            shift_start: shiftStart,
+            shift_end: shiftEnd,
+            status: "scheduled",
+            notes: "Demo ca trực",
+          },
+        })
+      );
+    }
+  });
+
+  if (schedulePromises.length > 0) {
+    await Promise.all(schedulePromises);
+    console.log("✅ Created staff schedules:", schedulePromises.length);
+  }
 
   // ===========================================
   // CREATE DRIVER USERS (using upsert to avoid duplicates)
@@ -605,7 +644,7 @@ async function main() {
           billing_cycle: pkg.billing_cycle,
           benefits: pkg.benefits,
           swap_limit: null,
-          battery_models: null,
+          battery_models: Prisma.JsonNull,
           metadata: {
             currency: "VND",
             createdBy: "seed",

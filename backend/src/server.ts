@@ -59,6 +59,9 @@ import adminForecastRoutes from "./routes/admin-forecast.routes";
 import packageRoutes from "./routes/package.routes";
 import adminPackageRoutes from "./routes/admin-package.routes";
 import driverSubscriptionRoutes from "./routes/driver-subscription.routes";
+import publicPricingRoutes from "./routes/public-pricing.routes";
+import staffScheduleRoutes from "./routes/staff-schedule.routes";
+import adminStaffScheduleRoutes from "./routes/admin-staff-schedule.routes";
 
 // ✅ topupPackageRoutes is already imported and mounted in admin.routes.ts
 // import topupPackageRoutes from "./routes/topup-package.routes";
@@ -198,6 +201,7 @@ app.use("/api/driver", driverRoutes); // Placeholder routes last
 // Staff API routes - Specific routes first to avoid conflicts
 app.use("/api/staff/batteries", batteryRoutes);
 app.use("/api/staff/bookings", staffBookingRoutes);
+app.use("/api/staff/schedules", staffScheduleRoutes);
 app.use("/api/staff", staffRoutes); // Placeholder routes last
 
 // Admin API routes - Specific routes first to avoid conflicts
@@ -208,11 +212,13 @@ app.use("/api/admin/packages", adminPackageRoutes);
 app.use("/api/admin/battery-transfers", adminBatteryTransferRoutes);
 app.use("/api/admin/support", adminSupportRoutes);
 app.use("/api/admin/forecast", adminForecastRoutes);
+app.use("/api/admin/staff-schedules", adminStaffScheduleRoutes);
 app.use("/api/admin", adminRoutes); // Contains pricing and topup-packages routes
 
 // Public API routes
 app.use("/api/stations/public", publicStationRoutes);
 app.use("/api/packages", packageRoutes);
+app.use("/api/pricing", publicPricingRoutes);
 
 // Maps API routes (Track-Asia - directions, distance, duration)
 app.use("/api/maps", mapsRoutes);

@@ -1,7 +1,270 @@
 import { Request, Response } from "express";
+import type { ServicePackage, UserSubscription } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
 import { prisma, notificationService } from "../server";
+
+type PricingCacheMaps = {
+  pricing?: Map<string, number | null>;
+  capacity?: Map<string, number | null>;
+};
+
+type BookingPricingPreview = {
+  currency: string;
+  base_price: number | null;
+  estimated_price: number | null;
+  pricing_source: "subscription" | "wallet" | "unavailable";
+  has_active_subscription: boolean;
+  is_covered_by_subscription: boolean;
+  subscription?:
+    | {
+        subscription_id: string;
+        package_id: string;
+        package_name: string;
+        package_duration_days: number;
+        package_battery_capacity_kwh: number;
+        package_swap_limit: number | null;
+        remaining_swaps: number | null;
+        ends_at: Date;
+        auto_renew: boolean;
+      }
+    | undefined;
+  message: string;
+};
+
+const normalizeBatteryModel = (value: string): string => value.trim().toLowerCase();
+
+const extractPackageModels = (pkg: ServicePackage | null): string[] => {
+  if (!pkg || pkg.battery_models === null || pkg.battery_models === undefined) {
+    return [];
+  }
+
+  const value = pkg.battery_models as unknown;
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === "string" ? item : null))
+      .filter((item): item is string => Boolean(item));
+  }
+
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((item) => (typeof item === "string" ? item : null))
+          .filter((item): item is string => Boolean(item));
+      }
+      if (typeof parsed === "string") {
+        return [parsed];
+      }
+    } catch {
+      return [value];
+    }
+  }
+
+  return [];
+};
+
+const getBatteryCapacityByModel = async (
+  batteryModel: string,
+  caches?: PricingCacheMaps
+): Promise<number | null> => {
+  const normalized = normalizeBatteryModel(batteryModel);
+  if (caches?.capacity?.has(normalized)) {
+    return caches.capacity.get(normalized) ?? null;
+  }
+
+  const battery = await prisma.battery.findFirst({
+    where: {
+      model: {
+        equals: batteryModel,
+        mode: "insensitive",
+      },
+    },
+    select: {
+      capacity_kwh: true,
+    },
+  });
+
+  const capacity =
+    battery?.capacity_kwh !== null && battery?.capacity_kwh !== undefined
+      ? Number(battery.capacity_kwh)
+      : null;
+
+  if (caches?.capacity) {
+    caches.capacity.set(normalized, capacity);
+  }
+
+  return capacity;
+};
+
+const getBasePriceByBatteryModel = async (
+  batteryModel: string,
+  caches?: PricingCacheMaps
+): Promise<number | null> => {
+  const normalized = normalizeBatteryModel(batteryModel);
+  if (caches?.pricing?.has(normalized)) {
+    return caches.pricing.get(normalized) ?? null;
+  }
+
+  const pricing = await prisma.batteryPricing.findFirst({
+    where: {
+      battery_model: {
+        equals: batteryModel,
+        mode: "insensitive",
+      },
+      is_active: true,
+    },
+    select: {
+      price: true,
+    },
+  });
+
+  const basePrice = pricing ? Number(pricing.price) : null;
+
+  if (caches?.pricing) {
+    caches.pricing.set(normalized, basePrice);
+  }
+
+  return basePrice;
+};
+
+const getActiveSubscription = async (
+  userId: string
+): Promise<(UserSubscription & { package: ServicePackage | null }) | null> => {
+  const now = new Date();
+  return prisma.userSubscription.findFirst({
+    where: {
+      user_id: userId,
+      status: "active",
+      start_date: { lte: now },
+      end_date: { gte: now },
+    },
+    include: {
+      package: true,
+    },
+    orderBy: { created_at: "desc" },
+  });
+};
+
+const doesSubscriptionCoverModel = async (
+  subscription: UserSubscription & { package: ServicePackage | null },
+  batteryModel: string,
+  caches?: PricingCacheMaps
+): Promise<boolean> => {
+  const pkg = subscription.package;
+  if (!pkg) {
+    return false;
+  }
+
+  const packageModels = extractPackageModels(pkg);
+  const normalizedModel = normalizeBatteryModel(batteryModel);
+  if (packageModels.length > 0) {
+    return packageModels.some(
+      (model) => normalizeBatteryModel(model) === normalizedModel
+    );
+  }
+
+  const batteryCapacity = await getBatteryCapacityByModel(batteryModel, caches);
+  if (batteryCapacity !== null) {
+    return batteryCapacity <= pkg.battery_capacity_kwh;
+  }
+
+  // Fallback: assume coverage when we cannot determine capacity but the package doesn't limit models explicitly
+  return true;
+};
+
+const buildSubscriptionInfo = (
+  subscription: UserSubscription & { package: ServicePackage | null } | null
+) => {
+  if (!subscription || !subscription.package) {
+    return undefined;
+  }
+
+  return {
+    subscription_id: subscription.subscription_id,
+    package_id: subscription.package_id,
+    package_name: subscription.package.name,
+    package_duration_days: subscription.package.duration_days,
+    package_battery_capacity_kwh: subscription.package.battery_capacity_kwh,
+    package_swap_limit: subscription.package.swap_limit,
+    remaining_swaps: subscription.remaining_swaps,
+    ends_at: subscription.end_date,
+    auto_renew: subscription.auto_renew,
+  };
+};
+
+const calculateBookingPricingPreview = async (
+  params: {
+    userId: string;
+    batteryModel: string;
+  },
+  caches?: PricingCacheMaps
+): Promise<BookingPricingPreview> => {
+  const { userId, batteryModel } = params;
+  const basePrice = await getBasePriceByBatteryModel(batteryModel, caches);
+
+  const preview: BookingPricingPreview = {
+    currency: "VND",
+    base_price: basePrice,
+    estimated_price: basePrice,
+    pricing_source: basePrice !== null ? "wallet" : "unavailable",
+    has_active_subscription: false,
+    is_covered_by_subscription: false,
+    message:
+      basePrice !== null
+        ? `Giá dự kiến dựa trên bảng giá cho ${batteryModel}.`
+        : "Chưa có bảng giá cho loại pin này. Vui lòng kiểm tra với nhân viên.",
+  };
+
+  const subscription = await getActiveSubscription(userId);
+  if (!subscription) {
+    return preview;
+  }
+
+  preview.has_active_subscription = true;
+  preview.subscription = buildSubscriptionInfo(subscription);
+
+  const coversModel = await doesSubscriptionCoverModel(
+    subscription,
+    batteryModel,
+    caches
+  );
+
+  if (!coversModel) {
+    preview.message = subscription.package
+      ? `Gói "${subscription.package.name}" không áp dụng cho loại pin "${batteryModel}". Áp dụng bảng giá tiêu chuẩn.`
+      : "Gói hiện tại không áp dụng cho loại pin này.";
+    return preview;
+  }
+
+  preview.is_covered_by_subscription = true;
+
+  const hasUnlimitedSwaps = subscription.remaining_swaps === null;
+  const hasRemainingSwaps =
+    hasUnlimitedSwaps || (subscription.remaining_swaps ?? 0) > 0;
+
+  if (hasRemainingSwaps) {
+    preview.estimated_price = 0;
+    preview.pricing_source = "subscription";
+    preview.message = hasUnlimitedSwaps
+      ? `Gói "${subscription.package?.name ?? ""}" bao trọn phí đổi pin cho loại "${batteryModel}".`
+      : `Gói "${subscription.package?.name ?? ""}" sẽ trừ 1 lượt đổi. Bạn còn ${
+          subscription.remaining_swaps
+        } lượt sau giao dịch này.`;
+    return preview;
+  }
+
+  preview.estimated_price = basePrice;
+  preview.pricing_source = basePrice !== null ? "wallet" : "unavailable";
+  preview.message =
+    basePrice !== null
+      ? `Gói "${subscription.package?.name ?? ""}" đã hết lượt đổi miễn phí. Áp dụng bảng giá tiêu chuẩn.`
+      : `Gói "${subscription.package?.name ?? ""}" đã hết lượt đổi và hiện chưa có bảng giá. Vui lòng kiểm tra với nhân viên.`;
+
+  return preview;
+};
 
 /**
  * Get user bookings
@@ -58,13 +321,35 @@ export const getUserBookings = asyncHandler(
       take: parseInt(limit as string),
     });
 
+    const caches: PricingCacheMaps = {
+      pricing: new Map(),
+      capacity: new Map(),
+    };
+
+    const bookingsWithPricing = await Promise.all(
+      bookings.map(async (booking) => {
+        const pricing_preview = await calculateBookingPricingPreview(
+          {
+            userId,
+            batteryModel: booking.battery_model,
+          },
+          caches
+        );
+
+        return {
+          ...booking,
+          pricing_preview,
+        };
+      })
+    );
+
     const total = await prisma.booking.count({ where: whereClause });
 
     res.status(200).json({
       success: true,
       message: "User bookings retrieved successfully",
       data: {
-        bookings,
+        bookings: bookingsWithPricing,
         pagination: {
           page: parseInt(page as string),
           limit: parseInt(limit as string),
@@ -315,6 +600,11 @@ export const createBooking = asyncHandler(
       },
     });
 
+    const pricing_preview = await calculateBookingPricingPreview({
+      userId,
+      batteryModel: battery_model,
+    });
+
     // Send notification to user
     try {
       // Get user info for notification
@@ -345,7 +635,10 @@ export const createBooking = asyncHandler(
     res.status(201).json({
       success: true,
       message: "Booking created successfully",
-      data: booking,
+      data: {
+        booking,
+        pricing_preview,
+      },
     });
   }
 );
@@ -414,10 +707,18 @@ export const getBookingDetails = asyncHandler(
       throw new CustomError("Booking not found", 404);
     }
 
+    const pricing_preview = await calculateBookingPricingPreview({
+      userId,
+      batteryModel: booking.battery_model,
+    });
+
     res.status(200).json({
       success: true,
       message: "Booking details retrieved successfully",
-      data: booking,
+      data: {
+        ...booking,
+        pricing_preview,
+      },
     });
   }
 );
@@ -660,6 +961,11 @@ export const createInstantBooking = asyncHandler(
       },
     });
 
+    const pricing_preview = await calculateBookingPricingPreview({
+      userId,
+      batteryModel: battery_model,
+    });
+
     // ✅ Send notification
     try {
       const { notificationService } = await import("../server");
@@ -688,6 +994,7 @@ export const createInstantBooking = asyncHandler(
         ...booking,
         reservation_expires_at: scheduledTime,
         message: "Pin đã được tạm giữ. Vui lòng đến trạm trong vòng 15 phút.",
+        pricing_preview,
       },
     });
   }
