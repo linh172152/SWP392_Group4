@@ -30,7 +30,7 @@ router.use(authorizeRole("ADMIN"));
  *         name: is_active
  *         schema:
  *           type: boolean
- *         description: Filter by active status
+ *         description: Only return active pricing records
  *       - in: query
  *         name: page
  *         schema:
