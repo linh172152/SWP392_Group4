@@ -30,7 +30,7 @@ router.use(authorizeRole("ADMIN"));
  *         name: is_active
  *         schema:
  *           type: boolean
- *         description: Filter by active status
+ *         description: "Filter by active status (default true)"
  *       - in: query
  *         name: page
  *         schema:
