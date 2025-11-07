@@ -38,7 +38,6 @@ model User {
   vehicles            Vehicle[]
   wallet              Wallet?
   notifications       Notification[]
-  staff_schedules     StaffSchedule[]
 
   @@map("users")
 }
@@ -80,7 +79,6 @@ model Station {
   station_ratings        StationRating[]
   transactions           Transaction[]
   staff                  User[]
-  staff_schedules        StaffSchedule[]
 
   @@map("stations")
 }
@@ -105,25 +103,6 @@ model Battery {
   old_transactions Transaction[]        @relation("OldBattery")
 
   @@map("batteries")
-}
-
-model StaffSchedule {
-  schedule_id String          @id @default(uuid()) @db.Uuid
-  staff_id    String          @db.Uuid
-  station_id  String?         @db.Uuid
-  shift_date  DateTime        @db.Date
-  shift_start DateTime
-  shift_end   DateTime
-  status      ScheduleStatus  @default(scheduled)
-  notes       String?
-  created_at  DateTime        @default(now())
-  updated_at  DateTime        @updatedAt
-
-  staff   User     @relation(fields: [staff_id], references: [user_id], onDelete: Cascade)
-  station Station? @relation(fields: [station_id], references: [station_id])
-
-  @@index([staff_id, shift_date])
-  @@map("staff_schedules")
 }
 
 model Booking {
@@ -438,13 +417,6 @@ enum PaymentType {
   PACKAGE_PURCHASE
   PACKAGE_REFUND
   PENALTY
-}
-
-enum ScheduleStatus {
-  scheduled
-  completed
-  absent
-  cancelled
 }
 
 enum SubscriptionStatus {
