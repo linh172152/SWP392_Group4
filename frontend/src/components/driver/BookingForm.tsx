@@ -16,7 +16,8 @@ import {
   Zap, 
   ArrowLeft, 
   MapPin, 
-  Star
+  Star,
+  Package
 } from 'lucide-react';
 import { bookingService } from '../../services/booking.service';
 import { vehicleService } from '../../services/vehicle.service';
@@ -30,6 +31,8 @@ import {
 } from '../../utils/batteryModelUtils';
 import { getBatteryPricing } from '../../services/battery-pricing.service';
 import type { BatteryPricing } from '../../services/battery-pricing.service';
+import API_ENDPOINTS, { fetchWithAuth } from '../../config/api';
+import { matchBatteryModel } from '../../utils/batteryModelUtils';
 
 interface BatteryTypeInfo {
   model: string;
@@ -39,7 +42,6 @@ interface BatteryTypeInfo {
   price: number;
   compatibleVehicles: Vehicle[];
 }
-
 
 const BookingForm: React.FC = () => {
   const { stationId } = useParams<{ stationId: string }>();
@@ -55,6 +57,7 @@ const BookingForm: React.FC = () => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [stationDetails, setStationDetails] = useState<Station | null>(null);
   const [pricingList, setPricingList] = useState<BatteryPricing[]>([]);
+  const [currentSubscription, setCurrentSubscription] = useState<any | null>(null);
   
   // State form
   const [selectedBatteryType, setSelectedBatteryType] = useState<string>('');
@@ -77,7 +80,7 @@ const BookingForm: React.FC = () => {
 
   // Auto-select battery type và vehicle khi có data
   useEffect(() => {
-    if (stationDetails && vehicles.length > 0 && !selectedBatteryType) {
+    if (stationDetails && vehicles.length > 0 && pricingList.length > 0 && !selectedBatteryType) {
       const compatibleBatteries = getCompatibleBatteryTypes();
       if (compatibleBatteries.length > 0) {
         const firstBattery = compatibleBatteries[0];
@@ -93,32 +96,16 @@ const BookingForm: React.FC = () => {
   const loadAllData = async () => {
     if (!stationId) return;
     
-    setLoadingVehicles(true);
-    setLoadingStation(true);
-    setLoadingPricing(true);
-    
     try {
       await Promise.all([
         loadVehicles(),
         loadStationDetails(),
-        loadPricing()
+        loadPricing(),
+        loadSubscription()
       ]);
     } catch (err) {
       console.error('Error loading data:', err);
-    }
-  };
-
-  const loadPricing = async () => {
-    setLoadingPricing(true);
-    try {
-      const response = await getBatteryPricing({ is_active: true, limit: 100 });
-      setPricingList(response.data.pricings);
-    } catch (err: any) {
-      console.error('Error loading pricing:', err);
-      // Không block nếu không load được pricing, sẽ hiển thị "Liên hệ"
-      setPricingList([]);
-    } finally {
-      setLoadingPricing(false);
+      setError('Không thể tải dữ liệu. Vui lòng thử lại.');
     }
   };
 
@@ -150,6 +137,109 @@ const BookingForm: React.FC = () => {
     }
   };
 
+  const loadPricing = async () => {
+    setLoadingPricing(true);
+    try {
+      const response = await getBatteryPricing({ is_active: true, limit: 100 });
+      setPricingList(response.data.pricings);
+    } catch (err: any) {
+      console.error('Error loading pricing:', err);
+      // Không block nếu không load được pricing, sẽ dùng giá mặc định
+    } finally {
+      setLoadingPricing(false);
+    }
+  };
+
+  // Load subscription để hiển thị preview giá cuối cùng
+  const loadSubscription = async () => {
+    try {
+      const url = new URL(API_ENDPOINTS.SUBSCRIPTIONS.BASE);
+      url.searchParams.set('status', 'active');
+      const subRes = await fetchWithAuth(url.toString());
+      
+      if (!subRes.ok) {
+        setCurrentSubscription(null);
+        return;
+      }
+      
+      const subData = await subRes.json();
+      if (subData.success && subData.data) {
+        const subscriptions = Array.isArray(subData.data) ? subData.data : (subData.data.subscriptions || []);
+        const activeSub = subscriptions.find((sub: any) => {
+          if (!sub || !sub.end_date) return false;
+          const now = new Date();
+          const endDate = new Date(sub.end_date);
+          return sub.status === 'active' && 
+                 endDate >= now && 
+                 (sub.remaining_swaps === null || (sub.remaining_swaps ?? 0) > 0);
+        });
+        if (activeSub) {
+          setCurrentSubscription(activeSub);
+        } else {
+          setCurrentSubscription(null);
+        }
+      } else {
+        setCurrentSubscription(null);
+      }
+    } catch (e) {
+      console.error('Error loading subscription:', e);
+      setCurrentSubscription(null);
+    }
+  };
+
+  // Kiểm tra subscription có tương thích với battery model không
+  const doesSubscriptionCoverModel = (subscription: any, batteryModel: string): boolean => {
+    if (!subscription || !subscription.package) {
+      console.log('❌ [SUBSCRIPTION CHECK] No subscription or package');
+      return false;
+    }
+    const pkg = subscription.package;
+    
+    console.log('🔍 [SUBSCRIPTION CHECK]', {
+      batteryModel,
+      packageName: pkg.name,
+      battery_models: pkg.battery_models,
+      battery_capacity_kwh: pkg.battery_capacity_kwh,
+      hasBatteryModels: !!pkg.battery_models && pkg.battery_models.length > 0
+    });
+    
+    // Nếu package không có battery_models hoặc battery_models rỗng → áp dụng cho tất cả
+    if (!pkg.battery_models || pkg.battery_models.length === 0) {
+      console.log('✅ [SUBSCRIPTION CHECK] No battery_models restriction → applies to all');
+      return true;
+    }
+    
+    // Check battery_capacity_kwh nếu có
+    if (pkg.battery_capacity_kwh) {
+      // Tìm battery info từ stationDetails hoặc từ compatibleBatteryTypes
+      let batteryCapacity: number | null = null;
+      if (stationDetails?.batteries) {
+        const battery = stationDetails.batteries.find(b => b.model === batteryModel);
+        batteryCapacity = battery?.capacity_kwh ? Number(battery.capacity_kwh) : null;
+      }
+      
+      if (batteryCapacity !== null) {
+        const packageCapacity = Number(pkg.battery_capacity_kwh);
+        if (batteryCapacity !== packageCapacity) {
+          console.log('❌ [SUBSCRIPTION CHECK] Capacity mismatch:', {
+            batteryCapacity,
+            packageCapacity
+          });
+          return false;
+        }
+      }
+    }
+    
+    // Check battery_models
+    const matches = pkg.battery_models.some((model: string) => {
+      const result = matchBatteryModel(model, batteryModel);
+      console.log(`🔍 [SUBSCRIPTION CHECK] Comparing "${model}" with "${batteryModel}":`, result);
+      return result;
+    });
+    
+    console.log(matches ? '✅ [SUBSCRIPTION CHECK] Model matches' : '❌ [SUBSCRIPTION CHECK] Model does not match');
+    return matches;
+  };
 
   // Lấy thông tin các loại pin tương thích
   const getCompatibleBatteryTypes = (): BatteryTypeInfo[] => {
@@ -189,8 +279,35 @@ const BookingForm: React.FC = () => {
   const selectedBatteryInfo = compatibleBatteryTypes.find(b => b.model === selectedBatteryType);
   const compatibleVehiclesForSelected = selectedBatteryInfo?.compatibleVehicles || [];
 
-  // Tính giá (nếu có pricing)
+  // Tính giá
   const batteryPrice = selectedBatteryInfo?.price || 0;
+  
+  // Kiểm tra subscription có áp dụng không
+  const subscriptionApplies = currentSubscription && 
+                              selectedBatteryType &&
+                              doesSubscriptionCoverModel(currentSubscription, selectedBatteryType) &&
+                              (currentSubscription.remaining_swaps === null || (currentSubscription.remaining_swaps ?? 0) > 0);
+  
+  // Tổng cộng dự kiến: Nếu có subscription áp dụng → Miễn phí, không thì = giá pin
+  const totalPrice = subscriptionApplies ? 0 : batteryPrice;
+  
+  // Debug log để kiểm tra
+  if (selectedBatteryType && currentSubscription) {
+    console.log('💰 [PRICING]', {
+      batteryModel: selectedBatteryType,
+      batteryPrice,
+      hasSubscription: !!currentSubscription,
+      subscriptionName: currentSubscription.package?.name,
+      remaining_swaps: currentSubscription.remaining_swaps,
+      subscriptionApplies,
+      totalPrice,
+      reason: !currentSubscription ? 'No subscription' :
+              !selectedBatteryType ? 'No battery selected' :
+              !doesSubscriptionCoverModel(currentSubscription, selectedBatteryType) ? 'Model not covered' :
+              (currentSubscription.remaining_swaps !== null && currentSubscription.remaining_swaps <= 0) ? 'No swaps left' :
+              'Should apply'
+    });
+  }
 
   // Xử lý chọn battery type
   const handleBatteryTypeSelect = (model: string) => {
@@ -217,8 +334,9 @@ const BookingForm: React.FC = () => {
       time: null,
     });
     
-    // Tính toán các time slots: 1 giờ, 2 giờ, 3 giờ (đã xóa 30 phút vì minimum là 30 phút)
+    // Tính toán các time slots: 30 phút, 1 giờ, 2 giờ, 3 giờ
     const timeSlotsConfig = [
+      { minutes: 30, label: '30 phút nữa' },
       { minutes: 60, label: '1 giờ nữa' },
       { minutes: 120, label: '2 giờ nữa' },
       { minutes: 180, label: '3 giờ nữa' },
@@ -296,7 +414,7 @@ const BookingForm: React.FC = () => {
           ...bookingData,
           scheduled_at: scheduledDate.toISOString(),
         });
-        setSuccess('Đã đặt lịch hẹn thành công! Bạn sẽ thanh toán khi hoàn tất đổi pin tại trạm.');
+        setSuccess('Đã đặt lịch hẹn thành công!');
       } else if (customTime) {
         // Đặt lịch hẹn với custom time
         const scheduledDate = new Date(customTime);
@@ -307,7 +425,7 @@ const BookingForm: React.FC = () => {
           ...bookingData,
           scheduled_at: scheduledDate.toISOString(),
         });
-        setSuccess('Đã đặt lịch hẹn thành công! Bạn sẽ thanh toán khi hoàn tất đổi pin tại trạm.');
+        setSuccess('Đã đặt lịch hẹn thành công!');
       } else {
         throw new Error('Vui lòng chọn thời gian');
       }
@@ -416,11 +534,10 @@ const BookingForm: React.FC = () => {
                       const range = batteryType.capacity ? Math.round(batteryType.capacity * 6.25) : null;
                       
                       return (
-                        <button
+                        <div
                           key={batteryType.model}
-                          type="button"
                           onClick={() => handleBatteryTypeSelect(batteryType.model)}
-                          className={`w-full p-5 rounded-xl border-2 transition-all text-left ${
+                          className={`w-full p-5 rounded-xl border-2 transition-all text-left cursor-pointer ${
                             isSelected
                               ? 'border-green-500 bg-green-50/50 dark:bg-green-900/10'
                               : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
@@ -551,7 +668,7 @@ const BookingForm: React.FC = () => {
                               </div>
                             </div>
                           )}
-                        </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -658,19 +775,68 @@ const BookingForm: React.FC = () => {
                     </div>
 
                     <div className="space-y-3">
-                      {batteryPrice > 0 && (
-                        <div className="flex justify-between text-base">
-                          <span className="text-slate-600 dark:text-slate-400">Giá thay pin</span>
-                          <span className="font-medium text-slate-900 dark:text-white">
-                            {batteryPrice.toLocaleString('vi-VN')}₫
-                          </span>
+                      <div className="flex justify-between text-base">
+                        <span className="text-slate-600 dark:text-slate-400">Giá thay pin</span>
+                        <span className="font-medium text-slate-900 dark:text-white">
+                          {batteryPrice > 0
+                            ? `${batteryPrice.toLocaleString('vi-VN')}₫`
+                            : 'Liên hệ'}
+                        </span>
+                      </div>
+                      
+                      {/* Gói dịch vụ - LUÔN hiển thị (có hoặc không có) */}
+                      <div className="flex justify-between text-base">
+                        <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1">
+                          <Package className="h-3 w-3" />
+                          Gói dịch vụ:
+                        </span>
+                        <span className="font-medium text-slate-900 dark:text-white text-sm">
+                          {currentSubscription 
+                            ? (
+                              <>
+                                {currentSubscription.package?.name || 'Gói dịch vụ'}
+                                {currentSubscription.remaining_swaps !== null && (
+                                  <span className="text-slate-500"> • Còn {currentSubscription.remaining_swaps} lần</span>
+                                )}
+                              </>
+                            )
+                            : 'Không có'
+                          }
+                        </span>
+                      </div>
+                      
+                      {subscriptionApplies && (
+                        <div className="bg-green-50 dark:bg-green-900/20 p-2 rounded-lg border border-green-200 dark:border-green-800">
+                          <div className="text-xs text-green-700 dark:text-green-300">
+                            ✓ Gói "{currentSubscription.package?.name || 'Gói dịch vụ'}" sẽ áp dụng cho loại pin này
+                          </div>
                         </div>
                       )}
-                      <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700">
-                        <p className="text-sm text-blue-700 dark:text-blue-300">
-                          <strong>Lưu ý:</strong> Bạn sẽ thanh toán khi hoàn tất đổi pin tại trạm. 
-                          {batteryPrice === 0 && ' Vui lòng liên hệ trạm để biết giá chi tiết.'}
-                          {batteryPrice > 0 && ' Nếu bạn có gói dịch vụ, sẽ được miễn phí.'}
+                      
+                      <div className="border-t border-slate-200 dark:border-slate-700 pt-3 mt-3">
+                        <div className="flex justify-between">
+                          <span className="font-semibold text-slate-900 dark:text-white text-lg">
+                            Tổng cộng (dự kiến)
+                          </span>
+                          <span className={`font-bold ${
+                            totalPrice === 0 && subscriptionApplies ? 'text-green-600 dark:text-green-400' : 'text-green-600'
+                          } ${totalPrice > 0 ? 'text-2xl' : 'text-lg'}`}>
+                            {(() => {
+                              // Nếu chưa chọn pin hoặc không có giá → "Liên hệ"
+                              if (!selectedBatteryType || batteryPrice === 0) {
+                                return 'Liên hệ';
+                              }
+                              // Nếu có subscription áp dụng → "Miễn phí"
+                              if (subscriptionApplies && totalPrice === 0) {
+                                return 'Miễn phí';
+                              }
+                              // Nếu không có subscription → hiển thị giá
+                              return `${totalPrice.toLocaleString('vi-VN')}₫`;
+                            })()}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                          * Giá cuối cùng sẽ được xác nhận trong lịch sử đặt chỗ sau khi đặt thành công.
                         </p>
                       </div>
                     </div>

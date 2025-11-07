@@ -9,12 +9,12 @@ import {
   ArrowDownLeft,
   RefreshCw,
   History,
-  Loader2,
-  ExternalLink
+  Loader2
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import walletService, { WalletTransaction } from '../../services/wallet.service';
-import { getTopUpPackages, TopUpPackage } from '../../services/topup-package.service';
+import walletService from '../../services/wallet.service';
+import type { WalletTransaction } from '../../services/wallet.service';
+import { getTopUpPackages } from '../../services/topup-package.service';
+import type { TopUpPackage } from '../../services/topup-package.service';
 import TopUpModal from './TopUpModal';
 import { formatCurrency } from '../../utils/format';
 
@@ -82,9 +82,6 @@ const Wallet: React.FC = () => {
     if (transaction.topup_package_id) {
       return 'topup';
     }
-    if (transaction.subscription_id || transaction.payment_type === 'SUBSCRIPTION') {
-      return 'subscription';
-    }
     if (transaction.transaction_id) {
       return 'payment';
     }
@@ -103,10 +100,6 @@ const Wallet: React.FC = () => {
     const type = getTransactionType(transaction);
     if (type === 'topup') {
       return `Nạp tiền: ${transaction.topup_package?.name || 'Nạp tiền'}`;
-    }
-    if (type === 'subscription') {
-      const packageName = transaction.subscription?.package?.name || 'Gói dịch vụ';
-      return `Mua gói dịch vụ: ${packageName}`;
     }
     if (transaction.transaction?.booking) {
       return `Thanh toán: ${transaction.transaction.booking.station?.name || 'Đổi pin'}`;
@@ -174,21 +167,11 @@ const Wallet: React.FC = () => {
       {/* Transactions */}
       <Card className="glass-card border-0 shadow-xl">
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <History className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                Lịch sử giao dịch
-              </CardTitle>
-              <CardDescription>Danh sách các giao dịch gần đây</CardDescription>
-            </div>
-            <Link to="/driver/transactions">
-              <Button variant="outline" size="sm" className="gap-2">
-                Xem tất cả
-                <ExternalLink className="h-4 w-4" />
-              </Button>
-            </Link>
-          </div>
+          <CardTitle className="flex items-center gap-2">
+            <History className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            Lịch sử giao dịch
+          </CardTitle>
+          <CardDescription>Danh sách các giao dịch gần đây</CardDescription>
         </CardHeader>
         <CardContent>
           {transactionsLoading ? (

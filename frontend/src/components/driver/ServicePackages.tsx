@@ -11,14 +11,34 @@ import {
   Battery,
   Zap
 } from 'lucide-react';
-import { getPublicPackages, ServicePackage } from '../../services/package.service';
-import { 
-  getMySubscriptions, 
-  subscribeToPackage, 
-  cancelSubscription,
-  UserSubscription 
-} from '../../services/subscription.service';
+import API_ENDPOINTS, { fetchWithAuth } from '../../config/api';
 import { formatCurrency } from '../../utils/format';
+
+interface ServicePackage {
+  package_id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  swap_limit: number | null;
+  duration_days: number;
+  battery_capacity_kwh: number;  // Thêm field này từ BE
+  battery_models?: string[];     // Optional vì BE đã không bắt buộc
+  is_active: boolean;
+}
+
+interface UserSubscription {
+  subscription_id: string;
+  package_id: string;
+  start_date: string;
+  end_date: string;
+  remaining_swaps: number | null;
+  status: 'active' | 'expired' | 'cancelled';
+  package: {
+    name: string;
+    swap_limit: number | null;
+    duration_days: number;
+  };
+}
 
 const ServicePackages: React.FC = () => {
   const navigate = useNavigate();
@@ -33,10 +53,12 @@ const ServicePackages: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const response = await getPublicPackages();
-      setPackages(response.data || []);
+      const res = await fetchWithAuth(`${API_ENDPOINTS.PACKAGES.BASE}?is_active=true`);
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Tải gói dịch vụ thất bại');
+      setPackages(data.data.packages || data.data || []);
     } catch (e: any) {
-      setError(e.message || 'Có lỗi xảy ra khi tải gói dịch vụ');
+      setError(e.message || 'Có lỗi xảy ra');
     } finally {
       setLoading(false);
     }
@@ -46,18 +68,24 @@ const ServicePackages: React.FC = () => {
   const loadCurrentSubscription = async () => {
     setLoadingSub(true);
     try {
-      const response = await getMySubscriptions();
-      const subscriptions = response.data || [];
-      // Lấy subscription active đầu tiên (theo BE chỉ có 1 active)
-      const activeSub = subscriptions.find((sub: UserSubscription) => {
-        const now = new Date();
-        const endDate = new Date(sub.end_date);
-        // Check thủ công vì BE có thể chưa tự động update status = "expired"
-        const isStillValid = endDate >= now && 
-                            (sub.remaining_swaps === null || sub.remaining_swaps > 0);
-        return sub.status === 'active' && isStillValid;
-      });
-      setCurrentSubscription(activeSub || null);
+      const url = new URL(API_ENDPOINTS.SUBSCRIPTIONS.BASE);
+      url.searchParams.set('status', 'active');
+      const res = await fetchWithAuth(url.toString());
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const subscriptions = data.data.subscriptions || data.data || [];
+        // Lấy subscription active đầu tiên (theo BE chỉ có 1 active)
+        const activeSub = subscriptions.find((sub: UserSubscription) => {
+          const now = new Date();
+          const endDate = new Date(sub.end_date);
+          // TODO: BE chưa tự động update status = "expired", nên FE phải check thủ công
+          // Khi BE có logic tự động update expired, có thể bỏ phần check này
+          const isStillValid = endDate >= now && 
+                              (sub.remaining_swaps === null || sub.remaining_swaps > 0);
+          return sub.status === 'active' && isStillValid;
+        });
+        setCurrentSubscription(activeSub || null);
+      }
     } catch (e: any) {
       console.error('Load subscription error:', e);
     } finally {
@@ -80,37 +108,80 @@ const ServicePackages: React.FC = () => {
   };
 
   // Mua gói dịch vụ
-  const handlePurchasePackage = async (packageId: string) => {
+  const purchasePackage = async (packageId: string, autoRenew: boolean = false) => {
     setLoading(true);
     setError('');
     try {
-      await subscribeToPackage(packageId, false);
+      // BE endpoint: POST /api/driver/subscriptions/packages/:packageId/subscribe
+      const res = await fetchWithAuth(API_ENDPOINTS.SUBSCRIPTIONS.SUBSCRIBE(packageId), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          autoRenew: autoRenew
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        // Xử lý error "Insufficient wallet balance" → Redirect đến wallet
+        if (data.message && (
+          data.message.toLowerCase().includes('insufficient') ||
+          data.message.toLowerCase().includes('không đủ') ||
+          data.message.toLowerCase().includes('số dư')
+        )) {
+          setError('Số dư ví không đủ. Vui lòng nạp thêm tiền vào ví.');
+          // Tự động redirect đến wallet sau 2 giây
+          setTimeout(() => {
+            navigate('/driver/wallet');
+          }, 2000);
+          return;
+        }
+        throw new Error(data.message || 'Mua gói dịch vụ thất bại');
+      }
       // Reload để cập nhật subscription
       await loadCurrentSubscription();
       await loadPackages();
       setError('');
-      // Hiển thị thông báo thành công
+      // Hiển thị thông báo thành công (có thể dùng toast notification)
       alert('Đăng ký gói dịch vụ thành công!');
     } catch (e: any) {
-      setError(e.message || 'Có lỗi xảy ra khi đăng ký gói dịch vụ');
+      // Xử lý error "Insufficient wallet balance" từ catch block
+      const errorMsg = e.message || 'Có lỗi xảy ra';
+      if (errorMsg.toLowerCase().includes('insufficient') ||
+          errorMsg.toLowerCase().includes('không đủ') ||
+          errorMsg.toLowerCase().includes('số dư')) {
+        setError('Số dư ví không đủ. Vui lòng nạp thêm tiền vào ví.');
+        setTimeout(() => {
+          navigate('/driver/wallet');
+        }, 2000);
+      } else {
+        setError(errorMsg);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   // Hủy subscription
-  const handleCancelSubscription = async (subscriptionId: string) => {
+  const cancelSubscription = async (subscriptionId: string) => {
     if (!confirm('Bạn có chắc muốn hủy gói dịch vụ này? Bạn sẽ mất quyền lợi miễn phí đổi pin.')) {
       return;
     }
     setLoading(true);
     setError('');
     try {
-      await cancelSubscription(subscriptionId);
+      // BE endpoint: POST /api/driver/subscriptions/:subscriptionId/cancel
+      const res = await fetchWithAuth(API_ENDPOINTS.SUBSCRIPTIONS.CANCEL(subscriptionId), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Hủy gói dịch vụ thất bại');
+      }
       await loadCurrentSubscription();
       alert('Đã hủy gói dịch vụ thành công!');
     } catch (e: any) {
-      setError(e.message || 'Có lỗi xảy ra khi hủy gói dịch vụ');
+      setError(e.message || 'Có lỗi xảy ra');
     } finally {
       setLoading(false);
     }
@@ -192,7 +263,7 @@ const ServicePackages: React.FC = () => {
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={() => handleCancelSubscription(currentSubscription.subscription_id)}
+                onClick={() => cancelSubscription(currentSubscription.subscription_id)}
                 disabled={loading}
                 className="border-red-500 text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
               >
@@ -245,6 +316,7 @@ const ServicePackages: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {packages.map((pkg) => {
               const isUnlimited = pkg.swap_limit === null;
+              // Dùng formatCurrency thay vì toLocaleString
               const priceFormatted = pkg.price === 0 ? 'Miễn phí' : formatCurrency(Number(pkg.price));
               const hasActiveSubscription = currentSubscription && isValid;
               
@@ -292,7 +364,7 @@ const ServicePackages: React.FC = () => {
                       <div className="flex items-center gap-2 text-sm">
                         <CheckCircle className="h-4 w-4 text-purple-600" />
                         <span className="text-slate-700 dark:text-slate-300">
-                          Dung lượng: {pkg.battery_capacity_kwh} kWh
+                          Dung lượng pin: {pkg.battery_capacity_kwh} kWh
                         </span>
                       </div>
                     </div>
@@ -307,7 +379,7 @@ const ServicePackages: React.FC = () => {
                     ) : (
                       <Button 
                         className="w-full gradient-primary text-white shadow-lg hover:shadow-xl transition-all duration-300"
-                        onClick={() => handlePurchasePackage(pkg.package_id)}
+                        onClick={() => purchasePackage(pkg.package_id, false)}
                         disabled={loading}
                       >
                         {loading ? 'Đang xử lý...' : 'Đăng ký ngay'}

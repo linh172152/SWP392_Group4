@@ -38,6 +38,7 @@ model User {
   vehicles            Vehicle[]
   wallet              Wallet?
   notifications       Notification[]
+  staff_schedules     StaffSchedule[]
 
   @@map("users")
 }
@@ -79,6 +80,7 @@ model Station {
   station_ratings        StationRating[]
   transactions           Transaction[]
   staff                  User[]
+  staff_schedules        StaffSchedule[]
 
   @@map("stations")
 }
@@ -103,6 +105,25 @@ model Battery {
   old_transactions Transaction[]        @relation("OldBattery")
 
   @@map("batteries")
+}
+
+model StaffSchedule {
+  schedule_id String          @id @default(uuid()) @db.Uuid
+  staff_id    String          @db.Uuid
+  station_id  String?         @db.Uuid
+  shift_date  DateTime        @db.Date
+  shift_start DateTime
+  shift_end   DateTime
+  status      ScheduleStatus  @default(scheduled)
+  notes       String?
+  created_at  DateTime        @default(now())
+  updated_at  DateTime        @updatedAt
+
+  staff   User     @relation(fields: [staff_id], references: [user_id], onDelete: Cascade)
+  station Station? @relation(fields: [station_id], references: [station_id])
+
+  @@index([staff_id, shift_date])
+  @@map("staff_schedules")
 }
 
 model Booking {
@@ -184,42 +205,42 @@ model Payment {
 }
 
 model ServicePackage {
-  package_id     String             @id @default(uuid()) @db.Uuid
-  name           String             @db.VarChar(100)
-  description    String?
-  price          Decimal            @db.Decimal(10, 2)
+  package_id           String             @id @default(uuid()) @db.Uuid
+  name                 String             @db.VarChar(100)
+  description          String?
+  price                Decimal            @db.Decimal(10, 2)
   battery_capacity_kwh Int
-  swap_limit     Int?
-  duration_days  Int
-  battery_models Json?
-  benefits       Json?
-  billing_cycle  PackageBillingCycle @default(monthly)
-  metadata       Json?
-  is_active      Boolean            @default(true)
-  created_at     DateTime           @default(now())
-  updated_at     DateTime           @updatedAt
-  subscriptions  UserSubscription[]
+  swap_limit           Int?
+  duration_days        Int
+  battery_models       Json?
+  benefits             Json?
+  billing_cycle        PackageBillingCycle @default(monthly)
+  metadata             Json?
+  is_active            Boolean            @default(true)
+  created_at           DateTime           @default(now())
+  updated_at           DateTime           @updatedAt
+  subscriptions        UserSubscription[]
 
   @@map("service_packages")
 }
 
 model UserSubscription {
-  subscription_id String             @id @default(uuid()) @db.Uuid
-  user_id         String             @db.Uuid
-  package_id      String             @db.Uuid
-  start_date      DateTime
-  end_date        DateTime
-  remaining_swaps Int?
-  status          SubscriptionStatus @default(active)
-  auto_renew      Boolean            @default(false)
-  cancelled_at    DateTime?
+  subscription_id     String             @id @default(uuid()) @db.Uuid
+  user_id             String             @db.Uuid
+  package_id          String             @db.Uuid
+  start_date          DateTime
+  end_date            DateTime
+  remaining_swaps     Int?
+  status              SubscriptionStatus @default(active)
+  auto_renew          Boolean            @default(false)
+  cancelled_at        DateTime?
   cancellation_reason String?
-  metadata        Json?
-  created_at      DateTime           @default(now())
-  updated_at      DateTime           @updatedAt
-  payments        Payment[]
-  package         ServicePackage     @relation(fields: [package_id], references: [package_id])
-  user            User               @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  metadata            Json?
+  created_at          DateTime           @default(now())
+  updated_at          DateTime           @updatedAt
+  payments            Payment[]
+  package             ServicePackage     @relation(fields: [package_id], references: [package_id])
+  user                User               @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
   @@map("user_subscriptions")
 }
@@ -290,14 +311,6 @@ model BatteryTransferLog {
 
   @@map("battery_transfer_logs")
 }
-
-enum TransferStatus {
-  pending
-  in_transit
-  completed
-  cancelled
-}
-
 
 model Wallet {
   wallet_id  String   @id @default(uuid()) @db.Uuid
@@ -401,6 +414,13 @@ enum PaymentStatus {
   failed
 }
 
+enum TransferStatus {
+  pending
+  in_transit
+  completed
+  cancelled
+}
+
 enum PaymentMethod {
   cash
   wallet
@@ -418,6 +438,13 @@ enum PaymentType {
   PACKAGE_PURCHASE
   PACKAGE_REFUND
   PENALTY
+}
+
+enum ScheduleStatus {
+  scheduled
+  completed
+  absent
+  cancelled
 }
 
 enum SubscriptionStatus {

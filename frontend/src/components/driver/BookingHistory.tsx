@@ -1,5 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -22,6 +21,30 @@ import {
   Zap
 } from 'lucide-react';
 import API_ENDPOINTS, { fetchWithAuth } from '../../config/api';
+import { BatterySpinner, BatteryLoading } from '../ui/battery-loading';
+import { ErrorDisplay } from '../ui/error-display';
+import { Skeleton } from '../ui/skeleton';
+
+interface PricingPreview {
+  currency: string;
+  base_price: number | null;
+  estimated_price: number | null;
+  pricing_source: 'subscription' | 'wallet' | 'unavailable';
+  has_active_subscription: boolean;
+  is_covered_by_subscription: boolean;
+  subscription?: {
+    subscription_id: string;
+    package_id: string;
+    package_name: string;
+    package_duration_days: number;
+    package_battery_capacity_kwh: number;
+    package_swap_limit: number | null;
+    remaining_swaps: number | null;
+    ends_at: string;
+    auto_renew: boolean;
+  };
+  message: string;
+}
 
 interface BookingItem {
   booking_id: string;
@@ -34,11 +57,10 @@ interface BookingItem {
     amount?: number; 
     payment_status?: string;
   };
+  pricing_preview?: PricingPreview;
 }
 
 const BookingHistory: React.FC = () => {
-  const location = useLocation();
-  const highlightBookingIdRef = useRef<string | null>(null);
   const [bookings, setBookings] = useState<BookingItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | BookingItem['status']>('all');
@@ -65,8 +87,8 @@ const BookingHistory: React.FC = () => {
     switch (status) {
       case 'completed': return 'bg-green-50/80 dark:bg-green-500/10 text-green-800 dark:text-green-400 border-green-200/50 dark:border-green-500/20';
       case 'cancelled': return 'bg-red-50/80 dark:bg-red-500/10 text-red-800 dark:text-red-400 border-red-200/50 dark:border-red-500/20';
-      case 'pending':
-      case 'confirmed':
+      case 'pending': return 'bg-amber-50/80 dark:bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-200/50 dark:border-amber-500/20';
+      case 'confirmed': return 'bg-blue-50/80 dark:bg-blue-500/10 text-blue-800 dark:text-blue-400 border-blue-200/50 dark:border-blue-500/20';
       case 'in_progress': return 'bg-blue-50/80 dark:bg-blue-500/10 text-blue-800 dark:text-blue-400 border-blue-200/50 dark:border-blue-500/20';
       default: return 'bg-slate-50/80 dark:bg-slate-500/10 text-slate-800 dark:text-slate-400 border-slate-200/50 dark:border-slate-500/20';
     }
@@ -74,10 +96,10 @@ const BookingHistory: React.FC = () => {
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'completed': return 'Hoàn thành';
+      case 'completed': return 'Hoàn tất';
       case 'cancelled': return 'Đã hủy';
       case 'pending': return 'Chờ xác nhận';
-      case 'confirmed': return 'Đã xác nhận';
+      case 'confirmed': return 'Đã xác nhận - Vui lòng đến trạm';
       case 'in_progress': return 'Đang thực hiện';
       default: return status;
     }
@@ -136,50 +158,108 @@ const BookingHistory: React.FC = () => {
 
   // Kiểm tra booking có sử dụng gói dịch vụ không
   const isUsingSubscription = (booking: BookingItem): boolean => {
-    // Chỉ check khi booking đã completed
-    // BE tự động set amount = 0 nếu có subscription hợp lệ
+    // Ưu tiên dùng pricing_preview từ BE (chính xác hơn)
+    if (booking.pricing_preview) {
+      return booking.pricing_preview.is_covered_by_subscription && 
+             booking.pricing_preview.pricing_source === 'subscription';
+    }
+    
+    // Fallback: Case 1: Booking đã completed và có transaction với amount = 0 và payment_status = completed
     if (booking.status === 'completed' && 
         booking.transaction?.amount === 0 && 
         booking.transaction?.payment_status === 'completed') {
       return true;
     }
+    // Case 2: Booking chưa completed nhưng user có subscription active tại thời điểm đặt
+    if ((booking.status === 'confirmed' || booking.status === 'in_progress') && activeSubscription) {
+      const bookingDate = new Date(booking.scheduled_at);
+      const subStart = new Date(activeSubscription.start_date);
+      const subEnd = new Date(activeSubscription.end_date);
+      // Booking nằm trong thời gian subscription
+      if (bookingDate >= subStart && bookingDate <= subEnd) {
+        return true;
+      }
+    }
     return false;
   };
 
-  // Lấy payment status text để hiển thị
-  const getPaymentStatusText = (booking: BookingItem): { text: string; color: string } => {
-    if (booking.status === 'completed') {
-      // Đã complete → Đã thanh toán
-      if (isUsingSubscription(booking)) {
-        return { text: 'Miễn phí (gói dịch vụ)', color: 'text-green-600 dark:text-green-400' };
+  // Lấy giá hiển thị từ pricing_preview hoặc transaction
+  const getDisplayPrice = (booking: BookingItem): { price: number | null; isFree: boolean; message?: string } => {
+    // Ưu tiên dùng pricing_preview từ BE
+    if (booking.pricing_preview) {
+      const preview = booking.pricing_preview;
+      if (preview.is_covered_by_subscription && preview.pricing_source === 'subscription') {
+        return { price: 0, isFree: true, message: preview.message };
       }
-      if (booking.transaction?.amount) {
-        return { 
-          text: `Đã thanh toán ${Number(booking.transaction.amount).toLocaleString('vi-VN')} đ`, 
-          color: 'text-slate-900 dark:text-white' 
-        };
-      }
-      return { text: 'Đã thanh toán', color: 'text-slate-900 dark:text-white' };
+      return { 
+        price: preview.estimated_price, 
+        isFree: false, 
+        message: preview.message 
+      };
     }
-    if (booking.status === 'cancelled') {
-      return { text: 'Đã hủy', color: 'text-red-600 dark:text-red-400' };
+    
+    // Fallback: Dùng transaction amount
+    if (booking.status === 'completed' && booking.transaction?.amount !== undefined) {
+      return { 
+        price: booking.transaction.amount, 
+        isFree: booking.transaction.amount === 0 
+      };
     }
-    // pending, confirmed → Chưa thanh toán
-    return { text: 'Chưa thanh toán', color: 'text-slate-600 dark:text-slate-400' };
+    
+    // Chưa có giá (chưa complete)
+    return { price: null, isFree: false };
   };
 
-  const cancelBooking = async (id: string, scheduledAt: string) => {
-    // Check thời gian: Nếu < 15 phút trước giờ hẹn → Không cho hủy
-    const scheduledTime = new Date(scheduledAt);
+  // Kiểm tra xem có thể hủy booking không (dựa trên thời gian)
+  const canCancelBooking = (booking: BookingItem): { canCancel: boolean; reason?: string; minutesUntilScheduled?: number } => {
+    // Chỉ cho hủy booking pending hoặc confirmed
+    if (booking.status !== 'pending' && booking.status !== 'confirmed') {
+      return { canCancel: false, reason: 'Chỉ có thể hủy đặt chỗ đang chờ xác nhận hoặc đã xác nhận' };
+    }
+
+    // Tính thời gian còn lại đến giờ hẹn
+    const scheduledTime = new Date(booking.scheduled_at);
     const now = new Date();
     const minutesUntilScheduled = (scheduledTime.getTime() - now.getTime()) / (1000 * 60);
-    
-    if (minutesUntilScheduled < 15 && minutesUntilScheduled > 0) {
-      setError('Không thể hủy đặt chỗ trong vòng 15 phút trước giờ hẹn. Vui lòng liên hệ nhân viên trạm.');
+
+    // Nếu đã qua giờ hẹn → Không thể hủy (đã quá hạn)
+    if (minutesUntilScheduled < 0) {
+      return { canCancel: false, reason: 'Không thể hủy đặt chỗ đã quá giờ hẹn' };
+    }
+
+    // Nếu < 15 phút trước giờ hẹn → Không cho hủy
+    if (minutesUntilScheduled < 15) {
+      return { 
+        canCancel: false, 
+        reason: 'Không thể hủy đặt chỗ trong vòng 15 phút trước giờ hẹn. Vui lòng liên hệ nhân viên nếu cần hỗ trợ.',
+        minutesUntilScheduled 
+      };
+    }
+
+    return { canCancel: true, minutesUntilScheduled };
+  };
+
+  const cancelBooking = async (id: string) => {
+    // Tìm booking để check thời gian
+    const booking = bookings.find(b => b.booking_id === id);
+    if (!booking) {
+      setError('Không tìm thấy đặt chỗ');
       return;
     }
 
-    if (!confirm('Bạn có chắc muốn hủy đặt chỗ này?')) {
+    // Check xem có thể hủy không
+    const cancelCheck = canCancelBooking(booking);
+    if (!cancelCheck.canCancel) {
+      setError(cancelCheck.reason || 'Không thể hủy đặt chỗ này');
+      return;
+    }
+
+    // Xác nhận trước khi hủy
+    const confirmMessage = cancelCheck.minutesUntilScheduled && cancelCheck.minutesUntilScheduled < 30
+      ? `Bạn có chắc muốn hủy đặt chỗ này? Còn ${Math.round(cancelCheck.minutesUntilScheduled)} phút nữa đến giờ hẹn.`
+      : 'Bạn có chắc muốn hủy đặt chỗ này?';
+    
+    if (!window.confirm(confirmMessage)) {
       return;
     }
 
@@ -188,58 +268,32 @@ const BookingHistory: React.FC = () => {
     try {
       const res = await fetchWithAuth(`${API_ENDPOINTS.DRIVER.BOOKINGS}/${id}/cancel`, { method: 'PUT' });
       const data = await res.json();
+      
       if (!res.ok || !data.success) {
-        // Xử lý error từ BE
-        if (data.message?.includes('Cannot cancel booking within 15 minutes')) {
-          throw new Error('Không thể hủy đặt chỗ trong vòng 15 phút trước giờ hẹn. Vui lòng liên hệ nhân viên trạm.');
+        // Xử lý error message từ BE
+        const errorMessage = data.message || 'Hủy đặt chỗ thất bại';
+        
+        // Check error message cụ thể từ BE
+        if (errorMessage.includes('15 minutes') || errorMessage.includes('Cannot cancel booking within')) {
+          throw new Error('Không thể hủy đặt chỗ trong vòng 15 phút trước giờ hẹn. Vui lòng liên hệ nhân viên nếu cần hỗ trợ.');
         }
-        throw new Error(data.message || 'Hủy đặt chỗ thất bại');
+        
+        if (errorMessage.includes('not found') || errorMessage.includes('cannot be cancelled')) {
+          throw new Error('Không tìm thấy đặt chỗ hoặc không thể hủy đặt chỗ này.');
+        }
+        
+        throw new Error(errorMessage);
       }
+      
+      // Success
       await loadBookings();
+      // Có thể thêm toast notification ở đây nếu cần
     } catch (e: any) {
-      setError(e.message || 'Có lỗi xảy ra');
+      setError(e.message || 'Có lỗi xảy ra khi hủy đặt chỗ');
     } finally {
       setLoading(false);
     }
   };
-
-  // Nhận highlightBookingId từ location.state (khi navigate từ notification)
-  useEffect(() => {
-    const state = location.state as { highlightBookingId?: string } | null;
-    if (state?.highlightBookingId) {
-      highlightBookingIdRef.current = state.highlightBookingId;
-      // Clear state để tránh highlight lại khi refresh
-      window.history.replaceState({}, document.title);
-    }
-  }, [location]);
-
-  // Scroll và highlight booking khi đã load xong
-  useEffect(() => {
-    if (highlightBookingIdRef.current && bookings.length > 0) {
-      const bookingId = highlightBookingIdRef.current;
-      // Tìm booking trong list (có thể là booking_id hoặc booking_code)
-      const booking = bookings.find(
-        b => b.booking_id === bookingId || b.booking_code === bookingId
-      );
-      
-      if (booking) {
-        // Scroll đến booking card
-        setTimeout(() => {
-          const element = document.getElementById(`booking-${booking.booking_id}`);
-          if (element) {
-            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            // Highlight animation
-            element.classList.add('animate-pulse');
-            setTimeout(() => {
-              element.classList.remove('animate-pulse');
-            }, 2000);
-          }
-        }, 300);
-      }
-      // Clear ref sau khi đã highlight
-      highlightBookingIdRef.current = null;
-    }
-  }, [bookings]);
 
   useEffect(() => { 
     // Reset về trang 1 khi filter thay đổi
@@ -494,15 +548,24 @@ const BookingHistory: React.FC = () => {
           <p className="text-slate-600 dark:text-slate-300">Xem lịch sử và chi tiết các lần thay pin</p>
         </div>
         <Button className="gradient-primary text-white shadow-lg hover:shadow-xl transition-all duration-300" onClick={() => loadBookings(currentPage)} disabled={loading}>
-          <Download className="mr-2 h-4 w-4" />
+          {loading ? (
+            <BatteryLoading size="sm" variant="rotate" className="mr-2" />
+          ) : (
+            <Download className="mr-2 h-4 w-4" />
+          )}
           Làm mới
         </Button>
       </div>
 
       {error && (
-        <div className="text-sm text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-500/10 p-3 rounded-lg border border-red-200/50 dark:border-red-500/20">
-          {error}
-        </div>
+        <ErrorDisplay 
+          error={error} 
+          onRetry={() => {
+            setError('');
+            loadBookings(currentPage);
+          }}
+          variant="inline"
+        />
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -564,21 +627,37 @@ const BookingHistory: React.FC = () => {
         </CardContent>
       </Card>
 
-      <div className="space-y-4">
-        {filteredBookings.map((booking) => {
-          const isHighlighted = highlightBookingIdRef.current && 
-            (booking.booking_id === highlightBookingIdRef.current || 
-             booking.booking_code === highlightBookingIdRef.current);
-          return (
-          <Card 
-            key={booking.booking_id} 
-            id={`booking-${booking.booking_id}`}
-            className={`glass-card border-0 glow-hover transition-all duration-300 ${
-              isHighlighted 
-                ? 'ring-4 ring-blue-500 dark:ring-blue-400 shadow-2xl bg-blue-50/50 dark:bg-blue-900/20' 
-                : ''
-            }`}
-          >
+      {loading && bookings.length === 0 ? (
+        <div className="space-y-4">
+          {[1, 2, 3].map(i => (
+            <Card key={i} className="glass-card border-0">
+              <CardContent className="p-6">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-4">
+                    <Skeleton className="h-12 w-12 rounded-lg" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-6 w-48" />
+                      <Skeleton className="h-4 w-64" />
+                    </div>
+                    <Skeleton className="h-6 w-24" />
+                  </div>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    {[1, 2, 3, 4].map(j => (
+                      <div key={j} className="space-y-2">
+                        <Skeleton className="h-4 w-20" />
+                        <Skeleton className="h-5 w-32" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredBookings.map((booking) => (
+          <Card key={booking.booking_id} className="glass-card border-0 glow-hover">
             <CardContent className="p-6">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div className="flex items-start space-x-4">
@@ -618,10 +697,37 @@ const BookingHistory: React.FC = () => {
                     <p className="font-medium text-slate-900 dark:text-white">{new Date(booking.scheduled_at).toLocaleTimeString()}</p>
                   </div>
                   <div>
-                    <p className="text-slate-600 dark:text-slate-400">Thanh toán</p>
-                    <p className={`font-medium ${getPaymentStatusText(booking).color}`}>
-                      {getPaymentStatusText(booking).text}
+                    <p className="text-slate-600 dark:text-slate-400">Chi phí</p>
+                    <p className="font-medium text-slate-900 dark:text-white">
+                      {(() => {
+                        const priceInfo = getDisplayPrice(booking);
+                        if (priceInfo.isFree) {
+                          return (
+                            <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
+                              <Zap className="h-4 w-4" />
+                              Miễn phí
+                            </span>
+                          );
+                        }
+                        if (priceInfo.price !== null) {
+                          return `${Number(priceInfo.price).toLocaleString('vi-VN')} đ`;
+                        }
+                        // Chưa có giá (chưa complete) - hiển thị estimated từ pricing_preview
+                        if (booking.pricing_preview?.estimated_price !== null && booking.pricing_preview?.estimated_price !== undefined) {
+                          return (
+                            <span className="text-slate-500 dark:text-slate-400">
+                              ~{Number(booking.pricing_preview.estimated_price).toLocaleString('vi-VN')} đ
+                            </span>
+                          );
+                        }
+                        return 'Chưa thanh toán';
+                      })()}
                     </p>
+                    {booking.pricing_preview?.message && booking.status !== 'completed' && (
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                        {booking.pricing_preview.message}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <p className="text-slate-600 dark:text-slate-400">Mã</p>
@@ -641,24 +747,46 @@ const BookingHistory: React.FC = () => {
                       Xuất phiếu xác nhận
                     </Button>
                   )}
-                  {(booking.status === 'pending' || booking.status === 'confirmed') && (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="glass border-red-200/50 dark:border-red-400/30 hover:bg-red-50/50 dark:hover:bg-red-500/10" 
-                      onClick={() => cancelBooking(booking.booking_id, booking.scheduled_at)} 
-                      disabled={loading}
-                    >
-                      Hủy đặt chỗ
-                    </Button>
-                  )}
+                  {(booking.status === 'pending' || booking.status === 'confirmed') && (() => {
+                    const cancelCheck = canCancelBooking(booking);
+                    const isDisabled = !cancelCheck.canCancel || loading;
+                    
+                    return (
+                      <div className="flex flex-col gap-1">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className={`glass border-red-200/50 dark:border-red-400/30 hover:bg-red-50/50 dark:hover:bg-red-500/10 ${
+                            isDisabled ? 'opacity-50 cursor-not-allowed' : ''
+                          }`} 
+                          onClick={() => cancelBooking(booking.booking_id)} 
+                          disabled={isDisabled}
+                          title={cancelCheck.reason}
+                        >
+                          Hủy đặt chỗ
+                        </Button>
+                        {!cancelCheck.canCancel && cancelCheck.reason && (
+                          <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                            {cancelCheck.minutesUntilScheduled !== undefined && cancelCheck.minutesUntilScheduled < 15
+                              ? `⚠️ Còn ${Math.round(cancelCheck.minutesUntilScheduled)} phút - Không thể hủy`
+                              : '⚠️ ' + cancelCheck.reason}
+                          </p>
+                        )}
+                        {cancelCheck.canCancel && cancelCheck.minutesUntilScheduled !== undefined && cancelCheck.minutesUntilScheduled < 30 && (
+                          <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                            ⚠️ Còn {Math.round(cancelCheck.minutesUntilScheduled)} phút - Hủy ngay nếu cần
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             </CardContent>
           </Card>
-          );
-        })}
-      </div>
+        ))}
+        </div>
+      )}
 
       {filteredBookings.length === 0 && !loading && (
         <Card className="glass-card border-0">

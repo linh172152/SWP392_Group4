@@ -3,10 +3,15 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { Package, Zap, Calendar, Clock } from 'lucide-react';
+import { Calendar, Clock, Package } from 'lucide-react';
 import API_ENDPOINTS, { fetchWithAuth } from '../../config/api';
-import { getMySubscriptions } from '../../services/subscription.service';
+import { getBatteryPricing } from '../../services/battery-pricing.service';
+import type { BatteryPricing } from '../../services/battery-pricing.service';
 import { matchBatteryModel } from '../../utils/batteryModelUtils';
+import { getWalletBalance } from '../../services/wallet.service';
+import { BatteryLoading } from '../ui/battery-loading';
+import { ErrorDisplay } from '../ui/error-display';
+import { Skeleton } from '../ui/skeleton';
 
 interface BatteryItem {
   battery_id: string;
@@ -40,115 +45,180 @@ const BookBatteryPage: React.FC = () => {
   const [vehicles, setVehicles] = useState<VehicleItem[]>([]);
   const [selectedModel, setSelectedModel] = useState<string|null>(null);
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleItem|null>(null);
-  const [currentSubscription, setCurrentSubscription] = useState<any|null>(null);
   const [scheduledAt, setScheduledAt] = useState<string>('');
   const [error, setError] = useState('');
   const [bookingMsg, setBookingMsg] = useState('');
   const [loading, setLoading] = useState(false);
+  const [pricingList, setPricingList] = useState<BatteryPricing[]>([]);
+  const [currentSubscription, setCurrentSubscription] = useState<any|null>(null);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+
+  // Load pricing
+  const loadPricing = async () => {
+    try {
+      // Tăng limit lên 100 để lấy hết pricing (hoặc có thể không giới hạn)
+      const res = await getBatteryPricing({ is_active: true, limit: 100 });
+      if (res.success && res.data.pricings) {
+        setPricingList(res.data.pricings);
+        console.log('✅ Loaded pricing:', res.data.pricings.length, 'items');
+        console.log('📋 Pricing models:', res.data.pricings.map(p => `${p.battery_model}: ${p.price}₫`));
+      }
+    } catch (e) {
+      console.error('Failed to load pricing:', e);
+      // Không block UI nếu pricing fail
+    }
+  };
+
+  // Load wallet balance để cảnh báo nếu không đủ tiền
+  const loadWalletBalance = async () => {
+    try {
+      const res = await getWalletBalance();
+      if (res.success && res.data) {
+        setWalletBalance(Number(res.data.balance));
+      }
+    } catch (e) {
+      // Không block UI nếu wallet fail
+      console.error('Failed to load wallet balance:', e);
+    }
+  };
+
+  // Load subscription để hiển thị preview giá cuối cùng
+  const loadSubscription = async () => {
+    try {
+      const url = new URL(API_ENDPOINTS.SUBSCRIPTIONS.BASE);
+      url.searchParams.set('status', 'active');
+      const subRes = await fetchWithAuth(url.toString());
+      
+      if (!subRes.ok) {
+        console.log('📦 [SUBSCRIPTION] API response not OK:', subRes.status);
+        setCurrentSubscription(null);
+        return;
+      }
+      
+      const subData = await subRes.json();
+      console.log('📦 [SUBSCRIPTION] API response:', subData);
+      
+      if (subData.success && subData.data) {
+        const subscriptions = Array.isArray(subData.data) ? subData.data : (subData.data.subscriptions || []);
+        console.log('📦 [SUBSCRIPTION] All subscriptions:', subscriptions);
+        
+        const activeSub = subscriptions.find((sub: any) => {
+          if (!sub || !sub.end_date) return false;
+          const now = new Date();
+          const endDate = new Date(sub.end_date);
+          const isValid = sub.status === 'active' && 
+                 endDate >= now && 
+                 (sub.remaining_swaps === null || (sub.remaining_swaps ?? 0) > 0);
+          console.log('📦 [SUBSCRIPTION] Checking subscription:', {
+            id: sub.subscription_id,
+            status: sub.status,
+            endDate: sub.end_date,
+            remaining_swaps: sub.remaining_swaps,
+            isValid
+          });
+          return isValid;
+        });
+        
+        if (activeSub) {
+          console.log('📦 [SUBSCRIPTION] Active subscription found:', activeSub);
+          setCurrentSubscription(activeSub);
+        } else {
+          console.log('📦 [SUBSCRIPTION] No active subscription found');
+          setCurrentSubscription(null);
+        }
+      } else {
+        console.log('📦 [SUBSCRIPTION] No subscription data in response');
+        setCurrentSubscription(null);
+      }
+    } catch (e) {
+      console.error('📦 [SUBSCRIPTION] Error loading subscription:', e);
+      setCurrentSubscription(null);
+    }
+  };
+
+  // Kiểm tra subscription có tương thích với battery model không
+  const doesSubscriptionCoverModel = (subscription: any, batteryModel: string): boolean => {
+    if (!subscription || !subscription.package) return false;
+    const pkg = subscription.package;
+    
+    // Nếu package có battery_models array, check xem model có trong đó không
+    if (pkg.battery_models && Array.isArray(pkg.battery_models) && pkg.battery_models.length > 0) {
+      return pkg.battery_models.some((model: string) => 
+        matchBatteryModel(model, batteryModel)
+      );
+    }
+    
+    // Nếu package có battery_capacity_kwh, check capacity
+    if (pkg.battery_capacity_kwh) {
+      const battery = batteries.find(b => matchBatteryModel(b.model, batteryModel));
+      if (battery && battery.capacity_kwh) {
+        return Number(battery.capacity_kwh) <= Number(pkg.battery_capacity_kwh);
+      }
+    }
+    
+    // Fallback: nếu không có giới hạn rõ ràng, assume coverage
+    return true;
+  };
+
 
   // Fetch tất cả dữ liệu gốc - Tối ưu: Load song song để nhanh hơn
   useEffect(() => {
+    console.log('🚀 [USEFFECT] useEffect triggered, id:', id);
     const fetchAll = async () => {
+      console.log('🚀 [USEFFECT] fetchAll started');
       setLoading(true);
       setError('');
       try {
+        console.log('🚀 [USEFFECT] Starting to load pricing...');
+        // Load pricing song song với các API khác
+        loadPricing();
+        console.log('🚀 [USEFFECT] Pricing load initiated (async)');
+        
+        console.log('🚀 [USEFFECT] Starting Promise.all for station, batteries, vehicles...');
         // Tối ưu: Load song song các API không phụ thuộc lẫn nhau
         const [stationRes, batteriesRes, vehiclesRes] = await Promise.all([
           fetchWithAuth(`${API_ENDPOINTS.DRIVER.STATIONS}/${id}`),
           fetchWithAuth(`${API_ENDPOINTS.DRIVER.STATIONS}/${id}/batteries`),
           fetchWithAuth(API_ENDPOINTS.DRIVER.VEHICLES)
         ]);
+        console.log('🚀 [USEFFECT] Promise.all completed, parsing JSON...');
         
         const [stj, brj, vrj] = await Promise.all([
           stationRes.json(),
           batteriesRes.json(),
           vehiclesRes.json()
         ]);
+        console.log('🚀 [USEFFECT] JSON parsing completed');
         
         if (!stationRes.ok) throw new Error(stj.message || 'Không lấy được thông tin trạm');
         if (!batteriesRes.ok) throw new Error(brj.message || 'Không lấy được pin');
         if (!vehiclesRes.ok) throw new Error(vrj.message || 'Không lấy được xe của bạn');
         
+        console.log('🚀 [USEFFECT] All API calls successful, setting state...');
         setStation(stj.data);
         setBatteries(brj.data);
         setVehicles(vrj.data);
+        console.log('🚀 [USEFFECT] State set, all data loaded successfully');
         
-        // Load subscription song song (không block UI chính)
-        // Subscription là optional nên không cần chờ
-        // Delay một chút để tránh rate limit
-        setTimeout(() => {
-          getMySubscriptions()
-            .then(response => {
-              console.log('📦 Subscription response:', response);
-              const subscriptions = response.data || [];
-              console.log('📦 All subscriptions:', subscriptions);
-              
-              if (!subscriptions || subscriptions.length === 0) {
-                console.log('📦 Không có subscription nào');
-                return;
-              }
-              
-              // Tìm subscription active và hợp lệ
-              const activeSub = subscriptions.find((sub: any) => {
-                const now = new Date();
-                const endDate = new Date(sub.end_date);
-                // Check thủ công vì BE có thể chưa tự động update status = "expired"
-                const isStillValid = sub.status === 'active' && 
-                                    endDate >= now && 
-                                    (sub.remaining_swaps === null || sub.remaining_swaps > 0);
-                console.log('📦 Checking subscription:', {
-                  id: sub.subscription_id,
-                  name: sub.package?.name,
-                  status: sub.status,
-                  endDate: sub.end_date,
-                  remaining: sub.remaining_swaps,
-                  isStillValid
-                });
-                return isStillValid;
-              });
-              
-              console.log('📦 Active subscription found:', activeSub);
-              if (activeSub) {
-                setCurrentSubscription(activeSub);
-                console.log('✅ Đã set subscription:', activeSub);
-              } else {
-                console.log('📦 Không tìm thấy subscription active hợp lệ');
-              }
-            })
-            .catch(subErr => {
-              // Không có subscription hoặc lỗi - không ảnh hưởng đến flow chính
-              console.error('❌ Lỗi khi load subscription:', subErr);
-              // Nếu là lỗi 429, thử lại sau 2 giây
-              if (subErr.status === 429) {
-                console.log('⏳ Rate limit, sẽ thử lại sau 2 giây...');
-                setTimeout(() => {
-                  getMySubscriptions()
-                    .then(response => {
-                      const subscriptions = response.data || [];
-                      const activeSub = subscriptions.find((sub: any) => {
-                        const now = new Date();
-                        const endDate = new Date(sub.end_date);
-                        return sub.status === 'active' && 
-                               endDate >= now && 
-                               (sub.remaining_swaps === null || sub.remaining_swaps > 0);
-                      });
-                      if (activeSub) {
-                        setCurrentSubscription(activeSub);
-                        console.log('✅ Đã load subscription sau retry:', activeSub);
-                      }
-                    })
-                    .catch(() => {
-                      console.log('❌ Vẫn lỗi sau retry, bỏ qua subscription');
-                    });
-                }, 2000);
-              }
-            });
-        }, 500); // Delay 500ms để tránh rate limit
+        // Load subscription và wallet balance để hiển thị preview giá
+        loadSubscription();
+        loadWalletBalance();
       } catch (e: any) {
+        console.error('❌ [USEFFECT] Error in fetchAll:', e);
+        console.error('❌ [USEFFECT] Error details:', {
+          message: e.message,
+          stack: e.stack,
+          name: e.name
+        });
         setError(e.message || 'Có lỗi xảy ra');
-      } finally { setLoading(false); }
+      } finally { 
+        console.log('🚀 [USEFFECT] fetchAll finally block, setting loading to false');
+        setLoading(false); 
+      }
     };
+    console.log('🚀 [USEFFECT] Calling fetchAll...');
     fetchAll();
+    console.log('🚀 [USEFFECT] fetchAll called (async)');
     
     // Tự động set thời gian mặc định: 1 giờ từ bây giờ
     const defaultTime = new Date(Date.now() + 60 * 60 * 1000);
@@ -173,10 +243,13 @@ const BookBatteryPage: React.FC = () => {
   const availableOnly = batteries.filter(b => b.status === 'full');
   const batteryModels = [...new Set(availableOnly.map(b => b.model))];
   // Map: model pin => số pin khả dụng hiện có
-  // FIX: Chỉ hiển thị những loại pin có ít nhất 1 xe tương thích
+  // FIX: Chỉ hiển thị những loại pin có ít nhất 1 xe tương thích (dùng matchBatteryModel để matching linh hoạt)
   const pinStats = batteryModels.map(model => {
     const pins = availableOnly.filter(b => b.model === model);
-    const compatibleVehiclesCount = vehicles.filter(v => v.battery_model && matchBatteryModel(model, v.battery_model)).length;
+    // Dùng matchBatteryModel để matching linh hoạt (ví dụ: "VinFast VF8" ↔ "VinFast VF8 Battery")
+    const compatibleVehiclesCount = vehicles.filter(v => 
+      v.battery_model && matchBatteryModel(model, v.battery_model)
+    ).length;
     return { 
       model, 
       count: pins.length, 
@@ -185,7 +258,7 @@ const BookBatteryPage: React.FC = () => {
     };
   }).filter(p => p.count > 0 && p.hasCompatibleVehicle); // Chỉ hiển thị pin có xe tương thích
 
-  // Tìm pin được đề xuất (phù hợp với xe đầu tiên của driver)
+  // Tìm pin được đề xuất (phù hợp với xe đầu tiên của driver) - dùng matchBatteryModel
   const recommendedPinModel = vehicles.length > 0 && vehicles[0]?.battery_model
     ? pinStats.find(p => matchBatteryModel(p.model, vehicles[0].battery_model!))
     : null;
@@ -196,13 +269,15 @@ const BookBatteryPage: React.FC = () => {
       // Tìm xe đầu tiên của driver
       const firstVehicle = vehicles[0];
       if (firstVehicle && firstVehicle.battery_model) {
-        // Tìm loại pin phù hợp với xe đầu tiên (flexible matching)
+        // Tìm loại pin phù hợp với xe đầu tiên - dùng matchBatteryModel
         const compatiblePinModel = pinStats.find(p => matchBatteryModel(p.model, firstVehicle.battery_model!));
         if (compatiblePinModel) {
           // Tự động đề xuất loại pin phù hợp
           setSelectedModel(compatiblePinModel.model);
-          // Tự động chọn xe đầu tiên phù hợp với pin này (flexible matching)
-          const compatibleVehicle = vehicles.find(v => v.battery_model && matchBatteryModel(compatiblePinModel.model, v.battery_model));
+          // Tự động chọn xe đầu tiên phù hợp với pin này - dùng matchBatteryModel
+          const compatibleVehicle = vehicles.find(v => 
+            v.battery_model && matchBatteryModel(compatiblePinModel.model, v.battery_model)
+          );
           if (compatibleVehicle) {
             setSelectedVehicle(compatibleVehicle);
           }
@@ -213,8 +288,9 @@ const BookBatteryPage: React.FC = () => {
 
   // Đặt chỗ khi đã chọn model và chọn xe phù hợp
   // NOTE về Subscription:
-  // - BE sẽ tự động check subscription khi staff completeBooking
-  // - Nếu có subscription active và hợp lệ → amount = 0 (miễn phí)
+  // - Khi user có subscription active và useSubscription = true
+  // - BE sẽ tự động check subscription khi staff completeBooking (trong completeBooking function)
+  // - BE tự động set transaction_amount = 0 và payment_status = "completed" → Miễn phí
   // - Không cần gửi subscription_id trong request body booking
   const handleBooking = async () => {
     setBookingMsg(''); setError('');
@@ -222,7 +298,7 @@ const BookBatteryPage: React.FC = () => {
       setError('Chọn loại pin và xe trước khi đặt!'); return;
     }
     
-    // FIX: Validation nghiêm ngặt - Kiểm tra xe có tương thích với loại pin đã chọn (flexible matching)
+    // FIX: Validation nghiêm ngặt - Kiểm tra xe có tương thích với loại pin đã chọn (dùng matchBatteryModel)
     if (!selectedVehicle.battery_model || !matchBatteryModel(selectedModel, selectedVehicle.battery_model)) {
       setError('Xe đã chọn không tương thích với loại pin này. Vui lòng chọn lại!');
       // Reset selection để tránh confusion
@@ -264,13 +340,10 @@ const BookBatteryPage: React.FC = () => {
     
     try {
       const scheduledAtISO = scheduledDate.toISOString();
-      // QUAN TRỌNG: Gửi vehicle.battery_model thay vì selectedModel
-      // Vì BE check compatibility với vehicle.battery_model (không có "Battery" suffix)
-      // selectedModel có thể có "Battery" suffix từ battery trong station
       const body = {
         vehicle_id: selectedVehicle.vehicle_id,
         station_id: id,
-        battery_model: selectedVehicle.battery_model, // Dùng vehicle.battery_model thay vì selectedModel
+        battery_model: selectedModel,
         scheduled_at: scheduledAtISO
       };
       
@@ -295,12 +368,9 @@ const BookBatteryPage: React.FC = () => {
         throw new Error(data.message || 'Đặt pin thất bại');
       }
       
-      // Hiển thị message
-      setBookingMsg(
-        currentSubscription 
-          ? 'Đặt Pin thành công! Bạn có gói dịch vụ - Sẽ được miễn phí khi hoàn tất đổi pin tại trạm.' 
-          : 'Đặt Pin thành công! Bạn sẽ thanh toán khi hoàn tất đổi pin tại trạm.'
-      );
+      // Tối ưu: Hiển thị message ngay lập tức
+      // BE sẽ tự động check subscription khi staff complete booking → Không cần hiển thị subscription ở đây
+      setBookingMsg('Đặt Pin thành công! Bạn sẽ thanh toán khi hoàn tất đổi pin tại trạm.');
       
       // Tối ưu: Tự động chuyển về trang bookings sau 1.5 giây
       setTimeout(() => {
@@ -444,6 +514,82 @@ const BookBatteryPage: React.FC = () => {
     }
   };
 
+  // Loading state
+  if (loading && !station) {
+    return (
+      <div className="flex flex-col p-6 lg:flex-row gap-8">
+        <div className="flex-1 space-y-6">
+          <Card>
+            <CardContent className="p-6">
+              <Skeleton className="h-8 w-64 mb-2" />
+              <Skeleton className="h-4 w-96" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-6 space-y-4">
+              {[1, 2, 3].map(i => (
+                <Skeleton key={i} className="h-24 w-full rounded-lg" />
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+        <div className="w-full md:w-80 lg:w-96 xl:w-[400px]">
+          <Card>
+            <CardContent className="p-6 space-y-4">
+              <Skeleton className="h-6 w-32" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-20 w-full" />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error && !station) {
+    return (
+      <div className="flex flex-col p-6">
+        <ErrorDisplay 
+          error={error} 
+          onRetry={() => {
+            setError('');
+            const fetchAll = async () => {
+              setLoading(true);
+              try {
+                const [stationRes, batteriesRes, vehiclesRes] = await Promise.all([
+                  fetchWithAuth(`${API_ENDPOINTS.DRIVER.STATIONS}/${id}`),
+                  fetchWithAuth(`${API_ENDPOINTS.DRIVER.STATIONS}/${id}/batteries`),
+                  fetchWithAuth(API_ENDPOINTS.DRIVER.VEHICLES)
+                ]);
+                const [stj, brj, vrj] = await Promise.all([
+                  stationRes.json(),
+                  batteriesRes.json(),
+                  vehiclesRes.json()
+                ]);
+                if (!stationRes.ok) throw new Error(stj.message || 'Không lấy được thông tin trạm');
+                if (!batteriesRes.ok) throw new Error(brj.message || 'Không lấy được pin');
+                if (!vehiclesRes.ok) throw new Error(vrj.message || 'Không lấy được xe của bạn');
+                setStation(stj.data);
+                setBatteries(brj.data);
+                setVehicles(vrj.data);
+                loadSubscription();
+                loadWalletBalance();
+              } catch (e: any) {
+                setError(e.message || 'Có lỗi xảy ra');
+              } finally {
+                setLoading(false);
+              }
+            };
+            fetchAll();
+          }}
+          variant="card"
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col p-6 lg:flex-row gap-8">
       <div className="flex-1 space-y-6">
@@ -462,13 +608,32 @@ const BookBatteryPage: React.FC = () => {
             {pinStats.length === 0 && <div>Hiện trạm này chưa có pin khả dụng.</div>}
             <div className="space-y-4">
               {pinStats.map(({ model, count, example }) => {
-                const compatibleVehicles = vehicles.filter(v => v.battery_model && matchBatteryModel(model, v.battery_model));
+                // Dùng matchBatteryModel để matching linh hoạt (ví dụ: "VinFast VF8" ↔ "VinFast VF8 Battery")
+                const compatibleVehicles = vehicles.filter(v => 
+                  v.battery_model && matchBatteryModel(model, v.battery_model)
+                );
+                // Tìm pricing cho model này - dùng matchBatteryModel utility để matching linh hoạt
+                const pricing = pricingList.find(p => {
+                  const matches = matchBatteryModel(p.battery_model, model);
+                  if (matches) {
+                    console.log(`✅ Matched pricing: "${p.battery_model}" with battery model "${model}" → Price: ${p.price}`);
+                  }
+                  return matches;
+                });
+                const price = pricing ? Number(pricing.price) : 0;
+                
+                // Debug: Log nếu không tìm thấy pricing
+                if (!pricing && pricingList.length > 0) {
+                  console.log(`❌ No pricing found for model "${model}". Available pricing models:`, 
+                    pricingList.map(p => p.battery_model));
+                }
+                
                 return (
                   <div key={model}
                     className={`p-4 rounded-lg border ${selectedModel === model ? 'border-green-600 ring-2 ring-green-500/30 bg-green-50' : 'border-slate-200 bg-white'} cursor-pointer transition-all hover:shadow-md`}
                     onClick={() => {
                       setSelectedModel(model);
-                      // FIX: Reset xe đã chọn nếu không tương thích với loại pin mới (flexible matching)
+                      // FIX: Reset xe đã chọn nếu không tương thích với loại pin mới (dùng matchBatteryModel)
                       if (selectedVehicle && (!selectedVehicle.battery_model || !matchBatteryModel(model, selectedVehicle.battery_model))) {
                         setSelectedVehicle(null);
                       }
@@ -483,7 +648,12 @@ const BookBatteryPage: React.FC = () => {
                           </Badge>
                         )}
                       </div>
-                      <div className="font-bold text-green-700 text-xl">{count} pin</div>
+                      <div className="text-right">
+                        <div className="font-bold text-green-700 text-xl">{count} pin</div>
+                        <div className={`font-bold ${price > 0 ? 'text-green-600 text-lg' : 'text-green-600 text-base'}`}>
+                          {price > 0 ? `${price.toLocaleString('vi-VN')}₫` : 'Liên hệ'}
+                        </div>
+                      </div>
                     </div>
                     <div className="flex gap-4 items-center text-xs">
                       <div>Dung lượng: <b>{example.capacity_kwh} kWh</b></div>
@@ -535,6 +705,105 @@ const BookBatteryPage: React.FC = () => {
                 <div>Xe: {selectedVehicle ? <span className="font-bold">{selectedVehicle.make} {selectedVehicle.model} ({selectedVehicle.license_plate})</span> : <span className="text-orange-500">Chọn xe</span>}</div>
                 <div>Số pin còn: <b>{pinStats.find(p=>p.model===selectedModel)?.count ?? 0}</b></div>
                 
+                {/* Phần giá - Preview giá cuối cùng (bao gồm subscription) */}
+                <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                  {(() => {
+                    const pricing = pricingList.find(p => matchBatteryModel(p.battery_model, selectedModel));
+                    const batteryPrice = pricing ? Number(pricing.price) : 0;
+                    
+                    // Kiểm tra subscription có áp dụng không
+                    const subscriptionApplies = currentSubscription && 
+                                              doesSubscriptionCoverModel(currentSubscription, selectedModel) &&
+                                              (currentSubscription.remaining_swaps === null || (currentSubscription.remaining_swaps ?? 0) > 0);
+                    
+                    const finalTotal = subscriptionApplies ? 0 : batteryPrice;
+                    
+                    return (
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-600 dark:text-slate-400">Giá thay pin:</span>
+                          <span className="font-bold text-slate-900 dark:text-white">
+                            {batteryPrice > 0 ? `${batteryPrice.toLocaleString('vi-VN')}₫` : 'Liên hệ'}
+                          </span>
+                        </div>
+                        
+                        {/* Gói dịch vụ - LUÔN hiển thị (có hoặc không có) */}
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1">
+                            <Package className="h-3 w-3" />
+                            Gói dịch vụ:
+                          </span>
+                          <span className="font-bold text-slate-900 dark:text-white text-sm">
+                            {currentSubscription 
+                              ? (
+                                <>
+                                  {currentSubscription.package?.name || 'Gói dịch vụ'}
+                                  {currentSubscription.remaining_swaps !== null && (
+                                    <span className="text-slate-500"> • Còn {currentSubscription.remaining_swaps} lần</span>
+                                  )}
+                                </>
+                              )
+                              : 'Không có'
+                            }
+                          </span>
+                        </div>
+                        
+                        {subscriptionApplies && (
+                          <div className="bg-green-50 dark:bg-green-900/20 p-2 rounded-lg border border-green-200 dark:border-green-800">
+                            <div className="text-xs text-green-700 dark:text-green-300">
+                              ✓ Gói "{currentSubscription.package?.name || 'Gói dịch vụ'}" sẽ áp dụng cho loại pin này
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div className="flex justify-between items-center pt-2 border-t border-slate-200 dark:border-slate-700">
+                          <span className="font-semibold text-slate-900 dark:text-white">Tổng cộng (dự kiến):</span>
+                          <span className={`font-bold text-lg ${
+                            finalTotal === 0 ? 'text-green-600 dark:text-green-400' : 'text-slate-900 dark:text-white'
+                          }`}>
+                            {batteryPrice > 0 
+                              ? finalTotal === 0 
+                                ? 'Miễn phí' 
+                                : `${finalTotal.toLocaleString('vi-VN')}₫`
+                              : 'Liên hệ'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                          * Giá cuối cùng sẽ được xác nhận trong lịch sử đặt chỗ sau khi đặt thành công.
+                        </p>
+                        
+                        {/* Wallet balance warning */}
+                        {walletBalance !== null && !subscriptionApplies && batteryPrice > 0 && (
+                          <div className={`mt-3 p-2 rounded-lg border ${
+                            walletBalance < batteryPrice
+                              ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+                              : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                          }`}>
+                            <p className={`text-xs ${
+                              walletBalance < batteryPrice
+                                ? 'text-amber-700 dark:text-amber-300'
+                                : 'text-blue-700 dark:text-blue-300'
+                            }`}>
+                              {walletBalance < batteryPrice ? (
+                                <>
+                                  ⚠️ <strong>Số dư ví: {walletBalance.toLocaleString('vi-VN')}₫</strong>. 
+                                  Ước tính giá: <strong>{batteryPrice.toLocaleString('vi-VN')}₫</strong>. 
+                                  Vui lòng nạp thêm nếu cần.
+                                </>
+                              ) : (
+                                <>
+                                  💰 Số dư ví: <strong>{walletBalance.toLocaleString('vi-VN')}₫</strong>. 
+                                  Ước tính giá: <strong>{batteryPrice.toLocaleString('vi-VN')}₫</strong>.
+                                </>
+                              )}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+                
                 {/* Phần chọn thời gian hẹn */}
                 <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
                   <div className="font-semibold mb-2 text-sm flex items-center gap-2">
@@ -574,56 +843,6 @@ const BookBatteryPage: React.FC = () => {
                     )}
                   </div>
                 </div>
-                
-                {/* Thông tin gói dịch vụ (nếu có) */}
-                {currentSubscription && (
-                  <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                    <div className="p-3 rounded-lg border border-green-500/30 bg-green-50/50 dark:bg-green-900/10">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Package className="h-4 w-4 text-green-600 dark:text-green-400" />
-                        <span className="font-semibold text-sm text-green-800 dark:text-green-400">
-                          Bạn có gói dịch vụ
-                        </span>
-                        <Badge className="bg-green-600 text-white ml-auto">
-                          <Zap className="h-3 w-3 mr-1" />
-                          Miễn phí
-                        </Badge>
-                      </div>
-                      <div className="text-xs text-slate-600 dark:text-slate-400">
-                        <div className="font-medium text-slate-700 dark:text-slate-300 mb-1">
-                          {currentSubscription.package?.name || 'Gói dịch vụ'}
-                        </div>
-                        <div>
-                          {currentSubscription.remaining_swaps === null 
-                            ? 'Không giới hạn' 
-                            : `Còn ${currentSubscription.remaining_swaps} lần`} • 
-                          Hết hạn: {new Date(currentSubscription.end_date).toLocaleDateString('vi-VN')}
-                        </div>
-                        <div className="mt-2 text-green-700 dark:text-green-400 font-medium">
-                          Sẽ được miễn phí khi hoàn tất đổi pin tại trạm
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {!currentSubscription && (
-                  <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                    <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
-                      <div className="text-sm text-slate-600 dark:text-slate-400 mb-2">
-                        Không có gói dịch vụ
-                      </div>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="w-full border-blue-500 text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                        onClick={() => navigate('/driver/subscriptions')}
-                      >
-                        <Package className="mr-2 h-4 w-4" />
-                        Mua gói dịch vụ
-                      </Button>
-                    </div>
-                  </div>
-                )}
               </>
             )}
             {selectedModel && selectedVehicle && (
@@ -634,10 +853,7 @@ const BookBatteryPage: React.FC = () => {
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
-                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
+                    <BatteryLoading size="sm" variant="charging" />
                     Đang xử lý...
                   </span>
                 ) : "Xác nhận đặt chỗ"}
@@ -656,16 +872,12 @@ const BookBatteryPage: React.FC = () => {
               </Button>
             )}
             {error && (
-              <div className="text-sm text-red-700 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-3 mt-2">
-                <div className="font-semibold mb-1">⚠️ Lỗi đặt chỗ</div>
-                <div className="whitespace-pre-line">{error}</div>
-                {error.includes('Không còn pin khả dụng') && (
-                  <div className="mt-2 pt-2 border-t border-red-200 dark:border-red-700">
-                    <p className="text-xs text-red-600 dark:text-red-400">
-                      💡 <strong>Gợi ý:</strong> Hãy thử chọn thời gian khác (sớm hơn hoặc muộn hơn) hoặc chọn loại pin khác nếu có.
-                    </p>
-                  </div>
-                )}
+              <div className="mt-5">
+                <ErrorDisplay 
+                  error={error} 
+                  variant="inline"
+                  onRetry={() => setError('')}
+                />
               </div>
             )}
             {bookingMsg && <div className="text-sm text-green-700 bg-green-100 rounded p-2 mt-2">{bookingMsg}</div>}
