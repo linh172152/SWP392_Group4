@@ -11,7 +11,9 @@ import {
   Save,
   Camera,
   Loader2,
-  X
+  X,
+  AlertCircle,
+  CheckCircle2
 } from 'lucide-react';
 import { authService, UserProfile } from '../../services/auth.service';
 import { useToast } from '../../hooks/use-toast';
@@ -23,6 +25,24 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
+
+interface ValidationErrors {
+  full_name?: string;
+  phone?: string;
+  current_password?: string;
+  new_password?: string;
+  confirm_password?: string;
+}
 
 const PersonalProfile: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
@@ -40,7 +60,132 @@ const PersonalProfile: React.FC = () => {
     confirm_password: '',
   });
   const [passwordLoading, setPasswordLoading] = useState(false);
+  
+  // Validation states
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
+  const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
+  
+  // Confirm dialog states
+  const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
+  const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
+  const [confirmPasswordOpen, setConfirmPasswordOpen] = useState(false);
+  
   const { toast } = useToast();
+
+  // Validation functions
+  const validateFullName = (name: string): string | undefined => {
+    if (!name.trim()) {
+      return 'Họ và tên không được để trống';
+    }
+    if (name.trim().length < 2) {
+      return 'Họ và tên phải có ít nhất 2 ký tự';
+    }
+    if (name.trim().length > 100) {
+      return 'Họ và tên không được vượt quá 100 ký tự';
+    }
+    if (!/^[a-zA-ZÀ-ỹ\s]+$/.test(name.trim())) {
+      return 'Họ và tên chỉ được chứa chữ cái và khoảng trắng';
+    }
+    return undefined;
+  };
+
+  const validatePhone = (phone: string): string | undefined => {
+    if (!phone.trim()) {
+      return undefined; // Phone is optional
+    }
+    // Vietnamese phone number: 10-11 digits, starting with 0 or +84
+    const phoneRegex = /^(\+84|0)[1-9][0-9]{8,9}$/;
+    const cleanedPhone = phone.replace(/\s+/g, '');
+    if (!phoneRegex.test(cleanedPhone)) {
+      return 'Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại Việt Nam (10-11 số)';
+    }
+    return undefined;
+  };
+
+  const validatePassword = (password: string): string | undefined => {
+    if (!password) {
+      return 'Mật khẩu không được để trống';
+    }
+    if (password.length < 6) {
+      return 'Mật khẩu phải có ít nhất 6 ký tự';
+    }
+    if (password.length > 50) {
+      return 'Mật khẩu không được vượt quá 50 ký tự';
+    }
+    // Optional: Check for at least one number and one letter
+    if (!/(?=.*[a-zA-Z])(?=.*\d)/.test(password)) {
+      return 'Mật khẩu nên chứa ít nhất một chữ cái và một số';
+    }
+    return undefined;
+  };
+
+  const validateConfirmPassword = (confirm: string, newPassword: string): string | undefined => {
+    if (!confirm) {
+      return 'Vui lòng xác nhận mật khẩu';
+    }
+    if (confirm !== newPassword) {
+      return 'Mật khẩu xác nhận không khớp';
+    }
+    return undefined;
+  };
+
+  // Real-time validation
+  const validateField = (field: string, value: string, additionalValue?: string) => {
+    let error: string | undefined;
+    
+    switch (field) {
+      case 'full_name':
+        error = validateFullName(value);
+        break;
+      case 'phone':
+        error = validatePhone(value);
+        break;
+      case 'new_password':
+        error = validatePassword(value);
+        break;
+      case 'confirm_password':
+        error = validateConfirmPassword(value, additionalValue || passwordData.new_password);
+        break;
+      default:
+        break;
+    }
+    
+    setValidationErrors(prev => ({
+      ...prev,
+      [field]: error,
+    }));
+    
+    return !error;
+  };
+
+  // Check if profile has unsaved changes
+  const hasUnsavedChanges = () => {
+    if (!profile) return false;
+    return (
+      editedProfile.full_name !== profile.full_name ||
+      editedProfile.phone !== (profile.phone || '')
+    );
+  };
+
+  // Check if form is valid
+  const isProfileFormValid = () => {
+    return (
+      !validationErrors.full_name &&
+      !validationErrors.phone &&
+      editedProfile.full_name.trim() !== '' &&
+      validateFullName(editedProfile.full_name) === undefined &&
+      (editedProfile.phone.trim() === '' || validatePhone(editedProfile.phone) === undefined)
+    );
+  };
+
+  const isPasswordFormValid = () => {
+    return (
+      passwordData.current_password.trim() !== '' &&
+      !validationErrors.new_password &&
+      !validationErrors.confirm_password &&
+      passwordData.new_password === passwordData.confirm_password
+    );
+  };
 
   // Fetch profile on mount
   useEffect(() => {
@@ -69,6 +214,32 @@ const PersonalProfile: React.FC = () => {
     }
   };
 
+  const handleSaveClick = () => {
+    // Validate all fields
+    const fullNameValid = validateField('full_name', editedProfile.full_name);
+    const phoneValid = editedProfile.phone.trim() === '' || validateField('phone', editedProfile.phone);
+    
+    if (!fullNameValid || !phoneValid) {
+      toast({
+        title: 'Lỗi xác thực',
+        description: 'Vui lòng kiểm tra lại thông tin đã nhập',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    if (!isProfileFormValid()) {
+      toast({
+        title: 'Lỗi xác thực',
+        description: 'Vui lòng sửa các lỗi trước khi lưu',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    setConfirmSaveOpen(true);
+  };
+
   const handleSave = async () => {
     try {
       setSaving(true);
@@ -77,6 +248,9 @@ const PersonalProfile: React.FC = () => {
       if (response.success) {
         setProfile(response.data.user);
         setIsEditing(false);
+        setValidationErrors({});
+        setTouchedFields(new Set());
+        setConfirmSaveOpen(false);
         toast({
           title: 'Thành công',
           description: 'Đã cập nhật thông tin cá nhân',
@@ -93,25 +267,71 @@ const PersonalProfile: React.FC = () => {
     }
   };
 
+  const handleCancelEdit = () => {
+    if (hasUnsavedChanges()) {
+      setConfirmCancelOpen(true);
+    } else {
+      setIsEditing(false);
+      setValidationErrors({});
+      setTouchedFields(new Set());
+      setEditedProfile({
+        full_name: profile?.full_name || '',
+        phone: profile?.phone || '',
+      });
+    }
+  };
+
+  const handleCancelConfirm = () => {
+    setIsEditing(false);
+    setValidationErrors({});
+    setTouchedFields(new Set());
+    setEditedProfile({
+      full_name: profile?.full_name || '',
+      phone: profile?.phone || '',
+    });
+    setConfirmCancelOpen(false);
+  };
+
+  const handleChangePasswordClick = () => {
+    // Validate all password fields
+    const newPasswordValid = validateField('new_password', passwordData.new_password);
+    const confirmPasswordValid = validateField('confirm_password', passwordData.confirm_password, passwordData.new_password);
+    
+    if (!passwordData.current_password.trim()) {
+      setValidationErrors(prev => ({
+        ...prev,
+        current_password: 'Vui lòng nhập mật khẩu hiện tại',
+      }));
+      toast({
+        title: 'Lỗi xác thực',
+        description: 'Vui lòng nhập đầy đủ thông tin',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    if (!newPasswordValid || !confirmPasswordValid) {
+      toast({
+        title: 'Lỗi xác thực',
+        description: 'Vui lòng kiểm tra lại mật khẩu đã nhập',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    if (!isPasswordFormValid()) {
+      toast({
+        title: 'Lỗi xác thực',
+        description: 'Vui lòng sửa các lỗi trước khi đổi mật khẩu',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    setConfirmPasswordOpen(true);
+  };
+
   const handleChangePassword = async () => {
-    if (passwordData.new_password !== passwordData.confirm_password) {
-      toast({
-        title: 'Lỗi',
-        description: 'Mật khẩu xác nhận không khớp',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (passwordData.new_password.length < 6) {
-      toast({
-        title: 'Lỗi',
-        description: 'Mật khẩu mới phải có ít nhất 6 ký tự',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     try {
       setPasswordLoading(true);
       const response = await authService.changePassword({
@@ -130,6 +350,9 @@ const PersonalProfile: React.FC = () => {
           new_password: '',
           confirm_password: '',
         });
+        setValidationErrors({});
+        setTouchedFields(new Set());
+        setConfirmPasswordOpen(false);
       }
     } catch (error: any) {
       toast({
@@ -225,22 +448,17 @@ const PersonalProfile: React.FC = () => {
           {isEditing && (
             <Button 
               variant="outline"
-              onClick={() => {
-                setIsEditing(false);
-                setEditedProfile({
-                  full_name: profile.full_name,
-                  phone: profile.phone || '',
-                });
-              }}
+              onClick={handleCancelEdit}
+              disabled={saving}
             >
               <X className="mr-2 h-4 w-4" />
               Hủy
             </Button>
           )}
           <Button 
-            onClick={() => isEditing ? handleSave() : setIsEditing(true)}
+            onClick={() => isEditing ? handleSaveClick() : setIsEditing(true)}
             className="bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg hover:shadow-xl transition-all duration-300"
-            disabled={saving}
+            disabled={saving || (isEditing && !isProfileFormValid())}
           >
             {saving ? (
               <>
@@ -318,16 +536,45 @@ const PersonalProfile: React.FC = () => {
             <CardDescription className="text-slate-600 dark:text-slate-400">Cập nhật thông tin liên lạc và chi tiết cá nhân</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="name" className="text-slate-700 dark:text-slate-300">Họ và tên</Label>
-                <Input
-                  id="name"
-                  value={isEditing ? editedProfile.full_name : profile.full_name}
-                  disabled={!isEditing}
-                  onChange={(e) => setEditedProfile({...editedProfile, full_name: e.target.value})}
-                  className="glass border-slate-200/50 dark:border-slate-700/50"
-                />
+                <Label htmlFor="name" className="text-slate-700 dark:text-slate-300">
+                  Họ và tên <span className="text-red-500">*</span>
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="name"
+                    value={isEditing ? editedProfile.full_name : profile.full_name}
+                    disabled={!isEditing}
+                    onChange={(e) => {
+                      setEditedProfile({...editedProfile, full_name: e.target.value});
+                      if (touchedFields.has('full_name')) {
+                        validateField('full_name', e.target.value);
+                      }
+                    }}
+                    onBlur={() => {
+                      setTouchedFields(prev => new Set(prev).add('full_name'));
+                      validateField('full_name', editedProfile.full_name);
+                    }}
+                    className={`glass border-slate-200/50 dark:border-slate-700/50 ${
+                      touchedFields.has('full_name') && validationErrors.full_name
+                        ? 'border-red-500 focus:border-red-500'
+                        : ''
+                    }`}
+                  />
+                  {touchedFields.has('full_name') && validationErrors.full_name && (
+                    <div className="absolute -bottom-6 left-0 flex items-center gap-1 text-xs text-red-500 mt-1">
+                      <AlertCircle className="h-3 w-3" />
+                      {validationErrors.full_name}
+                    </div>
+                  )}
+                  {touchedFields.has('full_name') && !validationErrors.full_name && editedProfile.full_name.trim() && (
+                    <div className="absolute -bottom-6 left-0 flex items-center gap-1 text-xs text-green-500 mt-1">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Hợp lệ
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-slate-700 dark:text-slate-300">Email</Label>
@@ -341,13 +588,41 @@ const PersonalProfile: React.FC = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone" className="text-slate-700 dark:text-slate-300">Số điện thoại</Label>
-                <Input
-                  id="phone"
-                  value={isEditing ? editedProfile.phone : (profile.phone || 'Chưa có')}
-                  disabled={!isEditing}
-                  onChange={(e) => setEditedProfile({...editedProfile, phone: e.target.value})}
-                  className="glass border-slate-200/50 dark:border-slate-700/50"
-                />
+                <div className="relative">
+                  <Input
+                    id="phone"
+                    value={isEditing ? editedProfile.phone : (profile.phone || 'Chưa có')}
+                    disabled={!isEditing}
+                    onChange={(e) => {
+                      setEditedProfile({...editedProfile, phone: e.target.value});
+                      if (touchedFields.has('phone')) {
+                        validateField('phone', e.target.value);
+                      }
+                    }}
+                    onBlur={() => {
+                      setTouchedFields(prev => new Set(prev).add('phone'));
+                      validateField('phone', editedProfile.phone);
+                    }}
+                    placeholder="Nhập số điện thoại (tùy chọn)"
+                    className={`glass border-slate-200/50 dark:border-slate-700/50 ${
+                      touchedFields.has('phone') && validationErrors.phone
+                        ? 'border-red-500 focus:border-red-500'
+                        : ''
+                    }`}
+                  />
+                  {touchedFields.has('phone') && validationErrors.phone && (
+                    <div className="absolute -bottom-6 left-0 flex items-center gap-1 text-xs text-red-500 mt-1">
+                      <AlertCircle className="h-3 w-3" />
+                      {validationErrors.phone}
+                    </div>
+                  )}
+                  {touchedFields.has('phone') && !validationErrors.phone && editedProfile.phone.trim() && (
+                    <div className="absolute -bottom-6 left-0 flex items-center gap-1 text-xs text-green-500 mt-1">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Hợp lệ
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="role" className="text-slate-700 dark:text-slate-300">Vai trò</Label>
@@ -438,34 +713,140 @@ const PersonalProfile: React.FC = () => {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="current_password">Mật khẩu hiện tại</Label>
-              <Input
-                id="current_password"
-                type="password"
-                value={passwordData.current_password}
-                onChange={(e) => setPasswordData({ ...passwordData, current_password: e.target.value })}
-                disabled={passwordLoading}
-              />
+              <Label htmlFor="current_password">
+                Mật khẩu hiện tại <span className="text-red-500">*</span>
+              </Label>
+              <div className="relative">
+                <Input
+                  id="current_password"
+                  type="password"
+                  value={passwordData.current_password}
+                  onChange={(e) => {
+                    setPasswordData({ ...passwordData, current_password: e.target.value });
+                    if (touchedFields.has('current_password')) {
+                      if (!e.target.value.trim()) {
+                        setValidationErrors(prev => ({
+                          ...prev,
+                          current_password: 'Vui lòng nhập mật khẩu hiện tại',
+                        }));
+                      } else {
+                        setValidationErrors(prev => ({
+                          ...prev,
+                          current_password: undefined,
+                        }));
+                      }
+                    }
+                  }}
+                  onBlur={() => {
+                    setTouchedFields(prev => new Set(prev).add('current_password'));
+                    if (!passwordData.current_password.trim()) {
+                      setValidationErrors(prev => ({
+                        ...prev,
+                        current_password: 'Vui lòng nhập mật khẩu hiện tại',
+                      }));
+                    }
+                  }}
+                  disabled={passwordLoading}
+                  className={`${
+                    touchedFields.has('current_password') && validationErrors.current_password
+                      ? 'border-red-500 focus:border-red-500'
+                      : ''
+                  }`}
+                />
+                {touchedFields.has('current_password') && validationErrors.current_password && (
+                  <div className="absolute -bottom-6 left-0 flex items-center gap-1 text-xs text-red-500 mt-1">
+                    <AlertCircle className="h-3 w-3" />
+                    {validationErrors.current_password}
+                  </div>
+                )}
+              </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="new_password">Mật khẩu mới</Label>
-              <Input
-                id="new_password"
-                type="password"
-                value={passwordData.new_password}
-                onChange={(e) => setPasswordData({ ...passwordData, new_password: e.target.value })}
-                disabled={passwordLoading}
-              />
+              <Label htmlFor="new_password">
+                Mật khẩu mới <span className="text-red-500">*</span>
+              </Label>
+              <div className="relative">
+                <Input
+                  id="new_password"
+                  type="password"
+                  value={passwordData.new_password}
+                  onChange={(e) => {
+                    setPasswordData({ ...passwordData, new_password: e.target.value });
+                    if (touchedFields.has('new_password')) {
+                      validateField('new_password', e.target.value);
+                    }
+                    // Re-validate confirm password if it's already touched
+                    if (touchedFields.has('confirm_password')) {
+                      validateField('confirm_password', passwordData.confirm_password, e.target.value);
+                    }
+                  }}
+                  onBlur={() => {
+                    setTouchedFields(prev => new Set(prev).add('new_password'));
+                    validateField('new_password', passwordData.new_password);
+                    if (touchedFields.has('confirm_password')) {
+                      validateField('confirm_password', passwordData.confirm_password, passwordData.new_password);
+                    }
+                  }}
+                  disabled={passwordLoading}
+                  className={`${
+                    touchedFields.has('new_password') && validationErrors.new_password
+                      ? 'border-red-500 focus:border-red-500'
+                      : ''
+                  }`}
+                />
+                {touchedFields.has('new_password') && validationErrors.new_password && (
+                  <div className="absolute -bottom-6 left-0 flex items-center gap-1 text-xs text-red-500 mt-1">
+                    <AlertCircle className="h-3 w-3" />
+                    {validationErrors.new_password}
+                  </div>
+                )}
+                {touchedFields.has('new_password') && !validationErrors.new_password && passwordData.new_password && (
+                  <div className="absolute -bottom-6 left-0 flex items-center gap-1 text-xs text-green-500 mt-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Hợp lệ
+                  </div>
+                )}
+              </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirm_password">Xác nhận mật khẩu mới</Label>
-              <Input
-                id="confirm_password"
-                type="password"
-                value={passwordData.confirm_password}
-                onChange={(e) => setPasswordData({ ...passwordData, confirm_password: e.target.value })}
-                disabled={passwordLoading}
-              />
+              <Label htmlFor="confirm_password">
+                Xác nhận mật khẩu mới <span className="text-red-500">*</span>
+              </Label>
+              <div className="relative">
+                <Input
+                  id="confirm_password"
+                  type="password"
+                  value={passwordData.confirm_password}
+                  onChange={(e) => {
+                    setPasswordData({ ...passwordData, confirm_password: e.target.value });
+                    if (touchedFields.has('confirm_password')) {
+                      validateField('confirm_password', e.target.value, passwordData.new_password);
+                    }
+                  }}
+                  onBlur={() => {
+                    setTouchedFields(prev => new Set(prev).add('confirm_password'));
+                    validateField('confirm_password', passwordData.confirm_password, passwordData.new_password);
+                  }}
+                  disabled={passwordLoading}
+                  className={`${
+                    touchedFields.has('confirm_password') && validationErrors.confirm_password
+                      ? 'border-red-500 focus:border-red-500'
+                      : ''
+                  }`}
+                />
+                {touchedFields.has('confirm_password') && validationErrors.confirm_password && (
+                  <div className="absolute -bottom-6 left-0 flex items-center gap-1 text-xs text-red-500 mt-1">
+                    <AlertCircle className="h-3 w-3" />
+                    {validationErrors.confirm_password}
+                  </div>
+                )}
+                {touchedFields.has('confirm_password') && !validationErrors.confirm_password && passwordData.confirm_password && (
+                  <div className="absolute -bottom-6 left-0 flex items-center gap-1 text-xs text-green-500 mt-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Khớp
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -478,14 +859,16 @@ const PersonalProfile: React.FC = () => {
                   new_password: '',
                   confirm_password: '',
                 });
+                setValidationErrors({});
+                setTouchedFields(new Set());
               }}
               disabled={passwordLoading}
             >
               Hủy
             </Button>
             <Button 
-              onClick={handleChangePassword}
-              disabled={passwordLoading || !passwordData.current_password || !passwordData.new_password || !passwordData.confirm_password}
+              onClick={handleChangePasswordClick}
+              disabled={passwordLoading || !isPasswordFormValid()}
             >
               {passwordLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Đổi mật khẩu
@@ -493,6 +876,74 @@ const PersonalProfile: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Confirm Save Dialog */}
+      <AlertDialog open={confirmSaveOpen} onOpenChange={setConfirmSaveOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Xác nhận lưu thay đổi</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bạn có chắc chắn muốn lưu các thay đổi thông tin cá nhân? Thông tin sẽ được cập nhật ngay lập tức.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Hủy</AlertDialogCancel>
+            <AlertDialogAction onClick={handleSave} disabled={saving}>
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Đang lưu...
+                </>
+              ) : (
+                'Xác nhận lưu'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirm Cancel Dialog */}
+      <AlertDialog open={confirmCancelOpen} onOpenChange={setConfirmCancelOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hủy chỉnh sửa?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bạn có các thay đổi chưa được lưu. Nếu hủy, tất cả thay đổi sẽ bị mất. Bạn có chắc chắn muốn hủy?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Tiếp tục chỉnh sửa</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCancelConfirm} className="bg-red-600 hover:bg-red-700">
+              Hủy thay đổi
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirm Change Password Dialog */}
+      <AlertDialog open={confirmPasswordOpen} onOpenChange={setConfirmPasswordOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Xác nhận đổi mật khẩu</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bạn có chắc chắn muốn đổi mật khẩu? Sau khi đổi, bạn sẽ cần đăng nhập lại bằng mật khẩu mới.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={passwordLoading}>Hủy</AlertDialogCancel>
+            <AlertDialogAction onClick={handleChangePassword} disabled={passwordLoading}>
+              {passwordLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Đang xử lý...
+                </>
+              ) : (
+                'Xác nhận đổi mật khẩu'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
