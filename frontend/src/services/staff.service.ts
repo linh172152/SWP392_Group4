@@ -234,6 +234,47 @@ export async function cancelBooking(bookingId: string, data?: CancelBookingData)
   return res; // { success, message, data: booking }
 }
 
+// ============================================
+// STAFF BATTERY OPERATIONS
+// ============================================
+
+export interface Battery {
+  battery_id: string;
+  battery_code: string;
+  station_id: string;
+  model: string;
+  capacity_kwh?: number | null;
+  voltage?: number | null;
+  current_charge: number;
+  health_percentage?: number | null;
+  cycle_count?: number | null;
+  status: "full" | "charging" | "in_use" | "maintenance" | "damaged";
+  last_charged_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  station?: {
+    station_id: string;
+    name: string;
+    address: string;
+  };
+}
+
+/**
+ * Lấy danh sách pin của trạm (cho staff)
+ */
+export async function getStationBatteries(params?: {
+  status?: string;
+  model?: string;
+}) {
+  const qs = new URLSearchParams();
+  if (params?.status) qs.set('status', params.status);
+  if (params?.model) qs.set('model', params.model);
+
+  const url = `${API_ENDPOINTS.STAFF.BATTERIES}${qs.toString() ? `?${qs.toString()}` : ''}`;
+  const res = await authFetch(url);
+  return res; // { success, message, data: batteries[] }
+}
+
 export default {
   // Admin operations
   getAllStaff,
@@ -248,4 +289,7 @@ export default {
   confirmBooking,
   completeBooking,
   cancelBooking,
+  
+  // Staff battery operations
+  getStationBatteries,
 };
