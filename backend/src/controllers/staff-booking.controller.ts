@@ -4,6 +4,10 @@ import type { ServicePackage, UserSubscription } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
 import { notificationService } from "../server";
+import {
+  consumeBookingHold,
+  type BookingHoldFields,
+} from "../services/booking-hold.service";
 
 const prisma = new PrismaClient();
 
@@ -64,22 +68,6 @@ const getBatteryCapacityByModel = async (
   }
 
   return Number(battery.capacity_kwh);
-};
-
-const getActiveSubscription = async (
-  userId: string
-): Promise<(UserSubscription & { package: ServicePackage | null }) | null> => {
-  const now = new Date();
-  return prisma.userSubscription.findFirst({
-    where: {
-      user_id: userId,
-      status: "active",
-      start_date: { lte: now },
-      end_date: { gte: now },
-    },
-    include: { package: true },
-    orderBy: { created_at: "desc" },
-  });
 };
 
 const doesSubscriptionCoverModel = async (
@@ -632,14 +620,14 @@ export const completeBooking = asyncHandler(
       );
     }
 
-    const booking = (await prisma.booking.findUnique({
+    const booking = await prisma.booking.findUnique({
       where: { booking_id: id },
       include: {
         station: {
-          select: { station_id: true },
+          select: { station_id: true, name: true },
         },
       },
-    })) as any;
+    });
 
     if (!booking) {
       throw new CustomError("Booking not found", 404);
@@ -677,6 +665,81 @@ export const completeBooking = asyncHandler(
 
     if (!finalBatteryModel) {
       throw new CustomError("Battery model is required", 400);
+    }
+
+    const vehicle = await prisma.vehicle.findUnique({
+      where: { vehicle_id: booking.vehicle_id },
+      select: {
+        vehicle_id: true,
+        license_plate: true,
+        battery_model: true,
+      },
+    });
+
+    if (!vehicle) {
+      throw new CustomError("Vehicle not found", 404);
+    }
+
+    const bookingHold = booking as unknown as BookingHoldFields;
+    const holdInfo: BookingHoldFields = {
+      booking_id: booking.booking_id,
+      user_id: booking.user_id,
+      station_id: booking.station_id,
+      locked_battery_id: bookingHold.locked_battery_id,
+      locked_battery_previous_status:
+        bookingHold.locked_battery_previous_status,
+      locked_wallet_amount: bookingHold.locked_wallet_amount,
+      locked_wallet_payment_id: bookingHold.locked_wallet_payment_id,
+      locked_subscription_id: bookingHold.locked_subscription_id,
+      locked_swap_count: bookingHold.locked_swap_count,
+      use_subscription: bookingHold.use_subscription,
+    };
+
+    type SubscriptionWithPackage = Prisma.UserSubscriptionGetPayload<{
+      include: { package: true };
+    }>;
+
+    if (!holdInfo.locked_battery_id) {
+      throw new CustomError(
+        "Booking chưa giữ pin. Vui lòng yêu cầu driver đặt lại để hệ thống giữ pin trước khi hoàn tất.",
+        400
+      );
+    }
+
+    const reservedBattery = await prisma.battery.findUnique({
+      where: { battery_id: holdInfo.locked_battery_id },
+    });
+
+    if (!reservedBattery) {
+      throw new CustomError(
+        "Không tìm thấy pin đã giữ cho booking này. Vui lòng kiểm tra lại.",
+        404
+      );
+    }
+
+    if (reservedBattery.station_id !== booking.station_id) {
+      throw new CustomError(
+        "Pin đã giữ không còn ở trạm này. Vui lòng điều phối lại pin trước khi hoàn tất.",
+        400
+      );
+    }
+
+    const reservedStatus = reservedBattery.status as unknown as string;
+    if (reservedStatus !== "reserved" && reservedStatus !== "full") {
+      throw new CustomError(
+        `Pin đã giữ hiện ở trạng thái ${reservedBattery.status}. Vui lòng kiểm tra lại trước khi hoàn tất.`,
+        400
+      );
+    }
+
+    if (
+      reservedBattery.model.toLowerCase().trim() !==
+      finalBatteryModel.toLowerCase().trim()
+    ) {
+      throw new CustomError(
+        `Pin đã giữ (${reservedBattery.model}) không khớp với model yêu cầu (${finalBatteryModel}).`,
+        400
+      );
     }
 
     let oldBattery = null;
@@ -726,41 +789,48 @@ export const completeBooking = asyncHandler(
       );
     }
 
-    // ✅ Tự động assign new battery từ battery_model (thay vì new_battery_id)
-    const newBattery = await prisma.battery.findFirst({
-      where: {
-        station_id: booking.station_id,
-        model: finalBatteryModel,
-        status: "full",
-      },
-      orderBy: { last_charged_at: "asc" }, // Pin cũ nhất sạc trước
-    });
+    let subscriptionRecord: SubscriptionWithPackage | null = null;
 
-    if (!newBattery) {
-      throw new CustomError(
-        `Không có pin sẵn sàng cho loại "${finalBatteryModel}" tại trạm này`,
-        400
-      );
-    }
+    if (holdInfo.use_subscription) {
+      if (!holdInfo.locked_subscription_id) {
+        throw new CustomError(
+          "Booking này sử dụng gói nhưng không tìm thấy thông tin giữ gói. Vui lòng kiểm tra lại.",
+          400
+        );
+      }
 
-    const activeSubscription = await getActiveSubscription(booking.user_id);
-    let subscriptionApplies = false;
-    let subscriptionUnlimited = false;
-    let subscriptionCoversModel = false;
+      subscriptionRecord = (await prisma.userSubscription.findUnique({
+        where: { subscription_id: holdInfo.locked_subscription_id },
+        include: { package: true },
+      })) as SubscriptionWithPackage | null;
 
-    if (activeSubscription) {
-      subscriptionCoversModel = await doesSubscriptionCoverModel(
-        activeSubscription,
+      if (!subscriptionRecord) {
+        throw new CustomError(
+          "Không tìm thấy gói đã giữ cho booking này. Vui lòng kiểm tra lại.",
+          404
+        );
+      }
+
+      const covers = await doesSubscriptionCoverModel(
+        subscriptionRecord,
         finalBatteryModel
       );
 
-      if (subscriptionCoversModel) {
-        if (activeSubscription.remaining_swaps === null) {
-          subscriptionApplies = true;
-          subscriptionUnlimited = true;
-        } else if ((activeSubscription.remaining_swaps ?? 0) > 0) {
-          subscriptionApplies = true;
-        }
+      if (!covers) {
+        throw new CustomError(
+          `Gói đã giữ không áp dụng cho loại pin "${finalBatteryModel}".`,
+          400
+        );
+      }
+    } else {
+      if (
+        !holdInfo.locked_wallet_payment_id ||
+        !holdInfo.locked_wallet_amount
+      ) {
+        throw new CustomError(
+          "Booking chưa giữ tiền ví. Vui lòng yêu cầu driver đặt lại trước khi hoàn tất.",
+          400
+        );
       }
     }
 
@@ -770,73 +840,31 @@ export const completeBooking = asyncHandler(
     // Import notificationService
     const { notificationService } = await import("../server");
 
-    // Start transaction
-    const result = await prisma.$transaction(async (tx) => {
-      const updatedBooking = await tx.booking.update({
-        where: { booking_id: id },
-        data: { status: "completed", battery_model: finalBatteryModel },
-      });
+    const subscriptionUnlimited = subscriptionRecord?.remaining_swaps === null;
+    const subscriptionRemainingAfter =
+      subscriptionRecord?.remaining_swaps ?? null;
 
-      const allPricing = await tx.batteryPricing.findMany({
-        where: { is_active: true },
-      });
+    let transactionAmountDecimal = holdInfo.use_subscription
+      ? new Prisma.Decimal(0)
+      : (holdInfo.locked_wallet_amount ?? new Prisma.Decimal(0));
 
-      const pricing = allPricing.find(
-        (p) =>
-          p.battery_model.toLowerCase().trim() ===
-          finalBatteryModel.toLowerCase().trim()
+    const transactionAmountNum = Number(transactionAmountDecimal);
+
+    if (!holdInfo.use_subscription && transactionAmountDecimal.equals(0)) {
+      throw new CustomError(
+        "Không tìm thấy số tiền đã giữ cho booking này. Vui lòng kiểm tra lại.",
+        400
       );
+    }
 
-      if (!pricing) {
-        throw new CustomError(
-          `Pricing not found or inactive for battery model "${finalBatteryModel}"`,
-          400
-        );
-      }
+    const oldBatteryHistoryAction =
+      old_battery_status === "damaged"
+        ? "damaged"
+        : old_battery_status === "maintenance"
+          ? "maintenance"
+          : "returned";
 
-      let transactionAmountDecimal = pricing.price;
-      let transactionAmountNum = Number(transactionAmountDecimal);
-
-      if (subscriptionApplies) {
-        transactionAmountDecimal = new Prisma.Decimal(0);
-        transactionAmountNum = 0;
-      }
-
-      let wallet = await tx.wallet.findUnique({
-        where: { user_id: booking.user_id },
-      });
-
-      if (!wallet) {
-        wallet = await tx.wallet.create({
-          data: {
-            user_id: booking.user_id,
-            balance: 0,
-          },
-        });
-      }
-
-      const walletBalanceBeforeDecimal = wallet.balance;
-      let walletBalanceAfterDecimal = wallet.balance;
-
-      if (transactionAmountNum > 0) {
-        if (wallet.balance.lessThan(transactionAmountDecimal)) {
-          const needed = Number(transactionAmountDecimal);
-          const current = Number(wallet.balance);
-          throw new CustomError(
-            `Số dư ví không đủ. Cần ${needed.toLocaleString("vi-VN")}đ, hiện có ${current.toLocaleString("vi-VN")}đ. Vui lòng nạp thêm ${(needed - current).toLocaleString("vi-VN")}đ vào ví trước khi hoàn tất đổi pin.`,
-            400
-          );
-        }
-
-        const updatedWallet = await tx.wallet.update({
-          where: { user_id: booking.user_id },
-          data: {
-            balance: wallet.balance.minus(transactionAmountDecimal),
-          },
-        });
-        walletBalanceAfterDecimal = updatedWallet.balance;
-      }
-
+    const result = await prisma.$transaction(async (tx) => {
       const transaction = await tx.transaction.create({
         data: {
           transaction_code: transactionCode,
@@ -845,7 +873,7 @@ export const completeBooking = asyncHandler(
           vehicle_id: booking.vehicle_id,
           station_id: booking.station_id,
           old_battery_id: oldBattery.battery_id,
-          new_battery_id: newBattery.battery_id,
+          new_battery_id: reservedBattery.battery_id,
           staff_id: staffId,
           swap_at: new Date(),
           swap_started_at: new Date(),
@@ -857,107 +885,118 @@ export const completeBooking = asyncHandler(
         },
       });
 
-      if (
-        old_battery_status === "damaged" ||
-        old_battery_status === "maintenance"
-      ) {
-        await tx.battery.update({
-          where: { battery_id: oldBattery.battery_id },
-          data: {
-            status: old_battery_status,
-            station_id: booking.station_id,
-          },
-        });
-      } else {
-        await tx.battery.update({
-          where: { battery_id: oldBattery.battery_id },
-          data: {
-            status: "charging",
-            station_id: booking.station_id,
-            current_charge: oldBattery.current_charge || 0,
-            last_charged_at: null,
-          },
-        });
-      }
+      const oldBatteryStatusUpdate =
+        old_battery_status === "damaged"
+          ? "damaged"
+          : old_battery_status === "maintenance"
+            ? "maintenance"
+            : "charging";
 
       await tx.battery.update({
-        where: { battery_id: newBattery.battery_id },
+        where: { battery_id: oldBattery.battery_id },
+        data: {
+          status: oldBatteryStatusUpdate,
+          station_id: booking.station_id,
+          last_charged_at:
+            oldBatteryStatusUpdate === "charging"
+              ? null
+              : oldBattery.last_charged_at,
+        },
+      });
+
+      await tx.battery.update({
+        where: { battery_id: reservedBattery.battery_id },
         data: {
           status: "in_use",
         },
       });
 
-      let payment: any = null;
-      if (transactionAmountNum > 0) {
-        payment = await tx.payment.create({
-          data: {
-            transaction_id: transaction.transaction_id,
-            user_id: booking.user_id,
-            amount: transactionAmountDecimal,
-            payment_method: "wallet",
-            payment_status: "completed",
-            paid_at: new Date(),
-            payment_type: "SWAP",
-            metadata: {
-              station_id: booking.station_id,
-              booking_id: booking.booking_id,
-            },
-          },
-        });
-      }
+      await tx.vehicle.update({
+        where: { vehicle_id: vehicle.vehicle_id },
+        data: {
+          current_battery_id: reservedBattery.battery_id,
+          battery_model: finalBatteryModel,
+        } as any,
+      });
 
-      let subscriptionRemainingAfter =
-        activeSubscription?.remaining_swaps ?? null;
+      await (tx as any).batteryHistory.create({
+        data: {
+          battery_id: oldBattery.battery_id,
+          booking_id: booking.booking_id,
+          station_id: booking.station_id,
+          actor_user_id: staffId,
+          action: oldBatteryHistoryAction,
+          notes:
+            old_battery_status === "good"
+              ? "Staff xác nhận pin cũ trả về trạng thái tốt."
+              : `Staff đánh dấu pin cũ ở trạng thái ${old_battery_status}.`,
+        },
+      });
 
-      if (subscriptionApplies && activeSubscription) {
-        if (!subscriptionUnlimited) {
-          const remainingBefore = activeSubscription.remaining_swaps ?? 0;
-          if (remainingBefore <= 0) {
-            throw new CustomError(
-              "Gói hiện tại đã hết lượt đổi. Vui lòng nạp thêm hoặc thanh toán bằng ví.",
-              400
-            );
-          }
+      await (tx as any).batteryHistory.create({
+        data: {
+          battery_id: reservedBattery.battery_id,
+          booking_id: booking.booking_id,
+          station_id: booking.station_id,
+          actor_user_id: staffId,
+          action: "issued",
+          notes: `Giao pin model ${reservedBattery.model} cho xe ${
+            vehicle.license_plate ?? ""
+          }.`,
+        },
+      });
 
-          subscriptionRemainingAfter = remainingBefore - 1;
+      const consume = await consumeBookingHold({
+        tx,
+        booking: holdInfo,
+        transactionId: transaction.transaction_id,
+        notes: "booking_completed",
+      });
 
-          await tx.userSubscription.update({
-            where: { subscription_id: activeSubscription.subscription_id },
-            data: { remaining_swaps: subscriptionRemainingAfter },
+      const updatedBooking = await tx.booking.update({
+        where: { booking_id: id },
+        data: {
+          status: "completed",
+          battery_model: finalBatteryModel,
+          ...consume.bookingUpdate,
+        },
+      });
+
+      const walletAfterRow = holdInfo.use_subscription
+        ? null
+        : await tx.wallet.findUnique({
+            where: { user_id: booking.user_id },
+            select: { balance: true },
           });
-        }
-      }
 
       return {
         updatedBooking,
         transaction,
-        payment,
+        payment: consume.payment,
         transactionAmount: transactionAmountNum,
-        walletBalanceBefore: Number(walletBalanceBeforeDecimal),
-        walletBalanceAfter: Number(walletBalanceAfterDecimal),
-        subscriptionApplied: subscriptionApplies,
-        subscriptionUnlimited,
-        subscriptionRemainingAfter,
-        subscriptionId: activeSubscription?.subscription_id ?? null,
-        subscriptionName: activeSubscription?.package?.name ?? null,
+        walletBalanceAfter: walletAfterRow
+          ? Number(walletAfterRow.balance)
+          : null,
       };
     });
 
     // ✅ Send notification về thanh toán / sử dụng gói
     try {
-      if (result.subscriptionApplied) {
-        const remainingText = result.subscriptionUnlimited
+      if (holdInfo.use_subscription && subscriptionRecord) {
+        const remainingText = subscriptionUnlimited
           ? "Gói không giới hạn lượt."
-          : `Bạn còn ${result.subscriptionRemainingAfter} lượt.`;
+          : `Bạn còn ${subscriptionRemainingAfter ?? 0} lượt.`;
 
         await notificationService.sendNotification({
           type: "payment_success",
           userId: booking.user_id,
           title: "Đổi pin bằng gói đăng ký",
-          message: `Đã hoàn tất đổi pin bằng gói "${result.subscriptionName ?? "Subscription"}". ${remainingText}`,
+          message: `Đã hoàn tất đổi pin bằng gói "${
+            subscriptionRecord.package?.name ?? "Subscription"
+          }". ${remainingText}`,
           data: {
-            subscription_id: result.subscriptionId,
-            remaining_swaps: result.subscriptionRemainingAfter,
+            subscription_id: subscriptionRecord.subscription_id,
+            remaining_swaps: subscriptionRemainingAfter,
             booking_id: booking.booking_id,
             payment_method: "subscription",
             amount: 0,
@@ -968,7 +1007,15 @@ export const completeBooking = asyncHandler(
           type: "payment_success",
           userId: booking.user_id,
           title: "Thanh toán thành công",
-          message: `Đã thanh toán ${result.transactionAmount.toLocaleString("vi-VN")}đ từ ví. Số dư còn lại: ${result.walletBalanceAfter.toLocaleString("vi-VN")}đ.`,
+          message:
+            `Đã sử dụng ${result.transactionAmount.toLocaleString(
+              "vi-VN"
+            )}đ đã giữ trước đó để hoàn tất đổi pin.` +
+            (result.walletBalanceAfter !== null
+              ? ` Số dư hiện tại: ${result.walletBalanceAfter.toLocaleString(
+                  "vi-VN"
+                )}đ.`
+              : ""),
           data: {
             transaction_id: result.transaction.transaction_id,
             amount: result.transactionAmount,
@@ -980,11 +1027,24 @@ export const completeBooking = asyncHandler(
       console.error("Failed to send payment notification:", error);
     }
 
-    const responseMessage = result.subscriptionApplied
-      ? result.subscriptionUnlimited
-        ? `Đổi pin hoàn tất bằng gói "${result.subscriptionName ?? "Subscription"}" (không giới hạn lượt).`
-        : `Đổi pin hoàn tất bằng gói "${result.subscriptionName ?? "Subscription"}". Bạn còn ${result.subscriptionRemainingAfter} lượt.`
-      : `Đã thanh toán ${result.transactionAmount.toLocaleString("vi-VN")}đ từ ví. Số dư còn lại: ${result.walletBalanceAfter.toLocaleString("vi-VN")}đ.`;
+    const responseMessage =
+      holdInfo.use_subscription && subscriptionRecord
+        ? subscriptionUnlimited
+          ? `Đổi pin hoàn tất bằng gói "${
+              subscriptionRecord.package?.name ?? "Subscription"
+            }" (không giới hạn lượt).`
+          : `Đổi pin hoàn tất bằng gói "${
+              subscriptionRecord.package?.name ?? "Subscription"
+            }". Bạn còn ${subscriptionRemainingAfter ?? 0} lượt.`
+        : result.transactionAmount > 0
+          ? `Đổi pin sử dụng số tiền đã giữ ${result.transactionAmount.toLocaleString(
+              "vi-VN"
+            )}đ. Số dư ví hiện tại: ${
+              result.walletBalanceAfter !== null
+                ? result.walletBalanceAfter.toLocaleString("vi-VN")
+                : "--"
+            }đ.`
+          : "Đổi pin hoàn tất.";
 
     res.status(200).json({
       success: true,
@@ -993,12 +1053,10 @@ export const completeBooking = asyncHandler(
         transaction: {
           transaction_code: result.transaction.transaction_code,
           amount: result.transactionAmount,
-          payment_status: result.subscriptionApplied
+          payment_status: holdInfo.use_subscription
             ? "covered_by_subscription"
             : "completed",
-          payment_source: result.subscriptionApplied
-            ? "subscription"
-            : "wallet",
+          payment_source: holdInfo.use_subscription ? "subscription" : "wallet",
         },
         payment: result.payment
           ? {
@@ -1007,18 +1065,16 @@ export const completeBooking = asyncHandler(
               status: result.payment.payment_status,
             }
           : null,
-        subscription_usage: result.subscriptionApplied
-          ? {
-              subscription_id: result.subscriptionId,
-              subscription_name: result.subscriptionName,
-              remaining_swaps: result.subscriptionUnlimited
-                ? null
-                : result.subscriptionRemainingAfter,
-              unlimited: result.subscriptionUnlimited,
-            }
-          : null,
-        wallet_balance: result.walletBalanceAfter,
-        message: responseMessage,
+        subscription_usage:
+          holdInfo.use_subscription && subscriptionRecord
+            ? {
+                subscription_id: subscriptionRecord.subscription_id,
+                subscription_name: subscriptionRecord.package?.name ?? null,
+                remaining_swaps: subscriptionRemainingAfter,
+                unlimited: subscriptionUnlimited,
+              }
+            : null,
+        response_message: responseMessage,
       },
     });
   }

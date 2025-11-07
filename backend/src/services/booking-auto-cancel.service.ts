@@ -1,5 +1,9 @@
 import { PrismaClient } from "@prisma/client";
 import { notificationService } from "../server";
+import {
+  releaseBookingHold,
+  type BookingHoldFields,
+} from "./booking-hold.service";
 
 const prisma = new PrismaClient();
 
@@ -46,47 +50,81 @@ export async function autoCancelExpiredBookings() {
       return { cancelled: 0, message: "No expired bookings to cancel" };
     }
 
-    // Cancel all expired bookings
-    const cancelledBookings = await Promise.all(
-      expiredBookings.map(async (booking) => {
-        const updatedBooking = await prisma.booking.update({
-          where: { booking_id: booking.booking_id },
-          data: {
-            status: "cancelled",
-            notes: booking.notes
-              ? `${booking.notes}\nAuto-cancelled: User did not arrive within 10 minutes of scheduled time.`
-              : "Auto-cancelled: User did not arrive within 10 minutes of scheduled time.",
-          },
-        });
+    const cancelledBookings: {
+      original: (typeof expiredBookings)[number];
+      updated: Awaited<ReturnType<typeof prisma.booking.update>>;
+      walletForfeitedAmount: number;
+    }[] = [];
 
-        // Send notification to user
-        try {
-          await notificationService.sendNotification({
-            type: "booking_cancelled",
-            userId: booking.user_id,
-            title: "Đặt chỗ đã bị hủy tự động",
-            message: `Đặt chỗ của bạn tại ${booking.station.name} đã bị hủy tự động do bạn không có mặt trong vòng 10 phút sau giờ đã đặt.`,
+    for (const booking of expiredBookings) {
+      const autoCancelNote =
+        "Auto-cancelled: User did not arrive within 10 minutes of scheduled time.";
+
+      const { updatedBooking, walletForfeitedAmount } =
+        await prisma.$transaction(async (tx) => {
+          const release = await releaseBookingHold({
+            tx,
+            booking: booking as unknown as BookingHoldFields,
+            actorUserId: booking.user_id,
+            notes: autoCancelNote,
+          });
+
+          const updated = await tx.booking.update({
+            where: { booking_id: booking.booking_id },
             data: {
-              email: booking.user.email,
-              userName: booking.user.full_name,
-              bookingId: booking.booking_code,
-              stationName: booking.station.name,
-              stationAddress: booking.station.address,
-              scheduledTime: booking.scheduled_at.toISOString(),
-              cancelledAt: new Date().toISOString(),
+              status: "cancelled",
+              notes: booking.notes
+                ? `${booking.notes}\n${autoCancelNote}`
+                : autoCancelNote,
+              ...release.bookingUpdate,
             },
           });
-        } catch (error) {
-          console.error(`Failed to send cancellation notification for booking ${booking.booking_code}:`, error);
-        }
 
-        return updatedBooking;
-      })
-    );
+          return {
+            updatedBooking: updated,
+            walletForfeitedAmount: release.walletForfeitedAmount,
+          };
+        });
+
+      cancelledBookings.push({
+        original: booking,
+        updated: updatedBooking,
+        walletForfeitedAmount,
+      });
+
+      try {
+        const walletMessage =
+          walletForfeitedAmount > 0
+            ? ` Khoản đã thanh toán ${walletForfeitedAmount.toLocaleString("vi-VN")}đ sẽ không được hoàn theo chính sách.`
+            : "";
+
+        await notificationService.sendNotification({
+          type: "booking_cancelled",
+          userId: booking.user_id,
+          title: "Đặt chỗ đã bị hủy tự động",
+          message: `Đặt chỗ của bạn tại ${booking.station.name} đã bị hủy tự động do bạn không có mặt trong vòng 10 phút sau giờ đã đặt.${walletMessage}`,
+          data: {
+            email: booking.user.email,
+            userName: booking.user.full_name,
+            bookingId: booking.booking_code,
+            stationName: booking.station.name,
+            stationAddress: booking.station.address,
+            scheduledTime: booking.scheduled_at.toISOString(),
+            cancelledAt: new Date().toISOString(),
+            wallet_forfeited_amount: walletForfeitedAmount,
+          },
+        });
+      } catch (error) {
+        console.error(
+          `Failed to send cancellation notification for booking ${booking.booking_code}:`,
+          error
+        );
+      }
+    }
 
     return {
       cancelled: cancelledBookings.length,
-      bookings: cancelledBookings.map((b) => b.booking_code),
+      bookings: cancelledBookings.map((b) => b.updated.booking_code),
       message: `Successfully auto-cancelled ${cancelledBookings.length} expired booking(s)`,
     };
   } catch (error) {
@@ -149,7 +187,10 @@ export async function sendBookingReminders() {
           },
         });
       } catch (error) {
-        console.error(`Failed to send reminder for booking ${booking.booking_code}:`, error);
+        console.error(
+          `Failed to send reminder for booking ${booking.booking_code}:`,
+          error
+        );
       }
     }
 
@@ -198,7 +239,10 @@ export async function sendBookingReminders() {
           },
         });
       } catch (error) {
-        console.error(`Failed to send final reminder for booking ${booking.booking_code}:`, error);
+        console.error(
+          `Failed to send final reminder for booking ${booking.booking_code}:`,
+          error
+        );
       }
     }
 
@@ -257,47 +301,81 @@ export async function autoCancelInstantBookings() {
       return { cancelled: 0, message: "No expired instant bookings to cancel" };
     }
 
-    // Cancel all expired instant bookings
-    const cancelledBookings = await Promise.all(
-      expiredInstantBookings.map(async (booking) => {
-        const updatedBooking = await prisma.booking.update({
-          where: { booking_id: booking.booking_id },
-          data: {
-            status: "cancelled",
-            notes: booking.notes
-              ? `${booking.notes}\nAuto-cancelled: Instant booking expired - User did not arrive within 15 minutes.`
-              : "Auto-cancelled: Instant booking expired - User did not arrive within 15 minutes.",
-          },
-        });
+    const cancelledBookings: {
+      original: (typeof expiredInstantBookings)[number];
+      updated: Awaited<ReturnType<typeof prisma.booking.update>>;
+      walletForfeitedAmount: number;
+    }[] = [];
 
-        // Send notification to user
-        try {
-          await notificationService.sendNotification({
-            type: "booking_cancelled",
-            userId: booking.user_id,
-            title: "Đặt chỗ ngay đã bị hủy tự động",
-            message: `Đặt chỗ ngay của bạn tại ${booking.station.name} đã bị hủy tự động do bạn không có mặt trong vòng 15 phút.`,
+    for (const booking of expiredInstantBookings) {
+      const autoCancelNote =
+        "Auto-cancelled: Instant booking expired - User did not arrive within 15 minutes.";
+
+      const { updatedBooking, walletForfeitedAmount } =
+        await prisma.$transaction(async (tx) => {
+          const release = await releaseBookingHold({
+            tx,
+            booking: booking as unknown as BookingHoldFields,
+            actorUserId: booking.user_id,
+            notes: autoCancelNote,
+          });
+
+          const updated = await tx.booking.update({
+            where: { booking_id: booking.booking_id },
             data: {
-              email: booking.user.email,
-              userName: booking.user.full_name,
-              bookingId: booking.booking_code,
-              stationName: booking.station.name,
-              stationAddress: booking.station.address,
-              scheduledTime: booking.scheduled_at.toISOString(),
-              cancelledAt: new Date().toISOString(),
+              status: "cancelled",
+              notes: booking.notes
+                ? `${booking.notes}\n${autoCancelNote}`
+                : autoCancelNote,
+              ...release.bookingUpdate,
             },
           });
-        } catch (error) {
-          console.error(`Failed to send cancellation notification for instant booking ${booking.booking_code}:`, error);
-        }
 
-        return updatedBooking;
-      })
-    );
+          return {
+            updatedBooking: updated,
+            walletForfeitedAmount: release.walletForfeitedAmount,
+          };
+        });
+
+      cancelledBookings.push({
+        original: booking,
+        updated: updatedBooking,
+        walletForfeitedAmount,
+      });
+
+      try {
+        const walletMessage =
+          walletForfeitedAmount > 0
+            ? ` Khoản đã thanh toán ${walletForfeitedAmount.toLocaleString("vi-VN")}đ sẽ không được hoàn theo chính sách.`
+            : "";
+
+        await notificationService.sendNotification({
+          type: "booking_cancelled",
+          userId: booking.user_id,
+          title: "Đặt chỗ ngay đã bị hủy tự động",
+          message: `Đặt chỗ ngay của bạn tại ${booking.station.name} đã bị hủy tự động do bạn không có mặt trong vòng 15 phút.${walletMessage}`,
+          data: {
+            email: booking.user.email,
+            userName: booking.user.full_name,
+            bookingId: booking.booking_code,
+            stationName: booking.station.name,
+            stationAddress: booking.station.address,
+            scheduledTime: booking.scheduled_at.toISOString(),
+            cancelledAt: new Date().toISOString(),
+            wallet_forfeited_amount: walletForfeitedAmount,
+          },
+        });
+      } catch (error) {
+        console.error(
+          `Failed to send cancellation notification for instant booking ${booking.booking_code}:`,
+          error
+        );
+      }
+    }
 
     return {
       cancelled: cancelledBookings.length,
-      bookings: cancelledBookings.map((b) => b.booking_code),
+      bookings: cancelledBookings.map((b) => b.updated.booking_code),
       message: `Successfully auto-cancelled ${cancelledBookings.length} expired instant booking(s)`,
     };
   } catch (error) {
@@ -305,4 +383,3 @@ export async function autoCancelInstantBookings() {
     throw error;
   }
 }
-

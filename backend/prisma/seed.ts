@@ -1,4 +1,9 @@
-import { PrismaClient, Prisma } from "@prisma/client";
+import {
+  PrismaClient,
+  Prisma,
+  PaymentStatus,
+  BatteryStatus,
+} from "@prisma/client";
 import { hashPassword } from "../src/utils/bcrypt.util";
 
 const prisma = new PrismaClient();
@@ -12,21 +17,55 @@ async function main() {
 
   // In production, require explicit FORCE_SEED=true to prevent accidental seeding
   if (isProduction && !forceSeed) {
-    console.log("⚠️  Production environment detected. Seed skipped for safety.");
+    console.log(
+      "⚠️  Production environment detected. Seed skipped for safety."
+    );
     console.log("   To seed in production, set FORCE_SEED=true");
-    console.log(`   Current data: ${existingUsersCount} users, ${existingStationsCount} stations`);
+    console.log(
+      `   Current data: ${existingUsersCount} users, ${existingStationsCount} stations`
+    );
     return;
   }
 
   // If database already has data, skip seeding unless FORCE_SEED=true
   if (!forceSeed && (existingUsersCount > 0 || existingStationsCount > 0)) {
-    console.log("⚠️  Database already contains data. Seed skipped to prevent data loss.");
-    console.log(`   Current data: ${existingUsersCount} users, ${existingStationsCount} stations`);
+    console.log(
+      "⚠️  Database already contains data. Seed skipped to prevent data loss."
+    );
+    console.log(
+      `   Current data: ${existingUsersCount} users, ${existingStationsCount} stations`
+    );
     console.log("   To force seed, set FORCE_SEED=true");
     return;
   }
 
   console.log("🌱 Starting comprehensive database seeding...");
+
+  if (forceSeed) {
+    console.log("🧹 Clearing existing data (FORCE_SEED=true)...");
+    await prisma.$executeRawUnsafe(`
+      TRUNCATE TABLE
+        "battery_history",
+        "transactions",
+        "payments",
+        "bookings",
+        "staff_schedules",
+        "vehicles",
+        "user_subscriptions",
+        "service_packages",
+        "batteries",
+        "station_ratings",
+        "support_tickets",
+        "ticket_replies",
+        "battery_transfer_logs",
+        "notifications",
+        "wallets",
+        "topup_packages",
+        "stations",
+        "users"
+      RESTART IDENTITY CASCADE;
+    `);
+  }
 
   // Generate simple password hashes for existing users
   const adminPasswordHash = await hashPassword("admin123");
@@ -234,16 +273,20 @@ async function main() {
   // ===========================================
   const schedulePromises: Promise<any>[] = [];
   const now = new Date();
-  const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const startOfToday = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  );
 
   staffs.forEach((staff, index) => {
     if (!staff) return;
 
     const baseStationId = staff.station_id ?? stations[0]?.station_id ?? null;
     for (let dayOffset = 1; dayOffset <= 5; dayOffset++) {
-      const shiftDate = new Date(startOfToday.getTime() + dayOffset * 24 * 60 * 60 * 1000);
+      const shiftDate = new Date(
+        startOfToday.getTime() + dayOffset * 24 * 60 * 60 * 1000
+      );
       const shiftStart = new Date(shiftDate);
-      shiftStart.setUTCHours(7 + index % 2 * 4, 0, 0, 0); // 07:00 or 11:00 UTC
+      shiftStart.setUTCHours(7 + (index % 2) * 4, 0, 0, 0); // 07:00 or 11:00 UTC
       const shiftEnd = new Date(shiftStart);
       shiftEnd.setUTCHours(shiftStart.getUTCHours() + 8, 0, 0, 0);
 
@@ -382,6 +425,21 @@ async function main() {
     }),
   ]);
   console.log("✅ Created driver users:", drivers.length);
+
+  // ===========================================
+  // CREATE WALLETS FOR DRIVERS
+  // ===========================================
+  const wallets = await Promise.all(
+    drivers.map((driver) =>
+      prisma.wallet.create({
+        data: {
+          user_id: driver.user_id,
+          balance: new Prisma.Decimal(0),
+        },
+      })
+    )
+  );
+  console.log("✅ Created wallets:", wallets.length);
 
   // ===========================================
   // CREATE VEHICLES
@@ -657,9 +715,55 @@ async function main() {
   console.log("✅ Created service packages:", servicePackages.length);
 
   // ===========================================
+  // CREATE TOP-UP PACKAGES
+  // ===========================================
+  const topupPackageDefinitions = [
+    {
+      name: "Bronze Boost 200K",
+      description:
+        "Nạp nhanh 200.000 VND và nhận thêm 10.000 VND để sử dụng cho các lần đổi pin.",
+      topupAmount: 200000,
+      bonusAmount: 10000,
+      actualAmount: 210000,
+    },
+    {
+      name: "Silver Saver 400K",
+      description:
+        "Gói tiết kiệm cho tài xế thường xuyên: nhận thêm 40.000 VND khi nạp 400.000 VND.",
+      topupAmount: 400000,
+      bonusAmount: 40000,
+      actualAmount: 440000,
+    },
+    {
+      name: "Quick Charge 100K",
+      description:
+        "Gói nhỏ cho chuyến đi ngắn: nạp 100.000 VND kèm 5.000 VND khuyến mãi.",
+      topupAmount: 100000,
+      bonusAmount: 5000,
+      actualAmount: 105000,
+    },
+  ];
+
+  const topupPackages = await Promise.all(
+    topupPackageDefinitions.map((pkg) =>
+      prisma.topUpPackage.create({
+        data: {
+          name: pkg.name,
+          description: pkg.description,
+          topup_amount: new Prisma.Decimal(pkg.topupAmount),
+          bonus_amount: new Prisma.Decimal(pkg.bonusAmount),
+          actual_amount: new Prisma.Decimal(pkg.actualAmount),
+          is_active: true,
+        },
+      })
+    )
+  );
+  console.log("✅ Created top-up packages:", topupPackages.length);
+
+  // ===========================================
   // CREATE USER SUBSCRIPTIONS
   // ===========================================
-  const subscriptions = await Promise.all([
+  const userSubscriptions = await Promise.all([
     prisma.userSubscription.create({
       data: {
         user_id: drivers[0].user_id,
@@ -706,11 +810,143 @@ async function main() {
       },
     }),
   ]);
-  console.log("✅ Created user subscriptions:", subscriptions.length);
+  console.log("✅ Created user subscriptions:", userSubscriptions.length);
 
   // ===========================================
-  // CREATE BOOKINGS
+  // CREATE DEMO BOOKINGS WITH HOLD DATA
   // ===========================================
+  const batteriesForHolds = await prisma.battery.findMany({
+    take: 5,
+    orderBy: { created_at: "asc" },
+  });
+
+  if (batteriesForHolds.length < 5) {
+    throw new Error(
+      "Seed requires at least 5 batteries to demonstrate hold flow"
+    );
+  }
+
+  const nowTime = new Date();
+  const twoHoursLater = new Date(nowTime.getTime() + 2 * 60 * 60 * 1000);
+  const fourHoursLater = new Date(nowTime.getTime() + 4 * 60 * 60 * 1000);
+  const sixHoursLater = new Date(nowTime.getTime() + 6 * 60 * 60 * 1000);
+
+  // ===========================================
+  // CREATE WALLET TOP-UPS
+  // ===========================================
+  const walletTopups = await Promise.all([
+    prisma.payment.create({
+      data: {
+        user_id: drivers[0].user_id,
+        topup_package_id: topupPackages[0].package_id,
+        amount: new Prisma.Decimal(topupPackageDefinitions[0].topupAmount),
+        payment_method: "vnpay",
+        payment_status: "completed" as PaymentStatus,
+        payment_type: "TOPUP",
+        metadata: {
+          bonus_amount: topupPackageDefinitions[0].bonusAmount,
+          actual_wallet_credit: topupPackageDefinitions[0].actualAmount,
+        },
+        paid_at: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000),
+      },
+    }),
+    prisma.payment.create({
+      data: {
+        user_id: drivers[1].user_id,
+        topup_package_id: topupPackages[1].package_id,
+        amount: new Prisma.Decimal(topupPackageDefinitions[1].topupAmount),
+        payment_method: "vnpay",
+        payment_status: "completed" as PaymentStatus,
+        payment_type: "TOPUP",
+        metadata: {
+          bonus_amount: topupPackageDefinitions[1].bonusAmount,
+          actual_wallet_credit: topupPackageDefinitions[1].actualAmount,
+        },
+        paid_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+      },
+    }),
+    prisma.payment.create({
+      data: {
+        user_id: drivers[4].user_id,
+        topup_package_id: topupPackages[2].package_id,
+        amount: new Prisma.Decimal(topupPackageDefinitions[2].topupAmount),
+        payment_method: "vnpay",
+        payment_status: "completed" as PaymentStatus,
+        payment_type: "TOPUP",
+        metadata: {
+          bonus_amount: topupPackageDefinitions[2].bonusAmount,
+          actual_wallet_credit: topupPackageDefinitions[2].actualAmount,
+        },
+        paid_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      },
+    }),
+  ]);
+  console.log("✅ Created top-up payments:", walletTopups.length);
+
+  await prisma.wallet.update({
+    where: { user_id: drivers[0].user_id },
+    data: { balance: new Prisma.Decimal(210000) },
+  });
+  await prisma.wallet.update({
+    where: { user_id: drivers[1].user_id },
+    data: { balance: new Prisma.Decimal(440000) },
+  });
+  await prisma.wallet.update({
+    where: { user_id: drivers[2].user_id },
+    data: { balance: new Prisma.Decimal(0) },
+  });
+  await prisma.wallet.update({
+    where: { user_id: drivers[3].user_id },
+    data: { balance: new Prisma.Decimal(0) },
+  });
+  await prisma.wallet.update({
+    where: { user_id: drivers[4].user_id },
+    data: { balance: new Prisma.Decimal(105000) },
+  });
+  await prisma.wallet.update({
+    where: { user_id: drivers[5].user_id },
+    data: { balance: new Prisma.Decimal(0) },
+  });
+
+  const refundPayment = await prisma.payment.create({
+    data: {
+      user_id: drivers[2].user_id,
+      amount: new Prisma.Decimal(150000),
+      payment_method: "wallet",
+      payment_status: "completed" as PaymentStatus,
+      payment_type: "REFUND",
+      metadata: {
+        reason: "duplicate_charge_resolution",
+        related_ticket_number: "TKT20250120003",
+      },
+      paid_at: new Date(Date.now() - 12 * 60 * 60 * 1000),
+    },
+  });
+  await prisma.wallet.update({
+    where: { user_id: drivers[2].user_id },
+    data: { balance: new Prisma.Decimal(150000) },
+  });
+
+  const holdPayment = await prisma.payment.create({
+    data: {
+      user_id: drivers[1].user_id,
+      amount: new Prisma.Decimal(250000),
+      payment_method: "wallet",
+      payment_status: "reserved" as PaymentStatus,
+      payment_type: "SWAP",
+      metadata: {
+        type: "booking_hold",
+        note: "Demo hold payment for driver 2",
+      },
+      paid_at: new Date(),
+    },
+  });
+
+  await prisma.wallet.update({
+    where: { user_id: drivers[1].user_id },
+    data: { balance: new Prisma.Decimal(190000) },
+  });
+
   const bookings = await Promise.all([
     prisma.booking.create({
       data: {
@@ -719,22 +955,42 @@ async function main() {
         vehicle_id: vehicles[0].vehicle_id,
         station_id: stations[0].station_id,
         battery_model: "VinFast VF8 Battery",
-        scheduled_at: new Date(Date.now() + 2 * 60 * 60 * 1000),
+        scheduled_at: twoHoursLater,
         status: "pending",
-      },
+        notes: "Demo booking with subscription hold",
+        locked_battery_id: batteriesForHolds[0].battery_id,
+        locked_battery_previous_status: batteriesForHolds[0]
+          .status as BatteryStatus,
+        locked_subscription_id: userSubscriptions[0]?.subscription_id ?? null,
+        locked_swap_count: 1,
+        locked_wallet_amount: new Prisma.Decimal(0),
+        locked_wallet_payment_id: null,
+        hold_expires_at: new Date(twoHoursLater.getTime() + 15 * 60 * 1000),
+        use_subscription: true,
+      } as any,
+      include: { station: true, vehicle: true },
     }),
     prisma.booking.create({
       data: {
         booking_code: "BSS20250120002",
         user_id: drivers[1].user_id,
         vehicle_id: vehicles[1].vehicle_id,
-        station_id: stations[0].station_id,
+        station_id: stations[1].station_id,
         battery_model: "Tesla Model 3 Battery",
-        scheduled_at: new Date(Date.now() + 4 * 60 * 60 * 1000),
-        status: "confirmed",
-        checked_in_at: new Date(Date.now() + 3.5 * 60 * 60 * 1000),
-        checked_in_by_staff_id: staffs[0].user_id,
-      },
+        scheduled_at: fourHoursLater,
+        status: "pending",
+        notes: "Demo booking with wallet hold",
+        locked_battery_id: batteriesForHolds[1].battery_id,
+        locked_battery_previous_status: batteriesForHolds[1]
+          .status as BatteryStatus,
+        locked_subscription_id: null,
+        locked_swap_count: 0,
+        locked_wallet_amount: holdPayment.amount,
+        locked_wallet_payment_id: holdPayment.payment_id,
+        hold_expires_at: new Date(fourHoursLater.getTime() + 15 * 60 * 1000),
+        use_subscription: false,
+      } as any,
+      include: { station: true, vehicle: true },
     }),
     prisma.booking.create({
       data: {
@@ -742,12 +998,12 @@ async function main() {
         user_id: drivers[2].user_id,
         vehicle_id: vehicles[2].vehicle_id,
         station_id: stations[1].station_id,
-        battery_model: "BYD Atto 3 Battery",
-        scheduled_at: new Date(Date.now() - 2 * 60 * 60 * 1000),
+        battery_model: "Hyundai IONIQ 5 Battery",
+        scheduled_at: new Date(nowTime.getTime() - 2 * 60 * 60 * 1000),
         status: "completed",
-        checked_in_at: new Date(Date.now() - 2.5 * 60 * 60 * 1000),
-        checked_in_by_staff_id: staffs[2].user_id,
+        notes: "Completed booking for Driver 3",
       },
+      include: { station: true, vehicle: true },
     }),
     prisma.booking.create({
       data: {
@@ -755,24 +1011,89 @@ async function main() {
         user_id: drivers[3].user_id,
         vehicle_id: vehicles[3].vehicle_id,
         station_id: stations[2].station_id,
-        battery_model: "BMW iX3 Battery",
-        scheduled_at: new Date(Date.now() + 6 * 60 * 60 * 1000),
-        status: "pending",
+        battery_model: "VinFast VF8 Battery",
+        scheduled_at: new Date(nowTime.getTime() - 30 * 60 * 1000),
+        status: "cancelled",
+        notes: "Cancelled booking for Driver 4",
       },
+      include: { station: true, vehicle: true },
     }),
     prisma.booking.create({
       data: {
         booking_code: "BSS20250120005",
         user_id: drivers[4].user_id,
         vehicle_id: vehicles[4].vehicle_id,
-        station_id: stations[1].station_id,
-        battery_model: "Hyundai IONIQ 5 Battery",
-        scheduled_at: new Date(Date.now() - 1 * 60 * 60 * 1000),
-        status: "cancelled",
+        station_id: stations[0].station_id,
+        battery_model: "VinFast VF8 Battery",
+        scheduled_at: sixHoursLater,
+        status: "pending",
+        notes: "Driver 5 scheduling for later",
       },
+      include: { station: true, vehicle: true },
     }),
   ]);
   console.log("✅ Created bookings:", bookings.length);
+
+  // Update batteries used for holds to reserved/in_use for demo consistency
+  await prisma.battery.update({
+    where: { battery_id: batteriesForHolds[0].battery_id },
+    data: {
+      status: "reserved" as BatteryStatus,
+      station_id: stations[0].station_id,
+    },
+  });
+  await prisma.battery.update({
+    where: { battery_id: batteriesForHolds[1].battery_id },
+    data: {
+      status: "reserved" as BatteryStatus,
+      station_id: stations[1].station_id,
+    },
+  });
+
+  await (prisma as any).batteryHistory.createMany({
+    data: [
+      {
+        battery_id: batteriesForHolds[0].battery_id,
+        booking_id: bookings[0].booking_id,
+        station_id: stations[0].station_id,
+        actor_user_id: drivers[0].user_id,
+        action: "reserved",
+        notes: "Seed: Pin giữ cho booking subscription",
+      },
+      {
+        battery_id: batteriesForHolds[1].battery_id,
+        booking_id: bookings[1].booking_id,
+        station_id: stations[1].station_id,
+        actor_user_id: drivers[1].user_id,
+        action: "reserved",
+        notes: "Seed: Pin giữ kèm giữ tiền ví",
+      },
+      {
+        battery_id: batteriesForHolds[0].battery_id,
+        booking_id: bookings[0].booking_id,
+        station_id: stations[0].station_id,
+        actor_user_id: staffs[0]?.user_id ?? null,
+        action: "issued",
+        notes: "Seed: Staff giao pin giữ cho driver",
+      },
+      {
+        battery_id: batteriesForHolds[1].battery_id,
+        booking_id: bookings[1].booking_id,
+        station_id: stations[1].station_id,
+        actor_user_id: staffs[1]?.user_id ?? null,
+        action: "released",
+        notes: "Seed: Hủy booking nên trả pin về kho",
+      },
+      {
+        battery_id: batteriesForHolds[2].battery_id,
+        booking_id: bookings[2].booking_id,
+        station_id: stations[1].station_id,
+        actor_user_id: staffs[2]?.user_id ?? null,
+        action: "returned",
+        notes: "Seed: Hoàn tất đổi pin – pin cũ trả về",
+      },
+    ],
+  });
 
   // ===========================================
   // CREATE TRANSACTIONS
@@ -813,7 +1134,7 @@ async function main() {
   // ===========================================
   // CREATE PAYMENTS
   // ===========================================
-  const payments = await Promise.all([
+  const swapAndSubscriptionPayments = await Promise.all([
     prisma.payment.create({
       data: {
         transaction_id: transactions[0].transaction_id,
@@ -827,7 +1148,7 @@ async function main() {
     }),
     prisma.payment.create({
       data: {
-        subscription_id: subscriptions[0].subscription_id,
+        subscription_id: userSubscriptions[0].subscription_id,
         user_id: drivers[0].user_id,
         amount: 500000,
         payment_method: "momo",
@@ -838,7 +1159,7 @@ async function main() {
     }),
     prisma.payment.create({
       data: {
-        subscription_id: subscriptions[1].subscription_id,
+        subscription_id: userSubscriptions[1].subscription_id,
         user_id: drivers[1].user_id,
         amount: 800000,
         payment_method: "credit_card",
@@ -848,7 +1169,13 @@ async function main() {
       },
     }),
   ]);
-  console.log("✅ Created payments:", payments.length);
+  const allPayments = [
+    holdPayment,
+    ...walletTopups,
+    refundPayment,
+    ...swapAndSubscriptionPayments,
+  ];
+  console.log("✅ Created payments:", allPayments.length);
 
   // ===========================================
   // CREATE SUPPORT TICKETS
@@ -984,6 +1311,74 @@ async function main() {
   ]);
   console.log("✅ Created battery transfer logs:", batteryTransferLogs.length);
 
+  // ===========================================
+  // CREATE NOTIFICATIONS
+  // ===========================================
+  const notificationSeedData = [
+    {
+      user_id: drivers[0].user_id,
+      type: "booking",
+      title: "Giữ pin thành công",
+      message: `Đơn ${bookings[0].booking_code} đã giữ pin thành công tại trạm ${bookings[0].station?.name ?? ""}.`,
+      data: {
+        booking_id: bookings[0].booking_id,
+        booking_code: bookings[0].booking_code,
+        station_id: bookings[0].station_id,
+      },
+    },
+    {
+      user_id: drivers[1].user_id,
+      type: "payment",
+      title: "Đã giữ 250.000 VND cho đơn đổi pin",
+      message: `Ví của bạn đã giữ 250.000 VND cho đơn ${bookings[1].booking_code}. Số dư khả dụng hiện tại là 190.000 VND.`,
+      data: {
+        booking_id: bookings[1].booking_id,
+        booking_code: bookings[1].booking_code,
+        payment_id: holdPayment.payment_id,
+        reserved_amount: holdPayment.amount,
+      },
+    },
+    {
+      user_id: drivers[2].user_id,
+      type: "payment",
+      title: "Hoàn tiền 150.000 VND đã được xử lý",
+      message:
+        "Chúng tôi đã hoàn 150.000 VND vào ví do lỗi thanh toán trùng lặp. Vui lòng kiểm tra lịch sử giao dịch.",
+      data: {
+        payment_id: refundPayment.payment_id,
+        amount: refundPayment.amount,
+      },
+    },
+    {
+      user_id: staffs[0].user_id,
+      type: "staff_booking",
+      title: "Tài xế sắp đến trạm",
+      message: `Xe biển số ${bookings[0].vehicle?.license_plate ?? ""} sẽ đến đổi pin lúc ${bookings[0].scheduled_at.toISOString()}.`,
+      data: {
+        booking_id: bookings[0].booking_id,
+        station_id: bookings[0].station_id,
+        vehicle_id: bookings[0].vehicle_id,
+      },
+    },
+    {
+      user_id: drivers[4].user_id,
+      type: "wallet",
+      title: "Nạp ví thành công",
+      message:
+        "Bạn vừa nạp 100.000 VND và nhận thêm 5.000 VND khuyến mãi. Tổng số dư hiện tại: 105.000 VND.",
+      data: {
+        payment_id: walletTopups[2].payment_id,
+        new_balance: "105000",
+      },
+    },
+  ];
+
+  const notificationsResult = await prisma.notification.createMany({
+    data: notificationSeedData,
+  });
+  const notificationsCount = notificationsResult.count;
+  console.log("✅ Created notifications:", notificationsCount);
+
   console.log("🎉 Comprehensive database seeding completed successfully!");
   console.log("\n📊 Final Summary:");
   console.log(
@@ -993,14 +1388,17 @@ async function main() {
   console.log(`- Vehicles: ${vehicles.length}`);
   console.log(`- Batteries: ${createdBatteries.length}`);
   console.log(`- Service Packages: ${servicePackages.length}`);
-  console.log(`- Subscriptions: ${subscriptions.length}`);
+  console.log(`- Top-up Packages: ${topupPackages.length}`);
+  console.log(`- Wallets: ${wallets.length}`);
+  console.log(`- Subscriptions: ${userSubscriptions.length}`);
   console.log(`- Bookings: ${bookings.length}`);
   console.log(`- Transactions: ${transactions.length}`);
-  console.log(`- Payments: ${payments.length}`);
+  console.log(`- Payments: ${allPayments.length}`);
   console.log(`- Support Tickets: ${supportTickets.length}`);
   console.log(`- Ticket Replies: ${ticketReplies.length}`);
   console.log(`- Station Ratings: ${stationRatings.length}`);
   console.log(`- Battery Transfer Logs: ${batteryTransferLogs.length}`);
+  console.log(`- Notifications: ${notificationsCount}`);
   console.log("\n🚀 Database is now ready for comprehensive testing!");
 }
 
