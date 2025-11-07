@@ -7,6 +7,7 @@ import { notificationService } from "../server";
 import {
   consumeBookingHold,
   type BookingHoldFields,
+  buildBookingUncheckedUpdate,
 } from "../services/booking-hold.service";
 
 const prisma = new PrismaClient();
@@ -953,13 +954,15 @@ export const completeBooking = asyncHandler(
         notes: "booking_completed",
       });
 
+      const bookingUpdateData: Prisma.BookingUncheckedUpdateInput = {
+        ...buildBookingUncheckedUpdate(consume.bookingUpdate),
+        status: "completed",
+        battery_model: finalBatteryModel,
+      };
+
       const updatedBooking = await tx.booking.update({
         where: { booking_id: id },
-        data: {
-          status: "completed",
-          battery_model: finalBatteryModel,
-          ...consume.bookingUpdate,
-        },
+        data: bookingUpdateData,
       });
 
       const walletAfterRow = holdInfo.use_subscription

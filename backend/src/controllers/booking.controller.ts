@@ -7,6 +7,7 @@ import { prisma, notificationService } from "../server";
 import {
   releaseBookingHold,
   type BookingHoldFields,
+  buildBookingUncheckedUpdate,
 } from "../services/booking-hold.service";
 
 type PricingCacheMaps = {
@@ -1322,12 +1323,15 @@ export const cancelBooking = asyncHandler(
         }
       }
 
+      const bookingUpdateData: Prisma.BookingUncheckedUpdateInput = {
+        ...buildBookingUncheckedUpdate(release.bookingUpdate),
+        status: "cancelled",
+        notes: booking.notes ? `${booking.notes}\n${releaseNote}` : releaseNote,
+      };
+
       const updatedBooking = await tx.booking.update({
         where: { booking_id: id },
-        data: {
-          status: "cancelled",
-          ...release.bookingUpdate,
-        },
+        data: bookingUpdateData,
       });
 
       return {

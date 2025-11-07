@@ -1,8 +1,9 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 import { notificationService } from "../server";
 import {
   releaseBookingHold,
   type BookingHoldFields,
+  buildBookingUncheckedUpdate,
 } from "./booking-hold.service";
 
 const prisma = new PrismaClient();
@@ -69,15 +70,17 @@ export async function autoCancelExpiredBookings() {
             notes: autoCancelNote,
           });
 
+          const bookingUpdateData: Prisma.BookingUncheckedUpdateInput = {
+            ...buildBookingUncheckedUpdate(release.bookingUpdate),
+            status: "cancelled",
+            notes: booking.notes
+              ? `${booking.notes}\n${autoCancelNote}`
+              : autoCancelNote,
+          };
+
           const updated = await tx.booking.update({
             where: { booking_id: booking.booking_id },
-            data: {
-              status: "cancelled",
-              notes: booking.notes
-                ? `${booking.notes}\n${autoCancelNote}`
-                : autoCancelNote,
-              ...release.bookingUpdate,
-            },
+            data: bookingUpdateData,
           });
 
           return {
@@ -320,15 +323,17 @@ export async function autoCancelInstantBookings() {
             notes: autoCancelNote,
           });
 
+          const bookingUpdateData: Prisma.BookingUncheckedUpdateInput = {
+            ...buildBookingUncheckedUpdate(release.bookingUpdate),
+            status: "cancelled",
+            notes: booking.notes
+              ? `${booking.notes}\n${autoCancelNote}`
+              : autoCancelNote,
+          };
+
           const updated = await tx.booking.update({
             where: { booking_id: booking.booking_id },
-            data: {
-              status: "cancelled",
-              notes: booking.notes
-                ? `${booking.notes}\n${autoCancelNote}`
-                : autoCancelNote,
-              ...release.bookingUpdate,
-            },
+            data: bookingUpdateData,
           });
 
           return {

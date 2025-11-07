@@ -36,6 +36,37 @@ type ReleaseResult = {
   batteryReleasedId: string | null;
 };
 
+export function buildBookingUncheckedUpdate(
+  patch: BookingUpdatePatch
+): Prisma.BookingUncheckedUpdateInput {
+  const data: Prisma.BookingUncheckedUpdateInput = {};
+
+  if (patch.locked_battery_id !== undefined) {
+    data.locked_battery_id = patch.locked_battery_id;
+  }
+  if (patch.locked_battery_previous_status !== undefined) {
+    data.locked_battery_previous_status = patch.locked_battery_previous_status;
+  }
+  if (patch.locked_wallet_payment_id !== undefined) {
+    data.locked_wallet_payment_id = patch.locked_wallet_payment_id;
+  }
+  if (patch.locked_wallet_amount !== undefined) {
+    data.locked_wallet_amount =
+      patch.locked_wallet_amount ?? new Prisma.Decimal(0);
+  }
+  if (patch.locked_subscription_id !== undefined) {
+    data.locked_subscription_id = patch.locked_subscription_id;
+  }
+  if (patch.locked_swap_count !== undefined) {
+    data.locked_swap_count = patch.locked_swap_count;
+  }
+  if (patch.hold_expires_at !== undefined) {
+    data.hold_expires_at = patch.hold_expires_at;
+  }
+
+  return data;
+}
+
 const BATTERY_STATUS_DEFAULT = BatteryStatus.full;
 const PAYMENT_STATUS_FORFEITED = "forfeited" as unknown as PaymentStatus;
 const PAYMENT_STATUS_COMPLETED = "completed" as unknown as PaymentStatus;
@@ -105,6 +136,9 @@ export async function releaseBookingHold({
     locked_battery_id: null,
     locked_battery_previous_status: null,
     locked_wallet_payment_id: null,
+    locked_wallet_amount: new Prisma.Decimal(0),
+    locked_subscription_id: null,
+    locked_swap_count: 0,
     hold_expires_at: null,
   };
 
