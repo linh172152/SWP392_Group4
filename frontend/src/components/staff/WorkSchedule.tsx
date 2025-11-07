@@ -13,16 +13,29 @@ import {
   Users,
   Briefcase,
   RefreshCw,
-  Loader2
+  Loader2,
+  Filter,
+  X
 } from 'lucide-react';
 import { getMyStaffSchedules, StaffSchedule } from '../../services/staff.service';
 import { useToast } from '../../hooks/use-toast';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
 
 const WorkSchedule: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [schedules, setSchedules] = useState<StaffSchedule[]>([]);
+  const [allSchedules, setAllSchedules] = useState<StaffSchedule[]>([]); // Store all schedules for calendar highlighting
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Filter states
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
+  const [includePast, setIncludePast] = useState(false);
+  
   const { toast } = useToast();
 
   const getStatusIcon = (status: string) => {
@@ -84,16 +97,32 @@ const WorkSchedule: React.FC = () => {
 
   useEffect(() => {
     loadSchedules();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [includePast]);
+
+  useEffect(() => {
+    applyFilters();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter, dateFrom, dateTo, allSchedules]);
 
   const loadSchedules = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await getMyStaffSchedules({ include_past: false });
+      
+      // Load all schedules for calendar highlighting
+      // We load all and filter client-side to ensure calendar highlighting works correctly
+      const params: {
+        include_past?: boolean;
+      } = {
+        include_past: includePast,
+      };
+      
+      const response = await getMyStaffSchedules(params);
       
       if (response.success && response.data) {
-        setSchedules(response.data);
+        setAllSchedules(response.data);
+        applyFiltersToSchedules(response.data);
       } else {
         setError(response.message || 'Không thể tải lịch làm việc');
         toast({
@@ -113,6 +142,106 @@ const WorkSchedule: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const applyFiltersToSchedules = (schedulesToFilter: StaffSchedule[]) => {
+    let filtered = [...schedulesToFilter];
+    
+    // Filter by status
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(s => s.status === statusFilter);
+    }
+    
+    // Filter by date range (client-side)
+    if (dateFrom) {
+      const fromDate = new Date(dateFrom);
+      fromDate.setHours(0, 0, 0, 0);
+      filtered = filtered.filter(s => {
+        const shiftDate = new Date(s.shift_start);
+        shiftDate.setHours(0, 0, 0, 0);
+        return shiftDate >= fromDate;
+      });
+    }
+    
+    if (dateTo) {
+      const toDate = new Date(dateTo);
+      toDate.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(s => {
+        const shiftDate = new Date(s.shift_start);
+        shiftDate.setHours(0, 0, 0, 0);
+        return shiftDate <= toDate;
+      });
+    }
+    
+    setSchedules(filtered);
+  };
+
+  const applyFilters = () => {
+    if (allSchedules.length > 0) {
+      applyFiltersToSchedules(allSchedules);
+    }
+  };
+
+  const clearFilters = () => {
+    setStatusFilter('all');
+    setDateFrom('');
+    setDateTo('');
+    // Don't reset includePast here, let user control it
+  };
+
+  // Quick filter functions
+  const setQuickFilter = (filter: 'today' | 'thisWeek' | 'thisMonth' | 'nextWeek') => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    let fromDate: Date;
+    let toDate: Date;
+    
+    switch (filter) {
+      case 'today':
+        fromDate = new Date(today);
+        toDate = new Date(today);
+        break;
+      case 'thisWeek':
+        fromDate = new Date(today);
+        fromDate.setDate(today.getDate() - today.getDay()); // Start of week (Sunday)
+        toDate = new Date(fromDate);
+        toDate.setDate(fromDate.getDate() + 6); // End of week
+        break;
+      case 'thisMonth':
+        fromDate = new Date(today.getFullYear(), today.getMonth(), 1);
+        toDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        break;
+      case 'nextWeek':
+        fromDate = new Date(today);
+        fromDate.setDate(today.getDate() - today.getDay() + 7); // Next week start
+        toDate = new Date(fromDate);
+        toDate.setDate(fromDate.getDate() + 6); // Next week end
+        break;
+    }
+    
+    setDateFrom(fromDate.toISOString().split('T')[0]);
+    setDateTo(toDate.toISOString().split('T')[0]);
+  };
+
+  // Get dates that have schedules for calendar highlighting
+  const getScheduledDates = () => {
+    return allSchedules.map(s => {
+      const date = new Date(s.shift_date);
+      date.setHours(0, 0, 0, 0);
+      return date;
+    });
+  };
+
+  // Get dates by status for different colors
+  const getDatesByStatus = (status: string) => {
+    return allSchedules
+      .filter(s => s.status === status)
+      .map(s => {
+        const date = new Date(s.shift_date);
+        date.setHours(0, 0, 0, 0);
+        return date;
+      });
   };
 
   const totalScheduled = schedules.filter(s => s.status === 'scheduled').length;
@@ -204,12 +333,145 @@ const WorkSchedule: React.FC = () => {
         </Card>
       </div>
 
+      {/* Quick Filters */}
+      <Card className="glass-card border-0 glow">
+        <CardContent className="p-4">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setQuickFilter('today')}
+              className="glass border-slate-200/50 dark:border-slate-700/50"
+            >
+              Hôm nay
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setQuickFilter('thisWeek')}
+              className="glass border-slate-200/50 dark:border-slate-700/50"
+            >
+              Tuần này
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setQuickFilter('thisMonth')}
+              className="glass border-slate-200/50 dark:border-slate-700/50"
+            >
+              Tháng này
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setQuickFilter('nextWeek')}
+              className="glass border-slate-200/50 dark:border-slate-700/50"
+            >
+              Tuần sau
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Filters */}
+      <Card className="glass-card border-0 glow">
+        <CardContent className="p-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            {/* Status Filter */}
+            <div className="flex-1">
+              <Label className="text-xs text-slate-600 dark:text-slate-400 mb-2 block">Trạng thái</Label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="glass border-slate-200/50 dark:border-slate-700/50">
+                  <Filter className="mr-2 h-4 w-4" />
+                  <SelectValue placeholder="Tất cả trạng thái" />
+                </SelectTrigger>
+                <SelectContent className="glass-card border-0">
+                  <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                  <SelectItem value="scheduled">Đã lên lịch</SelectItem>
+                  <SelectItem value="completed">Đã hoàn thành</SelectItem>
+                  <SelectItem value="absent">Vắng mặt</SelectItem>
+                  <SelectItem value="cancelled">Đã hủy</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Date From */}
+            <div className="flex-1">
+              <Label className="text-xs text-slate-600 dark:text-slate-400 mb-2 block">Từ ngày</Label>
+              <Input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="glass border-slate-200/50 dark:border-slate-700/50"
+              />
+            </div>
+
+            {/* Date To */}
+            <div className="flex-1">
+              <Label className="text-xs text-slate-600 dark:text-slate-400 mb-2 block">Đến ngày</Label>
+              <Input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="glass border-slate-200/50 dark:border-slate-700/50"
+                min={dateFrom || undefined}
+              />
+            </div>
+
+            {/* Include Past */}
+            <div className="flex items-end">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="includePast"
+                  checked={includePast}
+                  onChange={(e) => {
+                    setIncludePast(e.target.checked);
+                    setTimeout(() => loadSchedules(), 100);
+                  }}
+                  className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                />
+                <Label htmlFor="includePast" className="text-sm text-slate-600 dark:text-slate-400 cursor-pointer">
+                  Bao gồm quá khứ
+                </Label>
+              </div>
+            </div>
+
+            {/* Clear Filters */}
+            {(statusFilter !== 'all' || dateFrom || dateTo) && (
+              <div className="flex items-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearFilters}
+                  className="glass border-slate-200/50 dark:border-slate-700/50"
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Xóa bộ lọc
+                </Button>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Calendar */}
         <Card className="glass-card border-0 glow">
           <CardHeader>
             <CardTitle className="text-slate-900 dark:text-white">Lịch tháng</CardTitle>
-            <CardDescription className="text-slate-600 dark:text-slate-400">Chọn ngày để xem thông tin ca làm việc</CardDescription>
+            <CardDescription className="text-slate-600 dark:text-slate-400">
+              Chọn ngày để xem thông tin ca làm việc
+              <br />
+              <span className="text-xs">
+                <span className="inline-block w-2 h-2 rounded-full bg-blue-500 mr-1"></span>
+                Đã lên lịch • 
+                <span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-1 ml-2"></span>
+                Hoàn thành • 
+                <span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-1 ml-2"></span>
+                Vắng mặt
+              </span>
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <Calendar
@@ -217,6 +479,18 @@ const WorkSchedule: React.FC = () => {
               selected={selectedDate}
               onSelect={setSelectedDate}
               className="rounded-md border-0"
+              modifiers={{
+                hasScheduled: getDatesByStatus('scheduled'),
+                hasCompleted: getDatesByStatus('completed'),
+                hasAbsent: getDatesByStatus('absent'),
+                hasCancelled: getDatesByStatus('cancelled'),
+              }}
+              modifiersClassNames={{
+                hasScheduled: 'bg-blue-100 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100 font-semibold',
+                hasCompleted: 'bg-green-100 dark:bg-green-900/30 text-green-900 dark:text-green-100 font-semibold',
+                hasAbsent: 'bg-red-100 dark:bg-red-900/30 text-red-900 dark:text-red-100 font-semibold',
+                hasCancelled: 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100',
+              }}
             />
           </CardContent>
         </Card>
