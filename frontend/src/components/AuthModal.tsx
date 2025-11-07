@@ -70,17 +70,33 @@ const AuthModal: React.FC<AuthModalProps> = ({
 
     try {
       if (mode === "login") {
-        // Real API login
-        const response = await fetch(API_ENDPOINTS.AUTH.LOGIN, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email,
-            password,
-          }),
-        });
+        // Real API login với timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 giây timeout
+        
+        let response;
+        try {
+          response = await fetch(API_ENDPOINTS.AUTH.LOGIN, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              email,
+              password,
+            }),
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+        } catch (fetchError: any) {
+          clearTimeout(timeoutId);
+          if (fetchError.name === 'AbortError') {
+            setError("Yêu cầu mất quá nhiều thời gian. Vui lòng kiểm tra kết nối mạng hoặc thử lại sau.");
+            setLoading(false);
+            return;
+          }
+          throw fetchError;
+        }
 
         // Check for Too Many Requests
         if (response.status === 429) {

@@ -53,8 +53,6 @@ interface BatteryTypeInfo {
   compatibleVehicles: Vehicle[];
 }
 
-const SERVICE_FEE = 20000; // Phí dịch vụ 20.000đ
-
 const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, station, onSuccess }) => {
   // State quản lý loading
   const [loading, setLoading] = useState(false);
@@ -109,7 +107,7 @@ const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, station, o
 
   // Auto-select battery type và vehicle khi có data
   useEffect(() => {
-    if (stationDetails && vehicles.length > 0 && pricingList.length > 0 && !selectedBatteryType) {
+    if (stationDetails && vehicles.length > 0 && !selectedBatteryType) {
       const compatibleBatteries = getCompatibleBatteryTypes();
       if (compatibleBatteries.length > 0) {
         const firstBattery = compatibleBatteries[0];
@@ -132,6 +130,20 @@ const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, station, o
     } catch (err) {
       console.error('Error loading data:', err);
       // Không set error ở đây để tránh hiện lỗi khi đóng modal
+    }
+  };
+
+  const loadPricing = async () => {
+    setLoadingPricing(true);
+    try {
+      const response = await getBatteryPricing({ is_active: true, limit: 100 });
+      setPricingList(response.data.pricings);
+    } catch (err: any) {
+      console.error('Error loading pricing:', err);
+      // Không block nếu không load được pricing, sẽ hiển thị "Liên hệ"
+      setPricingList([]);
+    } finally {
+      setLoadingPricing(false);
     }
   };
 
@@ -167,18 +179,6 @@ const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, station, o
     }
   };
 
-  const loadPricing = async () => {
-    setLoadingPricing(true);
-    try {
-      const response = await getBatteryPricing({ is_active: true, limit: 100 });
-      setPricingList(response.data.pricings);
-    } catch (err: any) {
-      console.error('Error loading pricing:', err);
-      // Không block nếu không load được pricing, sẽ dùng giá mặc định
-    } finally {
-      setLoadingPricing(false);
-    }
-  };
 
   // Lấy thông tin các loại pin tương thích
   const getCompatibleBatteryTypes = (): BatteryTypeInfo[] => {
@@ -218,9 +218,8 @@ const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, station, o
   const selectedBatteryInfo = compatibleBatteryTypes.find(b => b.model === selectedBatteryType);
   const compatibleVehiclesForSelected = selectedBatteryInfo?.compatibleVehicles || [];
 
-  // Tính giá
+  // Tính giá (nếu có pricing)
   const batteryPrice = selectedBatteryInfo?.price || 0;
-  const totalPrice = batteryPrice + SERVICE_FEE;
 
   // Xử lý chọn battery type
   const handleBatteryTypeSelect = (model: string) => {
@@ -247,15 +246,14 @@ const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, station, o
       time: null,
     });
     
-    // 30 phút, 1h, 2h, 3h
-    for (let i = 1; i <= 4; i++) {
+    // 1h, 2h, 3h (đã xóa 30 phút vì minimum là 30 phút)
+    for (let i = 2; i <= 4; i++) {
       const time = new Date(now.getTime() + i * 30 * 60 * 1000);
       const hours = time.getHours().toString().padStart(2, '0');
       const minutes = time.getMinutes().toString().padStart(2, '0');
       
       let label = '';
-      if (i === 1) label = '30 phút nữa';
-      else if (i === 2) label = '1 giờ nữa';
+      if (i === 2) label = '1 giờ nữa';
       else if (i === 3) label = '2 giờ nữa';
       else label = '3 giờ nữa';
       
@@ -308,7 +306,7 @@ const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, station, o
           ...bookingData,
           scheduled_at: scheduledDate.toISOString(),
         });
-        setSuccess('Đã đặt lịch hẹn thành công!');
+        setSuccess('Đã đặt lịch hẹn thành công! Bạn sẽ thanh toán khi hoàn tất đổi pin tại trạm.');
       } else if (customTime) {
         // Đặt lịch hẹn với custom time
         const scheduledDate = new Date(customTime);
@@ -319,7 +317,7 @@ const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, station, o
           ...bookingData,
           scheduled_at: scheduledDate.toISOString(),
         });
-        setSuccess('Đã đặt lịch hẹn thành công!');
+        setSuccess('Đã đặt lịch hẹn thành công! Bạn sẽ thanh toán khi hoàn tất đổi pin tại trạm.');
       } else {
         throw new Error('Vui lòng chọn thời gian');
       }
@@ -635,33 +633,20 @@ const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, station, o
                       </div>
 
                       <div className="space-y-3">
-                        <div className="flex justify-between text-base">
-                          <span className="text-slate-600 dark:text-slate-400">Giá thay pin</span>
-                          <span className="font-medium text-slate-900 dark:text-white">
-                            {batteryPrice > 0
-                              ? `${batteryPrice.toLocaleString('vi-VN')}₫`
-                              : 'Liên hệ'}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-base">
-                          <span className="text-slate-600 dark:text-slate-400">Phí dịch vụ</span>
-                          <span className="font-medium text-slate-900 dark:text-white">
-                            {SERVICE_FEE.toLocaleString('vi-VN')}₫
-                          </span>
-                        </div>
-                        <div className="border-t border-slate-200 dark:border-slate-700 pt-3 mt-3">
-                          <div className="flex justify-between">
-                            <span className="font-semibold text-slate-900 dark:text-white text-lg">
-                              Tổng cộng
-                            </span>
-                            <span className={`font-bold text-green-600 ${
-                              totalPrice > SERVICE_FEE ? 'text-2xl' : 'text-lg'
-                            }`}>
-                              {totalPrice > SERVICE_FEE
-                                ? `${totalPrice.toLocaleString('vi-VN')}₫`
-                                : 'Liên hệ'}
+                        {batteryPrice > 0 && (
+                          <div className="flex justify-between text-base">
+                            <span className="text-slate-600 dark:text-slate-400">Giá thay pin</span>
+                            <span className="font-medium text-slate-900 dark:text-white">
+                              {batteryPrice.toLocaleString('vi-VN')}₫
                             </span>
                           </div>
+                        )}
+                        <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700">
+                          <p className="text-sm text-blue-700 dark:text-blue-300">
+                            <strong>Lưu ý:</strong> Bạn sẽ thanh toán khi hoàn tất đổi pin tại trạm. 
+                            {batteryPrice === 0 && ' Vui lòng liên hệ trạm để biết giá chi tiết.'}
+                            {batteryPrice > 0 && ' Nếu bạn có gói dịch vụ, sẽ được miễn phí.'}
+                          </p>
                         </div>
                       </div>
 

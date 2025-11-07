@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { User } from '../../App';
+import type { User } from '../../App';
 import { Button } from '../ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { ThemeToggle } from '../ThemeToggle';
@@ -29,7 +29,7 @@ interface AdminLayoutProps {
 const navigation = [
   { name: 'Bảng điều khiển', href: '/admin/home', icon: Home },
   { name: 'Quản lý trạm', href: '/admin/stations', icon: Building },
-  { name: 'Điều phối pin', href: '/admin/coordination', icon: Shuffle },
+  { name: 'Quản lý giá pin', href: '/admin/battery-pricing', icon: Shuffle },
   { name: 'Quản lý gói nạp tiền', href: '/admin/topup-packages', icon: Wallet },
   { name: 'Quản lý người dùng', href: '/admin/users', icon: Users },
   { name: 'Quản lý nhân viên', href: '/admin/employees', icon: Users },

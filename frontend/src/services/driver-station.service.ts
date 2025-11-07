@@ -71,6 +71,7 @@ export const driverStationService = {
   async findNearbyPublicStations(params: NearbyStationsParams): Promise<Station[]> {
     const { latitude, longitude, radius = 10 } = params;
     
+    // Backend expects 'latitude' and 'longitude' (not 'lat' and 'lng')
     const queryParams = new URLSearchParams({
       latitude: latitude.toString(),
       longitude: longitude.toString(),

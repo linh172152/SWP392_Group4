@@ -12,6 +12,7 @@ import {
   Zap
 } from 'lucide-react';
 import API_ENDPOINTS, { fetchWithAuth } from '../../config/api';
+import { formatCurrency } from '../../utils/format';
 
 interface ServicePackage {
   package_id: string;
@@ -20,7 +21,8 @@ interface ServicePackage {
   price: number;
   swap_limit: number | null;
   duration_days: number;
-  battery_models: string[];
+  battery_capacity_kwh: number;  // Thêm field này từ BE
+  battery_models?: string[];     // Optional vì BE đã không bắt buộc
   is_active: boolean;
 }
 
@@ -106,19 +108,33 @@ const ServicePackages: React.FC = () => {
   };
 
   // Mua gói dịch vụ
-  const purchasePackage = async (packageId: string, paymentMethod: 'cash' | 'vnpay' = 'cash') => {
+  const purchasePackage = async (packageId: string, autoRenew: boolean = false) => {
     setLoading(true);
     setError('');
     try {
-      const res = await fetchWithAuth(API_ENDPOINTS.SUBSCRIPTIONS.BASE, {
+      // BE endpoint: POST /api/driver/subscriptions/packages/:packageId/subscribe
+      const res = await fetchWithAuth(API_ENDPOINTS.SUBSCRIPTIONS.SUBSCRIBE(packageId), {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          package_id: packageId,
-          payment_method: paymentMethod
+          autoRenew: autoRenew
         })
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
+        // Xử lý error "Insufficient wallet balance" → Redirect đến wallet
+        if (data.message && (
+          data.message.toLowerCase().includes('insufficient') ||
+          data.message.toLowerCase().includes('không đủ') ||
+          data.message.toLowerCase().includes('số dư')
+        )) {
+          setError('Số dư ví không đủ. Vui lòng nạp thêm tiền vào ví.');
+          // Tự động redirect đến wallet sau 2 giây
+          setTimeout(() => {
+            navigate('/driver/wallet');
+          }, 2000);
+          return;
+        }
         throw new Error(data.message || 'Mua gói dịch vụ thất bại');
       }
       // Reload để cập nhật subscription
@@ -128,7 +144,18 @@ const ServicePackages: React.FC = () => {
       // Hiển thị thông báo thành công (có thể dùng toast notification)
       alert('Đăng ký gói dịch vụ thành công!');
     } catch (e: any) {
-      setError(e.message || 'Có lỗi xảy ra');
+      // Xử lý error "Insufficient wallet balance" từ catch block
+      const errorMsg = e.message || 'Có lỗi xảy ra';
+      if (errorMsg.toLowerCase().includes('insufficient') ||
+          errorMsg.toLowerCase().includes('không đủ') ||
+          errorMsg.toLowerCase().includes('số dư')) {
+        setError('Số dư ví không đủ. Vui lòng nạp thêm tiền vào ví.');
+        setTimeout(() => {
+          navigate('/driver/wallet');
+        }, 2000);
+      } else {
+        setError(errorMsg);
+      }
     } finally {
       setLoading(false);
     }
@@ -142,8 +169,10 @@ const ServicePackages: React.FC = () => {
     setLoading(true);
     setError('');
     try {
+      // BE endpoint: POST /api/driver/subscriptions/:subscriptionId/cancel
       const res = await fetchWithAuth(API_ENDPOINTS.SUBSCRIPTIONS.CANCEL(subscriptionId), {
-        method: 'PUT'
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
@@ -287,7 +316,8 @@ const ServicePackages: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {packages.map((pkg) => {
               const isUnlimited = pkg.swap_limit === null;
-              const priceFormatted = pkg.price === 0 ? 'Miễn phí' : `${Number(pkg.price).toLocaleString('vi-VN')} đ`;
+              // Dùng formatCurrency thay vì toLocaleString
+              const priceFormatted = pkg.price === 0 ? 'Miễn phí' : formatCurrency(Number(pkg.price));
               const hasActiveSubscription = currentSubscription && isValid;
               
               return (
@@ -334,7 +364,7 @@ const ServicePackages: React.FC = () => {
                       <div className="flex items-center gap-2 text-sm">
                         <CheckCircle className="h-4 w-4 text-purple-600" />
                         <span className="text-slate-700 dark:text-slate-300">
-                          Hỗ trợ {pkg.battery_models.length} loại pin
+                          Dung lượng pin: {pkg.battery_capacity_kwh} kWh
                         </span>
                       </div>
                     </div>
@@ -349,7 +379,7 @@ const ServicePackages: React.FC = () => {
                     ) : (
                       <Button 
                         className="w-full gradient-primary text-white shadow-lg hover:shadow-xl transition-all duration-300"
-                        onClick={() => purchasePackage(pkg.package_id, 'cash')}
+                        onClick={() => purchasePackage(pkg.package_id, false)}
                         disabled={loading}
                       >
                         {loading ? 'Đang xử lý...' : 'Đăng ký ngay'}

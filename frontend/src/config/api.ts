@@ -69,19 +69,40 @@ export const API_ENDPOINTS = {
     STATIONS: `${API_BASE_URL}/driver/stations`,
     BOOKINGS: `${API_BASE_URL}/driver/bookings`,
     TRANSACTIONS: `${API_BASE_URL}/driver/transactions`,
+    WALLET: {
+      BALANCE: `${API_BASE_URL}/driver/wallet/balance`,
+      TRANSACTIONS: `${API_BASE_URL}/driver/wallet/transactions`,
+      TOPUP: `${API_BASE_URL}/driver/wallet/topup`,
+    },
+    TOPUP_PACKAGES: `${API_BASE_URL}/driver/topup-packages`,
+    // TODO: BE đang tạo endpoint này, sẽ cập nhật khi BE hoàn thành
+    // Pricing endpoint cho driver (chỉ đọc active pricing)
+    PRICING: `${API_BASE_URL}/driver/pricing`, // Hoặc có thể là `${API_BASE_URL}/pricing/public` tùy BE
+    NOTIFICATIONS: {
+      BASE: `${API_BASE_URL}/driver/notifications`,
+      MARK_READ: (id: string) => `${API_BASE_URL}/driver/notifications/${id}/read`,
+      MARK_ALL_READ: `${API_BASE_URL}/driver/notifications/read-all`,
+    },
   },
-  // Code của bạn - Subscription endpoints (giữ nguyên)
+  // Code của bạn - Subscription endpoints (cập nhật theo BE)
   SUBSCRIPTIONS: {
-    BASE: `${API_BASE_URL}/subscriptions`,
-    BY_ID: (id: string) => `${API_BASE_URL}/subscriptions/${id}`,
-    CANCEL: (id: string) => `${API_BASE_URL}/subscriptions/${id}/cancel`,
+    BASE: `${API_BASE_URL}/driver/subscriptions`,
+    BY_ID: (id: string) => `${API_BASE_URL}/driver/subscriptions/${id}`,
+    SUBSCRIBE: (packageId: string) => `${API_BASE_URL}/driver/subscriptions/packages/${packageId}/subscribe`,
+    CANCEL: (subscriptionId: string) => `${API_BASE_URL}/driver/subscriptions/${subscriptionId}/cancel`,
   },
   PACKAGES: {
     BASE: `${API_BASE_URL}/packages`,
     BY_ID: (id: string) => `${API_BASE_URL}/packages/${id}`,
   },
+  DRIVER_SUBSCRIPTIONS: {
+    BASE: `${API_BASE_URL}/driver/subscriptions`,
+    SUBSCRIBE: (packageId: string) => `${API_BASE_URL}/driver/subscriptions/packages/${packageId}/subscribe`,
+    CANCEL: (subscriptionId: string) => `${API_BASE_URL}/driver/subscriptions/${subscriptionId}/cancel`,
+  },
   PUBLIC: {
     STATIONS: `${API_BASE_URL}/stations/public`,
+    PRICING: `${API_BASE_URL}/pricing`,
   },
   STAFF: {
     BOOKINGS: `${API_BASE_URL}/staff/bookings`,
@@ -97,6 +118,10 @@ export const API_ENDPOINTS = {
     ADD_BATTERY: `${API_BASE_URL}/staff/batteries`,
     UPDATE_BATTERY: (id: string) => `${API_BASE_URL}/staff/batteries/${id}`,
     DELETE_BATTERY: (id: string) => `${API_BASE_URL}/staff/batteries/${id}`,
+    
+    // Schedule endpoints
+    SCHEDULES: `${API_BASE_URL}/staff/schedules`,
+    UPDATE_SCHEDULE_STATUS: (id: string) => `${API_BASE_URL}/staff/schedules/${id}/status`,
   },
   HEALTH: `${API_BASE_URL}/health`,
 };

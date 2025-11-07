@@ -1,8 +1,8 @@
-import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import React, { useEffect, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
-import { Progress } from '../ui/progress';
+import { getDashboardStats } from '../../services/report.service';
+import type { DashboardStats } from '../../services/report.service';
 import { 
   Building, 
   Users, 
@@ -10,347 +10,524 @@ import {
   DollarSign,
   TrendingUp,
   TrendingDown,
-  Battery,
-  MapPin,
-  Clock,
-  AlertTriangle,
-  CheckCircle,
   Activity,
   RefreshCw,
-  BarChart3
+  BarChart3,
+  Calendar,
+  CreditCard,
+  Award,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Loader2
 } from 'lucide-react';
 
-// Dữ liệu KPI mẫu
-const kpiData = {
-  totalStations: 47,
-  activeStations: 45,
-  totalUsers: 12450,
-  dailySwaps: 2847,
-  dailyRevenue: 125450.75,
-  systemUptime: 99.2,
-  avgSwapTime: 2.8,
-  customerSatisfaction: 4.6
-};
-
-const recentAlerts = [
-  {
-    id: 'ALT-001',
-    type: 'warning',
-    station: 'Trung tâm Thành phố',
-    message: 'Kho pin thấp (12%)',
-    time: '15 phút trước',
-    priority: 'high'
-  },
-  {
-    id: 'ALT-002',
-    type: 'error',
-    station: 'Nhà ga Sân bay',
-    message: 'Cánh tay robot hỏng ở khu vực 3',
-    time: '1 giờ trước',
-    priority: 'critical'
-  },
-  {
-    id: 'ALT-003',
-    type: 'info',
-    station: 'Trung tâm Thương mại',
-    message: 'Hoàn thành bảo trì định kỳ',
-    time: '2 giờ trước',
-    priority: 'low'
-  }
-];
-
-const topStations = [
-  { name: 'Trung tâm Thành phố', swaps: 342, revenue: 12450.50, utilization: 89 },
-  { name: 'Trung tâm Thương mại', swaps: 298, revenue: 10780.25, utilization: 76 },
-  { name: 'Trạm Nghỉ Cao tốc', swaps: 267, revenue: 9834.75, utilization: 68 },
-  { name: 'Nhà ga Sân bay', swaps: 234, revenue: 8901.00, utilization: 62 }
-];
-
 const AdminHome: React.FC = () => {
-  const getAlertIcon = (type: string) => {
-    switch (type) {
-      case 'warning': return <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />;
-      case 'error': return <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />;
-      case 'info': return <CheckCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />;
-      default: return <AlertTriangle className="h-4 w-4 text-slate-600 dark:text-slate-400" />;
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [period, setPeriod] = useState<'day' | 'week' | 'month'>('day');
+
+  useEffect(() => {
+    fetchStats();
+  }, [period]);
+
+  const fetchStats = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await getDashboardStats(period);
+      if (res && res.success) {
+        setStats(res.data);
+      } else {
+        throw new Error(res?.message || 'Failed to load dashboard data');
+      }
+    } catch (err: any) {
+      console.error('Load dashboard error:', err);
+      setError(err.message || 'Không thể tải dữ liệu dashboard');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getAlertColor = (priority: string) => {
-    switch (priority) {
-      case 'critical': return 'bg-red-50/80 dark:bg-red-500/10 text-red-800 dark:text-red-400 border-red-200/50 dark:border-red-500/20';
-      case 'high': return 'bg-yellow-50/80 dark:bg-yellow-500/10 text-yellow-800 dark:text-yellow-400 border-yellow-200/50 dark:border-yellow-500/20';
-      case 'medium': return 'bg-blue-50/80 dark:bg-blue-500/10 text-blue-800 dark:text-blue-400 border-blue-200/50 dark:border-blue-500/20';
-      case 'low': return 'bg-slate-50/80 dark:bg-slate-500/10 text-slate-800 dark:text-slate-400 border-slate-200/50 dark:border-slate-500/20';
-      default: return 'bg-slate-50/80 dark:bg-slate-500/10 text-slate-800 dark:text-slate-400 border-slate-200/50 dark:border-slate-500/20';
-    }
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND',
+    }).format(amount);
   };
 
-  const getPriorityLabel = (priority: string) => {
-    switch (priority) {
-      case 'critical': return 'Nghiêm trọng';
-      case 'high': return 'Cao';
-      case 'medium': return 'Trung bình';
-      case 'low': return 'Thấp';
-      default: return priority;
-    }
+  const getTrendIcon = (trend: string) => {
+    if (trend === 'N/A') return null;
+    const value = parseFloat(trend);
+    if (value > 0) return <TrendingUp className="h-4 w-4 text-green-500" />;
+    if (value < 0) return <TrendingDown className="h-4 w-4 text-red-500" />;
+    return null;
   };
+
+  const getTrendColor = (trend: string) => {
+    if (trend === 'N/A') return 'text-slate-500';
+    const value = parseFloat(trend);
+    if (value > 0) return 'text-green-600';
+    if (value < 0) return 'text-red-600';
+    return 'text-slate-600';
+  };
+
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="float">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-purple-900 dark:from-white dark:to-purple-100 bg-clip-text text-transparent">Bảng điều khiển Quản trị</h1>
-          <p className="text-slate-600 dark:text-slate-300">Tổng quan hoạt động và hiệu suất toàn mạng lưới</p>
-        </div>
-        <div className="flex gap-3">
-          <Button variant="outline" className="glass border-purple-200/50 dark:border-purple-400/30 hover:bg-purple-50/50 dark:hover:bg-purple-500/10">
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Làm mới Dữ liệu
-          </Button>
-          <Button className="bg-gradient-to-r from-purple-500 to-violet-500 text-white shadow-lg hover:shadow-xl transition-all duration-300">
-            <BarChart3 className="mr-2 h-4 w-4" />
-            Xem Báo cáo
-          </Button>
-        </div>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <Building className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Trạm Hoạt động</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{kpiData.activeStations}/{kpiData.totalStations}</p>
-                <div className="flex items-center text-xs text-green-600 dark:text-green-400">
-                  <TrendingUp className="mr-1 h-3 w-3" />
-                  +2 tháng này
+      <div className="max-w-7xl mx-auto mb-8">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-8 shadow-2xl">
+          <div className="absolute inset-0 bg-black/10"></div>
+          <div className="relative z-10">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-white/20 rounded-2xl backdrop-blur-sm">
+                  <BarChart3 className="h-10 w-10 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-4xl font-black text-white tracking-tight">
+                    Bảng điều khiển Admin
+                  </h1>
+                  <p className="text-blue-100 text-lg mt-1">
+                    Tổng quan hoạt động và hiệu suất hệ thống
+                  </p>
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <Users className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Tổng Người dùng</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{kpiData.totalUsers.toLocaleString()}</p>
-                <div className="flex items-center text-xs text-green-600 dark:text-green-400">
-                  <TrendingUp className="mr-1 h-3 w-3" />
-                  +8.2% tăng trưởng
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-purple-500 to-violet-500 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <Zap className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Lần Thay Hôm nay</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{kpiData.dailySwaps.toLocaleString()}</p>
-                <div className="flex items-center text-xs text-green-600 dark:text-green-400">
-                  <TrendingUp className="mr-1 h-3 w-3" />
-                  +12% so với hôm qua
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-orange-500 to-yellow-500 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <DollarSign className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Doanh thu Hôm nay</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">${kpiData.dailyRevenue.toLocaleString()}</p>
-                <div className="flex items-center text-xs text-green-600 dark:text-green-400">
-                  <TrendingUp className="mr-1 h-3 w-3" />
-                  +15% so với hôm qua
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* System Health and Alerts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* System Health */}
-        <Card className="glass-card border-0 glow">
-          <CardHeader>
-            <CardTitle className="text-slate-900 dark:text-white">Sức khỏe Hệ thống</CardTitle>
-            <CardDescription className="text-slate-600 dark:text-slate-400">Chỉ số hiệu suất toàn mạng lưới</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600 dark:text-slate-400">Thời gian Hoạt động</span>
-                <span className="font-medium text-green-600 dark:text-green-400">{kpiData.systemUptime}%</span>
-              </div>
-              <Progress value={kpiData.systemUptime} className="h-2" />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600 dark:text-slate-400">Thời gian Thay trung bình</span>
-                <span className="font-medium text-slate-900 dark:text-white">{kpiData.avgSwapTime} phút</span>
-              </div>
-              <Progress value={85} className="h-2" />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600 dark:text-slate-400">Hài lòng Khách hàng</span>
-                <span className="font-medium text-green-600 dark:text-green-400">{kpiData.customerSatisfaction}/5.0</span>
-              </div>
-              <Progress value={(kpiData.customerSatisfaction / 5) * 100} className="h-2" />
-            </div>
-
-            <div className="grid grid-cols-3 gap-4 pt-4 border-t border-slate-200/50 dark:border-slate-700/50">
-              <div className="text-center">
-                <div className="text-lg font-bold text-green-600 dark:text-green-400">{kpiData.activeStations}</div>
-                <div className="text-xs text-slate-600 dark:text-slate-400">Trực tuyến</div>
-              </div>
-              <div className="text-center">
-                <div className="text-lg font-bold text-yellow-600 dark:text-yellow-400">2</div>
-                <div className="text-xs text-slate-600 dark:text-slate-400">Bảo trì</div>
-              </div>
-              <div className="text-center">
-                <div className="text-lg font-bold text-red-600 dark:text-red-400">0</div>
-                <div className="text-xs text-slate-600 dark:text-slate-400">Ngoại tuyến</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Recent Alerts */}
-        <Card className="glass-card border-0 glow">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-slate-900 dark:text-white">Cảnh báo Gần đây</CardTitle>
-                <CardDescription className="text-slate-600 dark:text-slate-400">Thông báo và vấn đề hệ thống</CardDescription>
-              </div>
-              <Button variant="outline" size="sm" className="glass border-purple-200/50 dark:border-purple-400/30">
-                Xem Tất cả
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {recentAlerts.map((alert) => (
-                <div key={alert.id} className="flex items-start space-x-3 p-3 glass rounded-lg">
-                  {getAlertIcon(alert.type)}
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-medium text-slate-900 dark:text-white">{alert.station}</p>
-                      <Badge className={getAlertColor(alert.priority)} variant="outline">
-                        {getPriorityLabel(alert.priority)}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-slate-600 dark:text-slate-300">{alert.message}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{alert.time}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Top Performing Stations */}
-      <Card className="glass-card border-0 glow">
-        <CardHeader>
-          <CardTitle className="text-slate-900 dark:text-white">Trạm Hiệu suất Cao nhất</CardTitle>
-          <CardDescription className="text-slate-600 dark:text-slate-400">Doanh thu và tỷ lệ sử dụng cao nhất hôm nay</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {topStations.map((station, index) => (
-              <div key={index} className="flex items-center justify-between p-4 glass rounded-lg hover:shadow-lg transition-all duration-300">
-                <div className="flex items-center space-x-4">
-                  <div className="p-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg">
-                    <MapPin className="h-5 w-5 text-white" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-slate-900 dark:text-white">{station.name}</h4>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">{station.swaps} lần thay hôm nay</p>
-                  </div>
-                </div>
-
-                <div className="text-center">
-                  <div className="text-lg font-bold text-slate-900 dark:text-white">${station.revenue.toLocaleString()}</div>
-                  <div className="text-xs text-slate-600 dark:text-slate-400">Doanh thu</div>
-                </div>
-
-                <div className="text-center">
-                  <div className="text-lg font-bold text-slate-900 dark:text-white">{station.utilization}%</div>
-                  <div className="text-xs text-slate-600 dark:text-slate-400">Sử dụng</div>
-                  <Progress value={station.utilization} className="w-16 h-1 mt-1" />
-                </div>
-
-                <Button variant="outline" size="sm" className="glass border-purple-200/50 dark:border-purple-400/30">
-                  <Activity className="mr-1 h-3 w-3" />
-                  Chi tiết
+              <div className="flex gap-3">
+                <Button 
+                  variant="outline" 
+                  onClick={fetchStats}
+                  disabled={loading}
+                  className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                >
+                  {loading ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                  )}
+                  Làm mới
                 </Button>
               </div>
-            ))}
+            </div>
+
+            {/* Period Selector */}
+            <div className="flex gap-2 bg-white/10 backdrop-blur-md rounded-xl p-1 border border-white/20 w-fit">
+              {(['day', 'week', 'month'] as const).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setPeriod(p)}
+                  disabled={loading}
+                  className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                    period === p
+                      ? 'bg-white text-indigo-600 shadow-lg'
+                      : 'text-white hover:bg-white/10'
+                  }`}
+                >
+                  {p === 'day' ? 'Hôm nay' : p === 'week' ? 'Tuần này' : 'Tháng này'}
+                </button>
+              ))}
+            </div>
+
+            {stats && (
+              <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 mt-4">
+                <div className="flex items-center gap-2 text-white">
+                  <Calendar className="h-5 w-5" />
+                  <span className="font-semibold">Kỳ: {stats.period}</span>
+                </div>
+              </div>
+            )}
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Network Performance */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-6 text-center">
-            <div className="p-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl w-fit mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
-              <Battery className="h-8 w-8 text-white" />
-            </div>
-            <h3 className="text-lg font-semibold mb-2 text-slate-900 dark:text-white">Sức khỏe Pin</h3>
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">94.2%</div>
-            <p className="text-sm text-slate-600 dark:text-slate-400">Trung bình mạng lưới</p>
-          </CardContent>
-        </Card>
+          {/* Decorative shapes */}
+          <div className="absolute -right-16 -top-16 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
+          <div className="absolute -left-16 -bottom-16 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl"></div>
+        </div>
+      </div>
 
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-6 text-center">
-            <div className="p-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl w-fit mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
-              <Clock className="h-8 w-8 text-white" />
-            </div>
-            <h3 className="text-lg font-semibold mb-2 text-slate-900 dark:text-white">Thời gian Chờ</h3>
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">4.2 phút</div>
-            <p className="text-sm text-slate-600 dark:text-slate-400">Trung bình toàn mạng</p>
-          </CardContent>
-        </Card>
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Error State */}
+        {error && (
+          <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl shadow-lg">
+            <p className="text-red-700 font-semibold">⚠️ {error}</p>
+          </div>
+        )}
 
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-6 text-center">
-            <div className="p-3 bg-gradient-to-r from-purple-500 to-violet-500 rounded-xl w-fit mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
-              <TrendingUp className="h-8 w-8 text-white" />
+        {/* Loading State */}
+        {loading && (
+          <div className="flex justify-center items-center py-20">
+            <div className="relative">
+              <div className="animate-spin rounded-full h-16 w-16 border-4 border-indigo-200 border-t-indigo-600"></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <BarChart3 className="h-8 w-8 text-indigo-600" />
+              </div>
             </div>
-            <h3 className="text-lg font-semibold mb-2 text-slate-900 dark:text-white">Tỷ lệ Tăng trưởng</h3>
-            <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">+18.5%</div>
-            <p className="text-sm text-slate-600 dark:text-slate-400">Tháng qua tháng</p>
-          </CardContent>
-        </Card>
+          </div>
+        )}
+
+        {/* Main Content */}
+        {!loading && !error && stats && (
+          <>
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Active Stations */}
+              <Card className="border-2 border-blue-100 bg-gradient-to-br from-blue-50 to-cyan-50 shadow-lg hover:shadow-xl transition-all">
+                <CardContent className="p-6">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl shadow-lg">
+                      <Building className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-600">Trạm Hoạt động</p>
+                      <p className="text-3xl font-black text-blue-600">{stats.stations.active}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Total Users */}
+              <Card className="border-2 border-green-100 bg-gradient-to-br from-green-50 to-emerald-50 shadow-lg hover:shadow-xl transition-all">
+                <CardContent className="p-6">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl shadow-lg">
+                      <Users className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-600">Tổng Người dùng</p>
+                      <p className="text-3xl font-black text-green-600">{stats.users.total}</p>
+                      <div className="flex items-center text-xs text-green-600 mt-1">
+                        +{stats.users.new_this_month} mới
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Total Bookings */}
+              <Card className="border-2 border-purple-100 bg-gradient-to-br from-purple-50 to-violet-50 shadow-lg hover:shadow-xl transition-all">
+                <CardContent className="p-6">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-3 bg-gradient-to-r from-purple-500 to-violet-500 rounded-xl shadow-lg">
+                      <Zap className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-600">Tổng Đặt chỗ</p>
+                      <p className="text-3xl font-black text-purple-600">{stats.bookings.total}</p>
+                      <div className="flex items-center text-xs gap-1 mt-1">
+                        {getTrendIcon(stats.bookings.trend)}
+                        <span className={getTrendColor(stats.bookings.trend)}>
+                          {stats.bookings.trend}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Total Revenue */}
+              <Card className="border-2 border-orange-100 bg-gradient-to-br from-orange-50 to-yellow-50 shadow-lg hover:shadow-xl transition-all">
+                <CardContent className="p-6">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-3 bg-gradient-to-r from-orange-500 to-yellow-500 rounded-xl shadow-lg">
+                      <DollarSign className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-600">Tổng Doanh thu</p>
+                      <p className="text-2xl font-black text-orange-600">
+                        {formatCurrency(stats.revenue.total)}
+                      </p>
+                      <div className="flex items-center text-xs gap-1 mt-1">
+                        {getTrendIcon(stats.revenue.trend)}
+                        <span className={getTrendColor(stats.revenue.trend)}>
+                          {stats.revenue.trend}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Revenue & Bookings Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Revenue Details */}
+              <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+                <div className="bg-gradient-to-r from-green-500 to-emerald-600 p-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                      <DollarSign className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-white">Chi tiết Doanh thu</h2>
+                      <p className="text-green-100 text-sm">Phân tích tài chính</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-6 space-y-4">
+                  <Card className="border-2 border-blue-100 bg-gradient-to-br from-blue-50 to-indigo-50">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-slate-700">Trung bình Hàng ngày</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-2xl font-black text-blue-600">
+                        {formatCurrency(stats.revenue.daily_average)}
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-2 border-purple-100 bg-gradient-to-br from-purple-50 to-pink-50">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2 text-slate-700">
+                        <CreditCard className="h-5 w-5" />
+                        Theo Phương thức
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {Object.entries(stats.revenue.by_payment_method).map(([method, amount]) => (
+                          amount > 0 && (
+                            <div key={method} className="flex justify-between items-center p-2 bg-white rounded-lg">
+                              <span className="text-sm font-medium text-slate-600 capitalize">
+                                {method === 'wallet' ? 'Ví' : method === 'cash' ? 'Tiền mặt' : method.toUpperCase()}
+                              </span>
+                              <span className="text-sm font-bold text-purple-600">
+                                {formatCurrency(amount as number)}
+                              </span>
+                            </div>
+                          )
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+
+              {/* Booking Status */}
+              <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+                <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                      <Activity className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-white">Trạng thái Đặt chỗ</h2>
+                      <p className="text-blue-100 text-sm">Phân tích hoạt động</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    <Card className="border-2 border-green-100 bg-gradient-to-br from-green-50 to-emerald-50">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-sm text-slate-600">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          Hoàn thành
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-3xl font-black text-green-600">{stats.bookings.completed}</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border-2 border-yellow-100 bg-gradient-to-br from-yellow-50 to-orange-50">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-sm text-slate-600">
+                          <Clock className="h-4 w-4 text-yellow-500" />
+                          Đang chờ
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-3xl font-black text-yellow-600">{stats.bookings.pending}</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border-2 border-red-100 bg-gradient-to-br from-red-50 to-pink-50">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-sm text-slate-600">
+                          <XCircle className="h-4 w-4 text-red-500" />
+                          Đã hủy
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-3xl font-black text-red-600">{stats.bookings.cancelled}</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border-2 border-orange-100 bg-gradient-to-br from-orange-50 to-red-50">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm text-slate-600">Tỷ lệ Hủy</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-3xl font-black text-orange-600">
+                          {stats.bookings.cancellation_rate}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Transactions & Most Popular Station */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Transactions */}
+              <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+                <div className="bg-gradient-to-r from-purple-500 to-pink-600 p-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                      <CreditCard className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-white">Giao dịch</h2>
+                      <p className="text-purple-100 text-sm">Tổng quan thanh toán</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-6 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <Card className="border-2 border-purple-100 bg-gradient-to-br from-purple-50 to-pink-50">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm text-slate-600">Tổng số</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-3xl font-black text-purple-600">{stats.transactions.total}</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border-2 border-pink-100 bg-gradient-to-br from-pink-50 to-rose-50">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm text-slate-600">TB Số tiền</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-xl font-black text-pink-600">
+                          {formatCurrency(stats.transactions.average_amount)}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <Card className="border-2 border-indigo-100 bg-gradient-to-br from-indigo-50 to-blue-50">
+                    <CardHeader>
+                      <CardTitle className="text-slate-700">Theo Model Pin</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {Object.entries(stats.transactions.by_battery_model).map(([model, count]) => (
+                          <div key={model} className="flex justify-between items-center p-2 bg-white rounded-lg">
+                            <span className="text-sm font-medium text-slate-700">{model}</span>
+                            <span className="text-sm font-bold text-indigo-600">{count} GD</span>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+
+              {/* Most Popular Station & Users */}
+              <div className="space-y-6">
+                {/* Most Popular Station */}
+                {stats.stations.most_popular && (
+                  <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+                    <div className="bg-gradient-to-r from-yellow-500 to-amber-600 p-6">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                          <Award className="h-6 w-6 text-white" />
+                        </div>
+                        <div>
+                          <h2 className="text-xl font-bold text-white">Trạm Phổ biến Nhất</h2>
+                          <p className="text-yellow-100 text-sm">Hiệu suất cao nhất</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-6">
+                      <Card className="border-2 border-yellow-200 bg-gradient-to-br from-yellow-50 to-amber-50">
+                        <CardContent className="p-6">
+                          <div className="flex items-center gap-4">
+                            <div className="p-3 bg-gradient-to-r from-yellow-500 to-amber-500 rounded-xl">
+                              <Building className="h-8 w-8 text-white" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-bold text-xl text-slate-800">
+                                {stats.stations.most_popular.name}
+                              </p>
+                              <p className="text-sm text-slate-600 mt-1">
+                                {stats.stations.most_popular.bookings_count} đặt chỗ trong kỳ
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </div>
+                )}
+
+                {/* Users Stats */}
+                <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+                  <div className="bg-gradient-to-r from-teal-500 to-green-600 p-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                        <Users className="h-6 w-6 text-white" />
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold text-white">Người dùng</h2>
+                        <p className="text-teal-100 text-sm">Cộng đồng & hoạt động</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-6">
+                    <div className="grid grid-cols-3 gap-4">
+                      <Card className="border-2 border-teal-100 bg-gradient-to-br from-teal-50 to-cyan-50">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-xs text-slate-600">Tổng</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-2xl font-black text-teal-600">{stats.users.total}</p>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="border-2 border-green-100 bg-gradient-to-br from-green-50 to-emerald-50">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-xs text-slate-600">Hoạt động</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-2xl font-black text-green-600">{stats.users.active_this_month}</p>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="border-2 border-blue-100 bg-gradient-to-br from-blue-50 to-indigo-50">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-xs text-slate-600">Mới</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-2xl font-black text-blue-600">{stats.users.new_this_month}</p>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Empty State */}
+        {!loading && !error && !stats && (
+          <Card className="text-center py-12">
+            <CardContent>
+              <BarChart3 className="h-16 w-16 text-slate-300 mx-auto mb-4" />
+              <p className="text-slate-500 text-lg font-medium">Không có dữ liệu</p>
+              <p className="text-slate-400 text-sm mt-2">Thử chọn khoảng thời gian khác</p>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

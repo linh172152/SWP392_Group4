@@ -234,6 +234,112 @@ export async function cancelBooking(bookingId: string, data?: CancelBookingData)
   return res; // { success, message, data: booking }
 }
 
+// ============================================
+// STAFF BATTERY OPERATIONS
+// ============================================
+
+export interface Battery {
+  battery_id: string;
+  battery_code: string;
+  station_id: string;
+  model: string;
+  capacity_kwh?: number | null;
+  voltage?: number | null;
+  current_charge: number;
+  health_percentage?: number | null;
+  cycle_count?: number | null;
+  status: "full" | "charging" | "in_use" | "maintenance" | "damaged";
+  last_charged_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  station?: {
+    station_id: string;
+    name: string;
+    address: string;
+  };
+}
+
+// ============================================
+// STAFF SCHEDULE INTERFACES
+// ============================================
+
+export interface StaffSchedule {
+  schedule_id: string;
+  staff_id: string;
+  station_id: string | null;
+  shift_date: string;
+  shift_start: string;
+  shift_end: string;
+  status: "scheduled" | "completed" | "absent" | "cancelled";
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  station?: {
+    station_id: string;
+    name: string;
+    address: string;
+  } | null;
+}
+
+/**
+ * Lấy danh sách pin của trạm (cho staff)
+ */
+export async function getStationBatteries(params?: {
+  status?: string;
+  model?: string;
+}) {
+  const qs = new URLSearchParams();
+  if (params?.status) qs.set('status', params.status);
+  if (params?.model) qs.set('model', params.model);
+
+  const url = `${API_ENDPOINTS.STAFF.BATTERIES}${qs.toString() ? `?${qs.toString()}` : ''}`;
+  const res = await authFetch(url);
+  return res; // { success, message, data: batteries[] }
+}
+
+// ============================================
+// STAFF SCHEDULE OPERATIONS
+// ============================================
+
+/**
+ * Lấy danh sách lịch làm việc của nhân viên đang đăng nhập
+ */
+export async function getMyStaffSchedules(params?: {
+  from?: string;
+  to?: string;
+  status?: "scheduled" | "completed" | "absent" | "cancelled";
+  include_past?: boolean;
+}) {
+  const qs = new URLSearchParams();
+  if (params?.from) qs.set('from', params.from);
+  if (params?.to) qs.set('to', params.to);
+  if (params?.status) qs.set('status', params.status);
+  if (params?.include_past !== undefined) qs.set('include_past', String(params.include_past));
+
+  const url = `${API_ENDPOINTS.STAFF.SCHEDULES}${qs.toString() ? `?${qs.toString()}` : ''}`;
+  const res = await authFetch(url);
+  return res; // { success, message, data: schedules[] }
+}
+
+/**
+ * Cập nhật trạng thái lịch làm việc
+ */
+export async function updateScheduleStatus(
+  scheduleId: string,
+  data: {
+    status: "completed" | "absent" | "cancelled";
+    notes?: string;
+  }
+) {
+  const url = API_ENDPOINTS.STAFF.UPDATE_SCHEDULE_STATUS(scheduleId);
+  const res = await authFetch(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return res; // { success, message, data: schedule }
+}
+
 export default {
   // Admin operations
   getAllStaff,
@@ -248,4 +354,11 @@ export default {
   confirmBooking,
   completeBooking,
   cancelBooking,
+  
+  // Staff battery operations
+  getStationBatteries,
+  
+  // Staff schedule operations
+  getMyStaffSchedules,
+  updateScheduleStatus,
 };

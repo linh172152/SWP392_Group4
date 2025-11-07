@@ -29,18 +29,34 @@ import {
   Phone,
   User,
   MapPin,
-  Calendar
+  Calendar,
+  Search,
+  Filter,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+} from '../ui/pagination';
 import { 
-  StaffBooking, 
+  type StaffBooking,
   getStationBookings,
   confirmBooking,
   completeBooking,
   cancelBooking,
-  ConfirmBookingData,
-  CompleteBookingData
 } from '../../services/staff.service';
 import { useToast } from '../../hooks/use-toast';
+
+type SortField = 'scheduled_at' | 'created_at' | 'user_name' | 'booking_code';
+type SortOrder = 'asc' | 'desc';
 
 const SwapTransactions: React.FC = () => {
   const [bookings, setBookings] = useState<StaffBooking[]>([]);
@@ -48,6 +64,16 @@ const SwapTransactions: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [selectedBooking, setSelectedBooking] = useState<StaffBooking | null>(null);
+  
+  // Pagination & Filter states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortField, setSortField] = useState<SortField>('scheduled_at');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   
   // Dialog states
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
@@ -62,23 +88,83 @@ const SwapTransactions: React.FC = () => {
   const [oldBatteryStatus, setOldBatteryStatus] = useState<'good' | 'damaged' | 'maintenance'>('good');
   const [cancelReason, setCancelReason] = useState('');
   const [cancelConfirmed, setCancelConfirmed] = useState(false);
+  const [completeError, setCompleteError] = useState<string | null>(null);
   
   const { toast } = useToast();
 
-  // Fetch bookings
+  // Fetch all bookings (for client-side filtering, searching, sorting)
   const fetchBookings = async () => {
     try {
       setRefreshing(true);
+      // Fetch a large number to get all bookings matching the status filter
       const response = await getStationBookings({
-        limit: 50,
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+        page: 1,
+        limit: 1000, // Fetch large number for client-side operations
       });
       
-      if (response.success && response.data?.bookings) {
-        // Filter chỉ lấy booking chưa hoàn thành hoặc hủy
-        const activeBookings = response.data.bookings.filter(
-          (b: StaffBooking) => ['pending', 'confirmed'].includes(b.status)
-        );
-        setBookings(activeBookings);
+      if (response.success && response.data) {
+        let allBookings = response.data.bookings || [];
+        
+        // Apply client-side search
+        if (searchTerm.trim()) {
+          const searchLower = searchTerm.toLowerCase();
+          allBookings = allBookings.filter((b: StaffBooking) => 
+            b.user?.full_name?.toLowerCase().includes(searchLower) ||
+            b.booking_code?.toLowerCase().includes(searchLower) ||
+            b.user?.phone?.includes(searchTerm) ||
+            b.user?.email?.toLowerCase().includes(searchLower) ||
+            b.vehicle?.license_plate?.toLowerCase().includes(searchLower) ||
+            b.vehicle?.make?.toLowerCase().includes(searchLower) ||
+            b.vehicle?.model?.toLowerCase().includes(searchLower)
+          );
+        }
+        
+        // Apply client-side sorting
+        allBookings.sort((a: StaffBooking, b: StaffBooking) => {
+          let aValue: any;
+          let bValue: any;
+          
+          switch (sortField) {
+            case 'scheduled_at':
+              aValue = new Date(a.scheduled_at).getTime();
+              bValue = new Date(b.scheduled_at).getTime();
+              break;
+            case 'created_at':
+              aValue = new Date(a.created_at).getTime();
+              bValue = new Date(b.created_at).getTime();
+              break;
+            case 'user_name':
+              aValue = a.user?.full_name || '';
+              bValue = b.user?.full_name || '';
+              break;
+            case 'booking_code':
+              aValue = a.booking_code || '';
+              bValue = b.booking_code || '';
+              break;
+            default:
+              return 0;
+          }
+          
+          if (sortOrder === 'asc') {
+            return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+          } else {
+            return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+          }
+        });
+        
+        // Calculate pagination
+        const totalFiltered = allBookings.length;
+        const totalPagesCalculated = Math.ceil(totalFiltered / pageSize);
+        setTotalItems(totalFiltered);
+        setTotalPages(totalPagesCalculated);
+        
+        // Apply pagination
+        const startIndex = (currentPage - 1) * pageSize;
+        const endIndex = startIndex + pageSize;
+        const paginatedBookings = allBookings.slice(startIndex, endIndex);
+        
+        setBookings(paginatedBookings);
       }
     } catch (error: any) {
       toast({
@@ -94,7 +180,41 @@ const SwapTransactions: React.FC = () => {
 
   useEffect(() => {
     fetchBookings();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, pageSize, statusFilter, sortField, sortOrder]);
+
+  // Debounce search and reset to page 1
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (currentPage !== 1) {
+        setCurrentPage(1);
+      } else {
+        fetchBookings();
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm]);
+
+  // Handle sort change
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('desc');
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="h-4 w-4 text-gray-400" />;
+    }
+    return sortOrder === 'asc' 
+      ? <ArrowUp className="h-4 w-4 text-blue-600" />
+      : <ArrowDown className="h-4 w-4 text-blue-600" />;
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -179,6 +299,7 @@ const SwapTransactions: React.FC = () => {
     setOldBatteryCode('');
     setBatteryModel(booking.battery_model || '');
     setOldBatteryStatus('good');
+    setCompleteError(null); // Reset error
     setCompleteDialogOpen(true);
   };
 
@@ -195,6 +316,8 @@ const SwapTransactions: React.FC = () => {
 
     try {
       setActionLoading(selectedBooking.booking_id);
+      setCompleteError(null); // Reset error trước khi submit
+      
       const response = await completeBooking(selectedBooking.booking_id, {
         old_battery_code: oldBatteryCode,
         battery_model: batteryModel,
@@ -207,12 +330,16 @@ const SwapTransactions: React.FC = () => {
           description: `Hoàn thành đổi pin. ${response.data?.message || ''}`,
         });
         setCompleteDialogOpen(false);
+        setCompleteError(null);
         fetchBookings(); // Refresh list
       }
     } catch (error: any) {
+      const errorMessage = error.message || 'Không thể hoàn thành booking';
+      setCompleteError(errorMessage); // Hiển thị lỗi trong dialog
+      
       toast({
         title: 'Lỗi',
-        description: error.message || 'Không thể hoàn thành booking',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -274,13 +401,18 @@ const SwapTransactions: React.FC = () => {
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Hàng đợi đổi pin</h1>
-          <p className="text-gray-600">Quản lý các giao dịch đổi pin đang hoạt động</p>
+        <div className="float">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-green-900 dark:from-white dark:to-green-100 bg-clip-text text-transparent">
+            Giao dịch thay pin
+          </h1>
+          <p className="text-slate-600 dark:text-slate-300">
+            Quản lý các giao dịch đổi pin đang hoạt động
+          </p>
         </div>
         <div className="flex gap-3">
           <Button 
             variant="outline" 
+            className="glass border-green-200/50 dark:border-emerald-400/30 hover:bg-green-50/50 dark:hover:bg-emerald-500/10"
             onClick={fetchBookings}
             disabled={refreshing}
           >
@@ -294,41 +426,158 @@ const SwapTransactions: React.FC = () => {
         </div>
       </div>
 
+      {/* Filters and Search */}
+      <Card className="glass-card border-0 glow">
+        <CardContent className="p-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            {/* Search */}
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400 dark:text-slate-500" />
+              <Input
+                placeholder="Tìm kiếm theo tên, mã booking, SĐT, biển số..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 glass border-slate-200/50 dark:border-slate-700/50"
+              />
+            </div>
+            
+            {/* Status Filter */}
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full md:w-48 glass border-slate-200/50 dark:border-slate-700/50">
+                <Filter className="mr-2 h-4 w-4" />
+                <SelectValue placeholder="Trạng thái" />
+              </SelectTrigger>
+              <SelectContent className="glass-card border-0">
+                <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                <SelectItem value="pending">Chờ xác nhận</SelectItem>
+                <SelectItem value="confirmed">Đã xác nhận</SelectItem>
+                <SelectItem value="completed">Hoàn thành</SelectItem>
+                <SelectItem value="cancelled">Đã hủy</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Page Size */}
+            <Select value={String(pageSize)} onValueChange={(value) => {
+              setPageSize(Number(value));
+              setCurrentPage(1);
+            }}>
+              <SelectTrigger className="w-full md:w-32 glass border-slate-200/50 dark:border-slate-700/50">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="glass-card border-0">
+                <SelectItem value="10">10 / trang</SelectItem>
+                <SelectItem value="20">20 / trang</SelectItem>
+                <SelectItem value="50">50 / trang</SelectItem>
+                <SelectItem value="100">100 / trang</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Queue Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="glass-card border-0 glow-hover group">
           <CardContent className="p-4">
             <div className="flex items-center space-x-3">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <Clock className="h-5 w-5 text-yellow-600" />
+              <div className="p-2 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg group-hover:scale-110 transition-transform duration-300">
+                <Clock className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Chờ xác nhận</p>
-                <p className="text-2xl font-bold">{bookings.filter(b => b.status === 'pending').length}</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400">Chờ xác nhận</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {bookings.filter(b => b.status === 'pending').length}
+                </p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="glass-card border-0 glow-hover group">
           <CardContent className="p-4">
             <div className="flex items-center space-x-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <CheckCircle className="h-5 w-5 text-blue-600" />
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg group-hover:scale-110 transition-transform duration-300">
+                <CheckCircle className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Đã xác nhận</p>
-                <p className="text-2xl font-bold">{bookings.filter(b => b.status === 'confirmed').length}</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400">Đã xác nhận</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {bookings.filter(b => b.status === 'confirmed').length}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card border-0 glow-hover group">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg group-hover:scale-110 transition-transform duration-300">
+                <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+              </div>
+              <div>
+                <p className="text-sm text-slate-600 dark:text-slate-400">Hoàn thành</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {bookings.filter(b => b.status === 'completed').length}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card border-0 glow-hover group">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg group-hover:scale-110 transition-transform duration-300">
+                <Zap className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+              </div>
+              <div>
+                <p className="text-sm text-slate-600 dark:text-slate-400">Tổng số</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">{totalItems}</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
+      {/* Sort Header */}
+      <Card className="glass-card border-0">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between text-sm text-slate-600 dark:text-slate-400">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => handleSort('scheduled_at')}
+                className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+              >
+                Thời gian đặt
+                {getSortIcon('scheduled_at')}
+              </button>
+              <button
+                onClick={() => handleSort('user_name')}
+                className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+              >
+                Khách hàng
+                {getSortIcon('user_name')}
+              </button>
+              <button
+                onClick={() => handleSort('booking_code')}
+                className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+              >
+                Mã booking
+                {getSortIcon('booking_code')}
+              </button>
+            </div>
+            <div className="text-xs">
+              Hiển thị {bookings.length} / {totalItems} kết quả
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Active Queue */}
       <div className="space-y-4">
         {bookings.map((booking) => (
-          <Card key={booking.booking_id} className="overflow-hidden">
+          <Card key={booking.booking_id} className="glass-card border-0 glow-hover overflow-hidden">
             <CardContent className="p-6">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 {/* Customer & Vehicle Info */}
@@ -459,13 +708,78 @@ const SwapTransactions: React.FC = () => {
       </div>
 
       {/* Empty State */}
-      {bookings.length === 0 && (
-        <Card className="p-12 text-center">
-          <Zap className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Không có giao dịch đang hoạt động</h3>
-          <p className="text-gray-500">
-            Hàng đợi trống. Khách hàng mới sẽ xuất hiện tại đây khi họ đến.
+      {bookings.length === 0 && !loading && (
+        <Card className="glass-card border-0 p-12 text-center">
+          <Zap className="mx-auto h-12 w-12 text-slate-400 dark:text-slate-500 mb-4" />
+          <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">
+            {searchTerm || statusFilter !== 'all' 
+              ? 'Không tìm thấy kết quả' 
+              : 'Không có giao dịch đang hoạt động'}
+          </h3>
+          <p className="text-slate-600 dark:text-slate-400">
+            {searchTerm || statusFilter !== 'all'
+              ? 'Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm'
+              : 'Hàng đợi trống. Khách hàng mới sẽ xuất hiện tại đây khi họ đến.'}
           </p>
+        </Card>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <Card className="glass-card border-0">
+          <CardContent className="p-4">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+                
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum: number;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  
+                  return (
+                    <PaginationItem key={pageNum}>
+                      <PaginationLink
+                        onClick={() => setCurrentPage(pageNum)}
+                        isActive={currentPage === pageNum}
+                        className="cursor-pointer"
+                      >
+                        {pageNum}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
+                
+                {totalPages > 5 && currentPage < totalPages - 2 && (
+                  <PaginationItem>
+                    <PaginationEllipsis />
+                  </PaginationItem>
+                )}
+                
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+            <div className="text-center text-sm text-slate-600 dark:text-slate-400 mt-4">
+              Trang {currentPage} / {totalPages} • Tổng {totalItems} giao dịch
+            </div>
+          </CardContent>
         </Card>
       )}
 
@@ -699,32 +1013,78 @@ const SwapTransactions: React.FC = () => {
                 </p>
               </div>
               
+              {/* Error Message */}
+              {completeError && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-red-900 dark:text-red-200">
+                        Lỗi khi hoàn thành booking
+                      </p>
+                      <p className="text-sm text-red-700 dark:text-red-300">
+                        {completeError}
+                      </p>
+                      {completeError.includes('not found') && (
+                        <p className="text-xs text-red-600 dark:text-red-400 mt-2">
+                          💡 Kiểm tra lại mã pin cũ. Mã pin phải tồn tại trong hệ thống kho pin.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Info Box - Giải thích */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                  <div className="text-xs text-blue-800 dark:text-blue-200">
+                    <p className="font-semibold mb-1">Lưu ý quan trọng:</p>
+                    <p>• <strong>Mã pin cũ:</strong> Mã riêng trên từng viên pin (VD: BAT-TD03, BAT-VF001)</p>
+                    <p>• <strong>Model pin:</strong> Loại/dòng pin (VD: Tesla Model 3, VinFast VF8 Battery)</p>
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-2">
-                <Label htmlFor="oldBatteryCode">
+                <Label htmlFor="oldBatteryCode" className="flex items-center gap-2">
+                  <Battery className="h-4 w-4 text-orange-600" />
                   Mã pin cũ <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   id="oldBatteryCode"
                   type="text"
-                  placeholder="Nhập mã pin cũ của khách hàng"
+                  placeholder="VD: BAT-TD03, BAT-VF001, BAT-123"
                   value={oldBatteryCode}
-                  onChange={(e) => setOldBatteryCode(e.target.value)}
+                  onChange={(e) => {
+                    setOldBatteryCode(e.target.value);
+                    if (completeError) setCompleteError(null); // Clear error khi user nhập lại
+                  }}
                   disabled={actionLoading === selectedBooking.booking_id}
+                  className={`font-mono ${completeError && completeError.includes('not found') ? 'border-red-500 focus:border-red-500' : ''}`}
                 />
+                <p className="text-xs text-gray-500">
+                  💡 Nhập mã trên nhãn pin cũ của khách hàng (không phải tên model)
+                </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="batteryModel">
+                <Label htmlFor="batteryModel" className="flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-green-600" />
                   Model pin mới <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   id="batteryModel"
                   type="text"
-                  placeholder="Nhập model pin mới"
+                  placeholder="VD: Tesla Model 3, VinFast VF8 Battery, BMW I3"
                   value={batteryModel}
                   onChange={(e) => setBatteryModel(e.target.value)}
                   disabled={actionLoading === selectedBooking.booking_id}
                 />
+                <p className="text-xs text-gray-500">
+                  💡 Nhập loại/dòng pin mới sẽ thay thế
+                </p>
               </div>
 
               <div className="space-y-2">

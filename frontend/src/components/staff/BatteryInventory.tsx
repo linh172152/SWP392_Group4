@@ -31,8 +31,20 @@ import {
   Edit,
   MapPin,
   Calendar,
-  Activity
+  Activity,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+} from '../ui/pagination';
 import {
   Battery as BatteryType,
   getStationBatteries,
@@ -43,14 +55,26 @@ import {
 import { useToast } from '../../hooks/use-toast';
 import AddBatteryDialog from './AddBatteryDialog';
 
+type SortField = 'battery_code' | 'model' | 'status' | 'current_charge' | 'created_at' | 'health_percentage';
+type SortOrder = 'asc' | 'desc';
+
 const BatteryInventory: React.FC = () => {
-  const [batteries, setBatteries] = useState<BatteryType[]>([]);
+  const [allBatteries, setAllBatteries] = useState<BatteryType[]>([]); // All batteries from API
+  const [batteries, setBatteries] = useState<BatteryType[]>([]); // Filtered and paginated batteries
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [modelFilter, setModelFilter] = useState('all');
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(12);
+  
+  // Sorting states
+  const [sortField, setSortField] = useState<SortField>('created_at');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   
   // Dialog states
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -80,7 +104,8 @@ const BatteryInventory: React.FC = () => {
       });
       
       if (response.success && response.data) {
-        setBatteries(response.data);
+        setAllBatteries(response.data);
+        applyFiltersAndSort(response.data);
       }
     } catch (error: any) {
       toast({
@@ -94,9 +119,114 @@ const BatteryInventory: React.FC = () => {
     }
   };
 
+  // Apply filters, search, sorting and pagination
+  const applyFiltersAndSort = (batteriesToProcess: BatteryType[]) => {
+    let processed = [...batteriesToProcess];
+    
+    // Apply search
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase();
+      processed = processed.filter(b => 
+        b.battery_code.toLowerCase().includes(searchLower) ||
+        b.model.toLowerCase().includes(searchLower) ||
+        b.station?.name.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    // Apply sorting
+    processed.sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+      
+      switch (sortField) {
+        case 'battery_code':
+          aValue = a.battery_code || '';
+          bValue = b.battery_code || '';
+          break;
+        case 'model':
+          aValue = a.model || '';
+          bValue = b.model || '';
+          break;
+        case 'status':
+          aValue = a.status || '';
+          bValue = b.status || '';
+          break;
+        case 'current_charge':
+          aValue = a.current_charge || 0;
+          bValue = b.current_charge || 0;
+          break;
+        case 'health_percentage':
+          aValue = a.health_percentage || 0;
+          bValue = b.health_percentage || 0;
+          break;
+        case 'created_at':
+          aValue = new Date(a.created_at).getTime();
+          bValue = new Date(b.created_at).getTime();
+          break;
+        default:
+          return 0;
+      }
+      
+      if (sortOrder === 'asc') {
+        return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+      } else {
+        return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+      }
+    });
+    
+    // Apply pagination
+    const totalPages = Math.ceil(processed.length / pageSize);
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const paginated = processed.slice(startIndex, endIndex);
+    
+    setBatteries(paginated);
+    setTotalPages(totalPages);
+    setTotalItems(processed.length);
+  };
+
   useEffect(() => {
     fetchBatteries();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter, modelFilter]);
+
+  useEffect(() => {
+    applyFiltersAndSort(allBatteries);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, sortField, sortOrder, currentPage, pageSize, allBatteries]);
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (currentPage !== 1) {
+        setCurrentPage(1);
+      } else {
+        applyFiltersAndSort(allBatteries);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm]);
+
+  // Handle sort change
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('desc');
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="h-4 w-4 text-gray-400" />;
+    }
+    return sortOrder === 'asc' 
+      ? <ArrowUp className="h-4 w-4 text-blue-600" />
+      : <ArrowDown className="h-4 w-4 text-blue-600" />;
+  };
 
   // Dialog handlers
   const handleViewDetail = (battery: BatteryType) => {
@@ -227,19 +357,17 @@ const BatteryInventory: React.FC = () => {
     return 'text-red-600 dark:text-red-400';
   };
 
-  const filteredBatteries = batteries.filter(battery => {
-    const matchesSearch = battery.battery_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          battery.model.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch;
-  });
+  // Pagination states
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
 
-  const totalBatteries = batteries.length;
-  const fullBatteries = batteries.filter(b => b.status === 'full').length;
-  const chargingBatteries = batteries.filter(b => b.status === 'charging').length;
-  const maintenanceBatteries = batteries.filter(b => b.status === 'maintenance' || b.status === 'damaged').length;
+  const totalBatteries = allBatteries.length;
+  const fullBatteries = allBatteries.filter(b => b.status === 'full').length;
+  const chargingBatteries = allBatteries.filter(b => b.status === 'charging').length;
+  const maintenanceBatteries = allBatteries.filter(b => b.status === 'maintenance' || b.status === 'damaged').length;
 
-  // Get unique models for filter
-  const uniqueModels = Array.from(new Set(batteries.map(b => b.model)));
+  // Get unique models for filter (from all batteries, not just paginated ones)
+  const uniqueModels = Array.from(new Set(allBatteries.map(b => b.model)));
 
   if (loading) {
     return (
@@ -340,14 +468,14 @@ const BatteryInventory: React.FC = () => {
         </Card>
       </div>
 
-      {/* Filters */}
+      {/* Filters and Search */}
       <Card className="glass-card border-0 glow">
         <CardContent className="p-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400 dark:text-slate-500" />
               <Input
-                placeholder="Tìm kiếm theo ID pin hoặc vị trí..."
+                placeholder="Tìm kiếm theo mã pin, model, trạm..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 glass border-slate-200/50 dark:border-slate-700/50"
@@ -355,6 +483,7 @@ const BatteryInventory: React.FC = () => {
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full md:w-48 glass border-slate-200/50 dark:border-slate-700/50">
+                <Filter className="mr-2 h-4 w-4" />
                 <SelectValue placeholder="Trạng thái" />
               </SelectTrigger>
               <SelectContent className="glass-card border-0">
@@ -377,13 +506,75 @@ const BatteryInventory: React.FC = () => {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={String(pageSize)} onValueChange={(value) => {
+              setPageSize(Number(value));
+              setCurrentPage(1);
+            }}>
+              <SelectTrigger className="w-full md:w-32 glass border-slate-200/50 dark:border-slate-700/50">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="glass-card border-0">
+                <SelectItem value="12">12 / trang</SelectItem>
+                <SelectItem value="24">24 / trang</SelectItem>
+                <SelectItem value="48">48 / trang</SelectItem>
+                <SelectItem value="100">100 / trang</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Sort Header */}
+      <Card className="glass-card border-0">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between text-sm text-slate-600 dark:text-slate-400">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => handleSort('battery_code')}
+                className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+              >
+                Mã pin
+                {getSortIcon('battery_code')}
+              </button>
+              <button
+                onClick={() => handleSort('model')}
+                className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+              >
+                Model
+                {getSortIcon('model')}
+              </button>
+              <button
+                onClick={() => handleSort('status')}
+                className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+              >
+                Trạng thái
+                {getSortIcon('status')}
+              </button>
+              <button
+                onClick={() => handleSort('current_charge')}
+                className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+              >
+                Mức sạc
+                {getSortIcon('current_charge')}
+              </button>
+              <button
+                onClick={() => handleSort('created_at')}
+                className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+              >
+                Ngày thêm
+                {getSortIcon('created_at')}
+              </button>
+            </div>
+            <div className="text-xs">
+              Hiển thị {batteries.length} / {totalItems} kết quả
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Battery Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredBatteries.map((battery) => (
+        {batteries.map((battery) => (
           <Card key={battery.battery_id} className="glass-card border-0 glow-hover group">
             <CardContent className="p-6">
               <div className="space-y-4">
@@ -471,12 +662,79 @@ const BatteryInventory: React.FC = () => {
         ))}
       </div>
 
-      {filteredBatteries.length === 0 && (
+      {batteries.length === 0 && !loading && (
         <Card className="glass-card border-0">
           <CardContent className="p-12 text-center">
             <Battery className="h-12 w-12 text-slate-400 dark:text-slate-500 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Không tìm thấy pin</h3>
-            <p className="text-slate-600 dark:text-slate-400">Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm</p>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+              {searchTerm || statusFilter !== 'all' || modelFilter !== 'all'
+                ? 'Không tìm thấy pin'
+                : 'Chưa có pin nào'}
+            </h3>
+            <p className="text-slate-600 dark:text-slate-400">
+              {searchTerm || statusFilter !== 'all' || modelFilter !== 'all'
+                ? 'Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm'
+                : 'Thêm pin mới để bắt đầu quản lý kho'}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <Card className="glass-card border-0">
+          <CardContent className="p-4">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+                
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum: number;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  
+                  return (
+                    <PaginationItem key={pageNum}>
+                      <PaginationLink
+                        onClick={() => setCurrentPage(pageNum)}
+                        isActive={currentPage === pageNum}
+                        className="cursor-pointer"
+                      >
+                        {pageNum}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
+                
+                {totalPages > 5 && currentPage < totalPages - 2 && (
+                  <PaginationItem>
+                    <PaginationEllipsis />
+                  </PaginationItem>
+                )}
+                
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+            <div className="text-center text-sm text-slate-600 dark:text-slate-400 mt-4">
+              Trang {currentPage} / {totalPages} • Tổng {totalItems} pin
+            </div>
           </CardContent>
         </Card>
       )}

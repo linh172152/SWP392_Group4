@@ -607,7 +607,7 @@ export const completeBooking = asyncHandler(
       battery_model: batteryModelInput,
       old_battery_status = "good",
       notes,
-    } = req.body; // ✅ Cải tiến
+    } = req.body;
 
     if (!staffId) {
       throw new CustomError("Staff not authenticated", 401);
