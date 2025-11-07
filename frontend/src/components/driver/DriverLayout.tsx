@@ -17,9 +17,11 @@ import {
   Menu,
   X,
   Package,
-  Wallet
+  Wallet,
+  Receipt
 } from 'lucide-react';
 import { useState } from 'react';
+import NotificationBell from './NotificationBell';
 
 interface DriverLayoutProps {
   user: User;
@@ -31,7 +33,7 @@ const navigation = [
   { name: 'Xe của tôi', href: '/driver/vehicles', icon: Car },
   { name: 'Tìm trạm thay pin', href: '/driver/stations', icon: MapPin },
   { name: 'Lịch sử thay pin', href: '/driver/bookings', icon: Calendar },
-  { name: 'Hóa đơn', href: '/driver/payments', icon: CreditCard },
+  { name: 'Giao dịch', href: '/driver/transactions', icon: Receipt },
   { name: 'Ví của tôi', href: '/driver/wallet', icon: Wallet },
   { name: 'Gói dịch vụ', href: '/driver/subscriptions', icon: Package },
   { name: 'Hồ sơ', href: '/driver/profile', icon: Settings },
@@ -182,6 +184,9 @@ const DriverLayout: React.FC<DriverLayoutProps> = ({ user, onLogout, children })
         <main className="flex-1">
           {children}
         </main>
+        
+        {/* Floating Notification Bell */}
+        <NotificationBell />
       </div>
     </div>
   );

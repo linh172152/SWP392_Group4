@@ -17,6 +17,8 @@ export interface WalletTransaction {
   user_id: string;
   topup_package_id?: string;
   transaction_id?: string;
+  subscription_id?: string;
+  payment_type?: string;
   amount: number;
   payment_method: string;
   payment_status: string;
@@ -34,6 +36,15 @@ export interface WalletTransaction {
       station?: {
         name: string;
       };
+    };
+  };
+  subscription?: {
+    subscription_id: string;
+    package?: {
+      package_id: string;
+      name: string;
+      battery_capacity_kwh: number;
+      billing_cycle: string;
     };
   };
 }
