@@ -27,8 +27,8 @@
   - Handle on-site bookings: phone verification, swap completion without PIN entry, subscription-aware settlement, issue resolution.
   - Manage personal schedules (`/api/staff/schedules`) and update shift statuses.
   - Inventory oversight for station batteries, including SoH insight and transfer requests.
-- **Admin Console**:
-  - CRUD for stations, staff, users, `BatteryPricing`, `TopUpPackage`, and service packages.
+-- **Admin Console**:
+  - CRUD for stations, staff, users, station batteries, `BatteryPricing`, `TopUpPackage`, and service packages.
   - Staff scheduling management (`/api/admin/staff-schedules`) with overlap detection and station assignment.
   - Demand forecasting, dashboard reports, battery transfer approvals, support ticket workflow.
 - **Wallet & Transactions**: Ledger of wallet credits/debits, swap payment settlement (wallet only when subscription does not cover), VNPay top-ups. No cash handling, no promotion codes.
@@ -51,8 +51,8 @@
 - `POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/logout`.
 - Driver: `/api/driver/*` for vehicles, bookings, transactions, wallet, subscriptions.
 - Staff: `/api/staff/batteries`, `/api/staff/bookings`, `/api/staff/schedules`.
-- Admin:
-  - `/api/admin/users`, `/stations`, `/staff`.
+-- Admin:
+  - `/api/admin/users`, `/stations`, `/staff`, `/batteries`.
   - `/api/admin/pricing` (`BatteryPricing`), `/topup-packages`, `/staff-schedules`.
   - `/api/admin/dashboard` (reports & metrics including SoH aggregates).
   - `/api/admin/battery-transfers` (create/list/detail transfers).
