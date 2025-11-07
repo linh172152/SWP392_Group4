@@ -12,16 +12,42 @@ import {
   AlertCircle,
   CheckCircle,
   Activity,
-  RefreshCw
+  RefreshCw,
+  Play,
+  Pause
 } from 'lucide-react';
 import { getStationBatteries, getStationBookings, Battery as BatteryType, StaffBooking } from '../../services/staff.service';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+} from '../ui/pagination';
+import { useToast } from '../../hooks/use-toast';
 
 const StaffHome: React.FC = () => {
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [batteries, setBatteries] = useState<BatteryType[]>([]);
   const [recentBookings, setRecentBookings] = useState<StaffBooking[]>([]);
   const [pendingBookings, setPendingBookings] = useState<StaffBooking[]>([]);
   const [stationName, setStationName] = useState<string>('Trạm');
+  
+  // Pagination for recent transactions
+  const [recentTransactionsPage, setRecentTransactionsPage] = useState(1);
+  const [recentTransactionsPageSize] = useState(5);
+  const [recentTransactionsTotal, setRecentTransactionsTotal] = useState(0);
+  const [recentTransactionsTotalPages, setRecentTransactionsTotalPages] = useState(1);
+  
+  // Auto-refresh state
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState<NodeJS.Timeout | null>(null);
+  const [lastRefreshTime, setLastRefreshTime] = useState<Date>(new Date());
+  
+  const { toast } = useToast();
 
   // Tính toán stats từ batteries
   const totalBatteries = batteries.length;
@@ -35,13 +61,13 @@ const StaffHome: React.FC = () => {
     ? Math.round(((totalBatteries - availableBatteries) / totalBatteries) * 100)
     : 0;
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = async (isAutoRefresh = false) => {
     try {
-      setLoading(true);
+      if (!isAutoRefresh) {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
       
       // Load batteries
       const batteriesRes = await getStationBatteries();
@@ -52,13 +78,18 @@ const StaffHome: React.FC = () => {
         }
       }
 
-      // Load recent completed bookings (giao dịch gần đây)
+      // Load recent completed bookings (giao dịch gần đây) with pagination
       const completedBookingsRes = await getStationBookings({ 
         status: 'completed', 
-        limit: 5 
+        page: recentTransactionsPage,
+        limit: recentTransactionsPageSize
       });
-      if (completedBookingsRes.success && completedBookingsRes.data?.bookings) {
-        setRecentBookings(completedBookingsRes.data.bookings);
+      if (completedBookingsRes.success && completedBookingsRes.data) {
+        setRecentBookings(completedBookingsRes.data.bookings || []);
+        if (completedBookingsRes.data.pagination) {
+          setRecentTransactionsTotal(completedBookingsRes.data.pagination.total || 0);
+          setRecentTransactionsTotalPages(completedBookingsRes.data.pagination.pages || 1);
+        }
       }
 
       // Load pending bookings (hàng đợi hiện tại)
@@ -69,12 +100,64 @@ const StaffHome: React.FC = () => {
       if (pendingBookingsRes.success && pendingBookingsRes.data?.bookings) {
         setPendingBookings(pendingBookingsRes.data.bookings);
       }
-    } catch (error) {
+      
+      setLastRefreshTime(new Date());
+    } catch (error: any) {
+      if (!isAutoRefresh) {
+        toast({
+          title: 'Lỗi',
+          description: error.message || 'Không thể tải dữ liệu',
+          variant: 'destructive',
+        });
+      }
       console.error('Error loading data:', error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
+
+  // Initial load
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  // Load data when pagination changes
+  useEffect(() => {
+    if (!loading) {
+      loadData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recentTransactionsPage]);
+
+  // Auto-refresh setup
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    
+    if (autoRefreshEnabled) {
+      interval = setInterval(() => {
+        loadData(true);
+      }, 30000); // Refresh every 30 seconds
+
+      setAutoRefreshInterval(interval);
+    }
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRefreshEnabled]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+      }
+    };
+  }, [autoRefreshInterval]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -142,11 +225,30 @@ const StaffHome: React.FC = () => {
         <div className="flex gap-3">
           <Button 
             variant="outline" 
-            className="glass border-green-200/50 dark:border-emerald-400/30 hover:bg-green-50/50 dark:hover:bg-emerald-500/10"
-            onClick={loadData}
-            disabled={loading}
+            size="sm"
+            className="glass border-slate-200/50 dark:border-slate-700/50 hover:bg-slate-50/50 dark:hover:bg-slate-500/10"
+            onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
+            title={autoRefreshEnabled ? 'Tắt tự động làm mới' : 'Bật tự động làm mới'}
           >
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            {autoRefreshEnabled ? (
+              <>
+                <Pause className="mr-2 h-4 w-4" />
+                Tắt tự động
+              </>
+            ) : (
+              <>
+                <Play className="mr-2 h-4 w-4" />
+                Bật tự động
+              </>
+            )}
+          </Button>
+          <Button 
+            variant="outline" 
+            className="glass border-green-200/50 dark:border-emerald-400/30 hover:bg-green-50/50 dark:hover:bg-emerald-500/10"
+            onClick={() => loadData(false)}
+            disabled={loading || refreshing}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${(loading || refreshing) ? 'animate-spin' : ''}`} />
             Làm mới dữ liệu
           </Button>
         </div>
@@ -245,16 +347,25 @@ const StaffHome: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-slate-900 dark:text-white">Giao dịch gần đây</CardTitle>
-              <CardDescription className="text-slate-600 dark:text-slate-400">Các hoạt động thay pin mới nhất</CardDescription>
+              <CardDescription className="text-slate-600 dark:text-slate-400">
+                Các hoạt động thay pin mới nhất
+                {autoRefreshEnabled && (
+                  <span className="ml-2 text-xs text-green-600 dark:text-green-400">
+                    • Tự động làm mới mỗi 30s
+                  </span>
+                )}
+              </CardDescription>
             </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="glass border-green-200/50 dark:border-emerald-400/30 hover:bg-green-50/50 dark:hover:bg-emerald-500/10"
-              onClick={() => window.location.href = '/staff/transactions'}
-            >
-              Xem tất cả
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="glass border-green-200/50 dark:border-emerald-400/30 hover:bg-green-50/50 dark:hover:bg-emerald-500/10"
+                onClick={() => window.location.href = '/staff/transactions'}
+              >
+                Xem tất cả
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -263,43 +374,109 @@ const StaffHome: React.FC = () => {
               Chưa có giao dịch nào
             </p>
           ) : (
-            <div className="space-y-4">
-              {recentBookings.map((booking) => (
-                <div key={booking.booking_id} className="flex items-center justify-between p-4 glass rounded-lg glow-hover group">
-                  <div className="flex items-center space-x-4">
-                    <div className="p-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg group-hover:scale-110 transition-transform duration-300">
-                      <Zap className="h-5 w-5 text-white" />
+            <>
+              <div className="space-y-4">
+                {recentBookings.map((booking) => (
+                  <div key={booking.booking_id} className="flex items-center justify-between p-4 glass rounded-lg glow-hover group">
+                    <div className="flex items-center space-x-4">
+                      <div className="p-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg group-hover:scale-110 transition-transform duration-300">
+                        <Zap className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-slate-900 dark:text-white">
+                          {booking.user?.full_name || 'Khách hàng'}
+                        </h4>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                          {booking.vehicle?.license_plate || booking.vehicle?.model || 'N/A'}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-semibold text-slate-900 dark:text-white">
-                        {booking.user?.full_name || 'Khách hàng'}
-                      </h4>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">
-                        {booking.vehicle?.license_plate || booking.vehicle?.model || 'N/A'}
+
+                    <div className="text-center">
+                      <p className="text-sm font-medium text-slate-900 dark:text-white">
+                        {formatTime(booking.scheduled_at)}
+                      </p>
+                      <p className="text-xs text-slate-600 dark:text-slate-400">
+                        {calculateDuration(booking)}
                       </p>
                     </div>
-                  </div>
 
-                  <div className="text-center">
-                    <p className="text-sm font-medium text-slate-900 dark:text-white">
-                      {formatTime(booking.scheduled_at)}
-                    </p>
-                    <p className="text-xs text-slate-600 dark:text-slate-400">
-                      {calculateDuration(booking)}
-                    </p>
+                    <Badge className={getStatusColor(booking.status)}>
+                      {booking.status === 'completed' && <CheckCircle className="mr-1 h-3 w-3" />}
+                      {booking.status === 'confirmed' && <Clock className="mr-1 h-3 w-3" />}
+                      {getStatusText(booking.status)}
+                    </Badge>
                   </div>
+                ))}
+              </div>
 
-                  <Badge className={getStatusColor(booking.status)}>
-                    {booking.status === 'completed' && <CheckCircle className="mr-1 h-3 w-3" />}
-                    {booking.status === 'confirmed' && <Clock className="mr-1 h-3 w-3" />}
-                    {getStatusText(booking.status)}
-                  </Badge>
+              {/* Pagination for Recent Transactions */}
+              {recentTransactionsTotalPages > 1 && (
+                <div className="mt-6 pt-4 border-t border-slate-200/50 dark:border-slate-700/50">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious
+                          onClick={() => setRecentTransactionsPage(prev => Math.max(1, prev - 1))}
+                          className={recentTransactionsPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                        />
+                      </PaginationItem>
+                      
+                      {Array.from({ length: Math.min(5, recentTransactionsTotalPages) }, (_, i) => {
+                        let pageNum: number;
+                        if (recentTransactionsTotalPages <= 5) {
+                          pageNum = i + 1;
+                        } else if (recentTransactionsPage <= 3) {
+                          pageNum = i + 1;
+                        } else if (recentTransactionsPage >= recentTransactionsTotalPages - 2) {
+                          pageNum = recentTransactionsTotalPages - 4 + i;
+                        } else {
+                          pageNum = recentTransactionsPage - 2 + i;
+                        }
+                        
+                        return (
+                          <PaginationItem key={pageNum}>
+                            <PaginationLink
+                              onClick={() => setRecentTransactionsPage(pageNum)}
+                              isActive={recentTransactionsPage === pageNum}
+                              className="cursor-pointer"
+                            >
+                              {pageNum}
+                            </PaginationLink>
+                          </PaginationItem>
+                        );
+                      })}
+                      
+                      {recentTransactionsTotalPages > 5 && recentTransactionsPage < recentTransactionsTotalPages - 2 && (
+                        <PaginationItem>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      )}
+                      
+                      <PaginationItem>
+                        <PaginationNext
+                          onClick={() => setRecentTransactionsPage(prev => Math.min(recentTransactionsTotalPages, prev + 1))}
+                          className={recentTransactionsPage === recentTransactionsTotalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                  <div className="text-center text-xs text-slate-600 dark:text-slate-400 mt-3">
+                    Trang {recentTransactionsPage} / {recentTransactionsTotalPages} • Tổng {recentTransactionsTotal} giao dịch
+                  </div>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
+
+      {/* Last Refresh Time */}
+      {lastRefreshTime && (
+        <div className="text-center text-xs text-slate-500 dark:text-slate-500">
+          Cập nhật lần cuối: {lastRefreshTime.toLocaleTimeString('vi-VN')}
+        </div>
+      )}
     </div>
   );
 };
