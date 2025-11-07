@@ -12,7 +12,8 @@ import {
   LogOut,
   Settings,
   Menu,
-  X
+  X,
+  Calendar
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -26,6 +27,7 @@ const navigation = [
   { name: 'Tổng quan', href: '/staff/home', icon: Home },
   { name: 'Kho pin', href: '/staff/inventory', icon: Battery },
   { name: 'Giao dịch thay pin', href: '/staff/transactions', icon: Zap },
+  { name: 'Lịch làm việc', href: '/staff/schedule', icon: Calendar },
   { name: 'Hồ sơ cá nhân', href: '/staff/profile', icon: Users },
 ];
 
