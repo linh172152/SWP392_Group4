@@ -34,26 +34,42 @@ router.get('/health', (_req, res) => {
 
 /**
  * @swagger
- * /api/shared/stations/public:
+ * /api/shared:
  *   get:
- *     summary: Get public stations information
+ *     summary: Shared API root summary
+ *     description: Lists shared utilities available under the /api namespace (health, support, ratings, maps). Public station data is exposed via `/api/stations/public`.
  *     tags: [Shared]
  *     responses:
  *       200:
- *         description: Public stations endpoint
+ *         description: Shared API overview returned
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
+ *                 success:
+ *                   type: boolean
  *                 message:
  *                   type: string
+ *                 endpoints:
+ *                   type: array
+ *                   items:
+ *                     type: string
  */
-router.get('/stations/public', (_req, res) => {
-  res.json({ message: 'Public stations endpoint - coming soon' });
+router.get('/', (_req, res) => {
+  res.json({
+    success: true,
+    message: 'Shared API modules',
+    endpoints: [
+      '/api/shared/health',
+      '/api/support',
+      '/api/ratings',
+      '/api/maps',
+      '/api/stations/public'
+    ]
+  });
 });
 
-// Public shared routes
-// Placeholder for other shared endpoints
+// Public shared routes summary endpoint
 
 export default router;

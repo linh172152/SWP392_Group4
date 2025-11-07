@@ -21,7 +21,7 @@
 
 - **Auth & Users**: Registration/login, token refresh, role-based guard (`authenticateToken`, `authorizeRole`).
 - **Driver Experience**:
-  - Manage vehicles, search stations, book swaps (scheduled/instant), track wallet balance & history.
+  - Manage vehicles, search stations, book swaps (scheduled/instant), track wallet balance & history (`/api/driver/...`).
   - Booking engine immediately **reserves a concrete battery** (`batteries.status = reserved`) and locks the funding source: subscription swap or wallet hold.
   - Cancellation policy: nếu driver hủy/no-show, pin được trả lại nhưng lượt/tiền đã trừ **không tự hoàn**, chỉ admin mới hoàn lại ví thủ công.
   - Pricing preview trả về thông tin `hold_summary` (pin, subscription, ví) để frontend thể hiện rõ.
@@ -53,8 +53,8 @@
 ## API Surface (High Level)
 
 - `POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/logout`.
-- Driver: `/api/driver/*` for vehicles, bookings, transactions, wallet, subscriptions.
-- Staff: `/api/staff/batteries`, `/api/staff/bookings`, `/api/staff/schedules`.
+- Driver: `/api/driver/vehicles`, `/api/driver/stations`, `/api/driver/bookings`, `/api/driver/wallet`, `/api/driver/transactions`, `/api/driver/subscriptions`, `/api/driver/notifications`.
+- Staff: `/api/staff/bookings`, `/api/staff/batteries`, `/api/staff/schedules`.
 -- Admin:
   - `/api/admin/users`, `/stations`, `/staff`, `/batteries`.
   - `/api/admin/pricing` (`BatteryPricing`), `/topup-packages`, `/staff-schedules`.
@@ -63,7 +63,7 @@
   - `/api/admin/support` (ticket assignment, replies, status updates).
   - `/api/admin/forecast/bookings` (7-day booking forecast from recent history).
 - Shared: `/api/support`, `/api/ratings`, `/api/maps`.
-- Public routes: `/api/packages` (active service packages), `/api/pricing` (read-only `BatteryPricing`).
+- Public routes: `/api/packages` (active service packages), `/api/pricing` (read-only `BatteryPricing`), `/api/stations/public` (public station directory & nearby search).
 
 ## Key Flows
 
