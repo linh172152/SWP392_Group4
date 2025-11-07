@@ -118,6 +118,10 @@ export const API_ENDPOINTS = {
     ADD_BATTERY: `${API_BASE_URL}/staff/batteries`,
     UPDATE_BATTERY: (id: string) => `${API_BASE_URL}/staff/batteries/${id}`,
     DELETE_BATTERY: (id: string) => `${API_BASE_URL}/staff/batteries/${id}`,
+    
+    // Schedule endpoints
+    SCHEDULES: `${API_BASE_URL}/staff/schedules`,
+    UPDATE_SCHEDULE_STATUS: (id: string) => `${API_BASE_URL}/staff/schedules/${id}/status`,
   },
   HEALTH: `${API_BASE_URL}/health`,
 };
