@@ -2,15 +2,19 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import batteryPricingService from '../../services/battery-pricing.service';
 import batteryTransferService from '../../services/battery-transfer.service';
+import adminBatteryService from '../../services/admin-battery.service';
+import { getAllStations } from '../../services/station.service';
 
 import { toast } from 'sonner';
 import type { BatteryPricing } from '../../services/battery-pricing.service';
 import type { BatteryTransfer, CreateBatteryTransferDto } from '../../services/battery-transfer.service';
+import type { Battery, CreateBatteryDto, BatteryStats } from '../../services/admin-battery.service';
+import type { Station } from '../../services/station.service';
 
-import { DollarSign, Edit2, Trash2, Plus, Check, X, Battery, Zap, TrendingUp, Search, ArrowRightLeft, Truck, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { DollarSign, Edit2, Trash2, Plus, Check, X, Battery as BatteryIcon, Zap, TrendingUp, Search, ArrowRightLeft, Truck, Clock, CheckCircle, XCircle, AlertCircle, Package, Activity } from 'lucide-react';
 
 const BatteryPricingManagement: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'pricing' | 'transfer'>('pricing');
+  const [activeTab, setActiveTab] = useState<'pricing' | 'transfer' | 'inventory'>('pricing');
   const [loading, setLoading] = useState(false);
   
   // Pricing state
@@ -32,11 +36,32 @@ const BatteryPricingManagement: React.FC = () => {
   });
   const [filterStatus, setFilterStatus] = useState<string>('all');
 
+  // Inventory state
+  const [batteries, setBatteries] = useState<Battery[]>([]);
+  const [stations, setStations] = useState<Station[]>([]);
+  const [showBatteryForm, setShowBatteryForm] = useState(false);
+  const [newBattery, setNewBattery] = useState<CreateBatteryDto>({
+    station_id: '',
+    model: '',
+    battery_code: '',
+    status: 'available',
+    health_percentage: 100,
+    cycle_count: 0
+  });
+  const [editingBattery, setEditingBattery] = useState<string | null>(null);
+  const [batteryStats, setBatteryStats] = useState<BatteryStats | null>(null);
+  const [filterBatteryStatus, setFilterBatteryStatus] = useState<string>('all');
+  const [searchBatteryQuery, setSearchBatteryQuery] = useState('');
+
   useEffect(() => {
     if (activeTab === 'pricing') {
       fetchPricing();
-    } else {
+    } else if (activeTab === 'transfer') {
       fetchTransfers();
+    } else {
+      fetchBatteries();
+      fetchBatteryStats();
+      fetchStations();
     }
   }, [activeTab]);
 
@@ -70,6 +95,47 @@ const BatteryPricingManagement: React.FC = () => {
     }
   };
 
+  const fetchBatteries = async () => {
+    setLoading(true);
+    try {
+      const batteryRes = await adminBatteryService.getBatteries({ 
+        limit: 100,
+        status: filterBatteryStatus !== 'all' ? filterBatteryStatus : undefined,
+        model: searchBatteryQuery || undefined
+      });
+      if (batteryRes && batteryRes.success) {
+        setBatteries(batteryRes.data.batteries || []);
+      }
+    } catch (err: any) {
+      console.error('Failed to fetch batteries:', err);
+      toast.error('Failed to load battery data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchBatteryStats = async () => {
+    try {
+      const statsRes = await adminBatteryService.getBatteryStats();
+      if (statsRes && statsRes.success) {
+        setBatteryStats(statsRes.data);
+      }
+    } catch (err: any) {
+      console.error('Failed to fetch battery stats:', err);
+    }
+  };
+
+  const fetchStations = async () => {
+    try {
+      const stationRes = await getAllStations({ limit: 100 });
+      if (stationRes && stationRes.success) {
+        setStations(stationRes.data.stations || []);
+      }
+    } catch (err: any) {
+      console.error('Failed to fetch stations:', err);
+    }
+  };
+
   // Filter pricings based on search
   const filteredPricings = pricings.filter((p) =>
     p.battery_model.toLowerCase().includes(searchQuery.toLowerCase())
@@ -79,6 +145,15 @@ const BatteryPricingManagement: React.FC = () => {
   const filteredTransfers = transfers.filter((t) =>
     filterStatus === 'all' ? true : t.transfer_status === filterStatus
   );
+
+  // Filter batteries
+  const filteredBatteries = batteries.filter((b) => {
+    const statusMatch = filterBatteryStatus === 'all' || b.status === filterBatteryStatus;
+    const searchMatch = !searchBatteryQuery || 
+      b.battery_code.toLowerCase().includes(searchBatteryQuery.toLowerCase()) ||
+      b.model.toLowerCase().includes(searchBatteryQuery.toLowerCase());
+    return statusMatch && searchMatch;
+  });
 
   // Calculate stats
   const totalPricings = pricings.length;
@@ -144,16 +219,22 @@ const BatteryPricingManagement: React.FC = () => {
           <div className="relative z-10">
             <div className="flex items-center gap-4 mb-4">
               <div className="p-4 bg-white/20 rounded-2xl backdrop-blur-sm">
-                {activeTab === 'pricing' ? <Battery className="h-10 w-10 text-white" /> : <ArrowRightLeft className="h-10 w-10 text-white" />}
+                {activeTab === 'pricing' ? <DollarSign className="h-10 w-10 text-white" /> : 
+                 activeTab === 'transfer' ? <ArrowRightLeft className="h-10 w-10 text-white" /> :
+                 <Package className="h-10 w-10 text-white" />}
               </div>
               <div>
                 <h1 className="text-4xl font-black text-white tracking-tight">
-                  {activeTab === 'pricing' ? 'Quản lí Giá Pin' : 'Chuyển Pin Giữa Trạm'}
+                  {activeTab === 'pricing' ? 'Quản lí Giá Pin' : 
+                   activeTab === 'transfer' ? 'Chuyển Pin Giữa Trạm' :
+                   'Kho Pin Hệ Thống'}
                 </h1>
                 <p className="text-blue-100 text-lg mt-1">
                   {activeTab === 'pricing' 
                     ? 'Quản lý và cấu hình giá cho tất cả các mẫu pin'
-                    : 'Quản lý việc chuyển pin giữa các trạm đổi pin'
+                    : activeTab === 'transfer'
+                    ? 'Quản lý việc chuyển pin giữa các trạm đổi pin'
+                    : 'Quản lý tồn kho pin của tất cả các trạm'
                   }
                 </p>
               </div>
@@ -182,6 +263,17 @@ const BatteryPricingManagement: React.FC = () => {
               >
                 <ArrowRightLeft className="h-5 w-5" />
                 Chuyển Pin
+              </button>
+              <button
+                onClick={() => setActiveTab('inventory')}
+                className={`px-6 py-3 rounded-xl font-semibold transition-all flex items-center gap-2 ${
+                  activeTab === 'inventory'
+                    ? 'bg-white text-blue-600 shadow-lg'
+                    : 'bg-white/10 text-white hover:bg-white/20'
+                }`}
+              >
+                <Package className="h-5 w-5" />
+                Kho Pin
               </button>
             </div>
 
@@ -212,7 +304,7 @@ const BatteryPricingManagement: React.FC = () => {
                   </div>
                 </div>
               </div>
-            ) : (
+            ) : activeTab === 'transfer' ? (
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
                 <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20">
                   <div className="flex items-center gap-3">
@@ -258,6 +350,56 @@ const BatteryPricingManagement: React.FC = () => {
                     <div>
                       <p className="text-blue-100 text-sm">Hoàn thành</p>
                       <p className="text-3xl font-bold text-white">{completedTransfers}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+                <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-purple-500/20 rounded-lg">
+                      <Package className="h-6 w-6 text-purple-200" />
+                    </div>
+                    <div>
+                      <p className="text-blue-100 text-sm">Tổng Pin</p>
+                      <p className="text-3xl font-bold text-white">{batteryStats?.total || 0}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-green-500/20 rounded-lg">
+                      <CheckCircle className="h-6 w-6 text-green-200" />
+                    </div>
+                    <div>
+                      <p className="text-blue-100 text-sm">Sẵn sàng</p>
+                      <p className="text-3xl font-bold text-white">{batteryStats?.by_status.available || 0}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-yellow-500/20 rounded-lg">
+                      <Activity className="h-6 w-6 text-yellow-200" />
+                    </div>
+                    <div>
+                      <p className="text-blue-100 text-sm">SoH thấp</p>
+                      <p className="text-3xl font-bold text-white">{batteryStats?.low_health_count || 0}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-blue-500/20 rounded-lg">
+                      <TrendingUp className="h-6 w-6 text-blue-200" />
+                    </div>
+                    <div>
+                      <p className="text-blue-100 text-sm">SoH TB</p>
+                      <p className="text-3xl font-bold text-white">{batteryStats?.avg_health.toFixed(1) || 0}%</p>
                     </div>
                   </div>
                 </div>
@@ -465,7 +607,7 @@ const BatteryPricingManagement: React.FC = () => {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
                           <div className={`p-2 rounded-lg ${pricing.is_active ? 'bg-gradient-to-br from-blue-500 to-indigo-600' : 'bg-slate-400'}`}>
-                            <Battery className="h-5 w-5 text-white" />
+                            <BatteryIcon className="h-5 w-5 text-white" />
                           </div>
                           <h3 className="text-xl font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
                             {pricing.battery_model}
@@ -606,7 +748,7 @@ const BatteryPricingManagement: React.FC = () => {
             )}
           </CardContent>
         </Card>
-        ) : (
+        ) : activeTab === 'transfer' ? (
           /* Transfer Tab */
           <Card className="shadow-2xl border-0 rounded-3xl overflow-hidden bg-white/80 backdrop-blur-sm">
             <CardHeader className="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50 p-6">
@@ -988,6 +1130,383 @@ const BatteryPricingManagement: React.FC = () => {
                     <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
                   </div>
                   <p className="text-slate-600 font-medium mt-4">Loading transfers...</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="shadow-2xl border-0 rounded-3xl overflow-hidden bg-white/80 backdrop-blur-sm">
+            <CardHeader className="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-purple-50 p-6">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                  <CardTitle className="text-2xl font-bold text-slate-800 flex items-center gap-3">
+                    <div className="p-2 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg">
+                      <Package className="h-6 w-6 text-white" />
+                    </div>
+                    Quản lý kho pin
+                  </CardTitle>
+                  <CardDescription className="text-slate-600 mt-1">
+                    Theo dõi và quản lý toàn bộ pin trong hệ thống
+                  </CardDescription>
+                </div>
+
+                <div className="flex items-center gap-3 flex-wrap">
+                  {/* Station Filter */}
+                  <select
+                    value={filterBatteryStatus}
+                    onChange={(e) => setFilterBatteryStatus(e.target.value)}
+                    className="px-4 py-2.5 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all outline-none bg-white"
+                  >
+                    <option value="all">Tất cả trạng thái</option>
+                    <option value="available">Sẵn sàng</option>
+                    <option value="charging">Đang sạc</option>
+                    <option value="in_use">Đang sử dụng</option>
+                    <option value="maintenance">Bảo trì</option>
+                    <option value="damaged">Hư hỏng</option>
+                  </select>
+
+                  {/* Search Bar */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Tìm mã pin hoặc model..."
+                      value={searchBatteryQuery}
+                      onChange={(e) => setSearchBatteryQuery(e.target.value)}
+                      className="pl-10 pr-4 py-2.5 w-64 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all outline-none"
+                    />
+                  </div>
+
+                  {/* Add Button */}
+                  <button
+                    onClick={() => {
+                      setShowBatteryForm((v) => !v);
+                      setNewBattery({
+                        station_id: '',
+                        model: '',
+                        battery_code: '',
+                        status: 'available',
+                        health_percentage: 100,
+                        cycle_count: 0,
+                      });
+                      setEditingBattery(null);
+                    }}
+                    className={`px-6 py-2.5 rounded-xl font-semibold transition-all shadow-lg flex items-center gap-2 ${
+                      showBatteryForm
+                        ? 'bg-gradient-to-r from-slate-600 to-slate-700 text-white hover:from-slate-700 hover:to-slate-800'
+                        : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700 hover:shadow-xl hover:scale-105'
+                    }`}
+                  >
+                    {showBatteryForm ? (
+                      <>
+                        <X className="h-5 w-5" /> Đóng
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="h-5 w-5" /> Thêm Pin
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="p-6">
+              {/* Add/Edit Battery Form */}
+              {showBatteryForm && (
+                <div className="mb-6 p-6 bg-gradient-to-br from-purple-50 to-blue-50 rounded-2xl border-2 border-purple-200 shadow-inner">
+                  <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <Package className="h-5 w-5 text-purple-600" />
+                    {editingBattery ? 'Chỉnh sửa pin' : 'Thêm pin mới'}
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        Trạm
+                      </label>
+                      <select
+                        value={newBattery.station_id}
+                        onChange={(e) => setNewBattery({ ...newBattery, station_id: e.target.value })}
+                        className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all outline-none"
+                        required
+                      >
+                        <option value="">Chọn trạm</option>
+                        {stations.map((station) => (
+                          <option key={station.station_id} value={station.station_id}>
+                            {station.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        Model
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="VD: VF-48V-20Ah"
+                        value={newBattery.model}
+                        onChange={(e) => setNewBattery({ ...newBattery, model: e.target.value })}
+                        className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all outline-none"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        Mã pin
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="VD: BAT001"
+                        value={newBattery.battery_code}
+                        onChange={(e) => setNewBattery({ ...newBattery, battery_code: e.target.value })}
+                        className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all outline-none"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        Trạng thái
+                      </label>
+                      <select
+                        value={newBattery.status}
+                        onChange={(e) => setNewBattery({ ...newBattery, status: e.target.value as any })}
+                        className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all outline-none"
+                      >
+                        <option value="available">Sẵn sàng</option>
+                        <option value="charging">Đang sạc</option>
+                        <option value="in_use">Đang sử dụng</option>
+                        <option value="maintenance">Bảo trì</option>
+                        <option value="damaged">Hư hỏng</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        SoH (%)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={newBattery.health_percentage}
+                        onChange={(e) => setNewBattery({ ...newBattery, health_percentage: Number(e.target.value) })}
+                        className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        Số chu kỳ sạc
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={newBattery.cycle_count}
+                        onChange={(e) => setNewBattery({ ...newBattery, cycle_count: Number(e.target.value) })}
+                        className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 mt-6">
+                    <button
+                      onClick={async () => {
+                        if (!newBattery.station_id || !newBattery.model || !newBattery.battery_code) {
+                          toast.error('Vui lòng điền đầy đủ thông tin');
+                          return;
+                        }
+
+                        setLoading(true);
+                        try {
+                          if (editingBattery) {
+                            await adminBatteryService.updateBattery(editingBattery, newBattery);
+                            toast.success('Cập nhật pin thành công!');
+                          } else {
+                            await adminBatteryService.createBattery(newBattery);
+                            toast.success('Thêm pin mới thành công!');
+                          }
+                          setShowBatteryForm(false);
+                          setEditingBattery(null);
+                          fetchBatteries();
+                          fetchBatteryStats();
+                        } catch (err: any) {
+                          console.error('Battery operation error', err);
+                          toast.error(err?.message || 'Thao tác thất bại');
+                        } finally {
+                          setLoading(false);
+                        }
+                      }}
+                      disabled={loading}
+                      className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
+                    >
+                      {loading ? 'Đang xử lý...' : editingBattery ? 'Cập nhật' : 'Thêm pin'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowBatteryForm(false);
+                        setEditingBattery(null);
+                      }}
+                      className="px-6 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-semibold transition-all"
+                    >
+                      Hủy
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Battery List */}
+              <div className="space-y-3">
+                {filteredBatteries.map((battery) => {
+                  const healthColor =
+                    battery.health_percentage >= 85
+                      ? 'text-green-600 bg-green-100'
+                      : battery.health_percentage >= 70
+                      ? 'text-yellow-600 bg-yellow-100'
+                      : 'text-red-600 bg-red-100';
+
+                  const statusConfig = {
+                    available: { label: 'Sẵn sàng', color: 'bg-green-100 text-green-700' },
+                    charging: { label: 'Đang sạc', color: 'bg-blue-100 text-blue-700' },
+                    in_use: { label: 'Đang dùng', color: 'bg-purple-100 text-purple-700' },
+                    maintenance: { label: 'Bảo trì', color: 'bg-orange-100 text-orange-700' },
+                    damaged: { label: 'Hư hỏng', color: 'bg-red-100 text-red-700' },
+                  };
+
+                  return (
+                    <div
+                      key={battery.battery_id}
+                      className="group bg-gradient-to-br from-white to-slate-50 hover:from-purple-50 hover:to-blue-50 p-5 rounded-2xl border-2 border-slate-200 hover:border-purple-300 transition-all shadow-sm hover:shadow-lg"
+                    >
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="flex-1 grid grid-cols-1 md:grid-cols-5 gap-4">
+                          <div>
+                            <p className="text-xs text-slate-500 mb-1">Mã pin</p>
+                            <p className="font-bold text-slate-800">{battery.battery_code}</p>
+                          </div>
+
+                          <div>
+                            <p className="text-xs text-slate-500 mb-1">Model</p>
+                            <p className="font-semibold text-slate-700">{battery.model}</p>
+                          </div>
+
+                          <div>
+                            <p className="text-xs text-slate-500 mb-1">Trạm</p>
+                            <p className="font-semibold text-slate-700">{battery.station?.name || 'N/A'}</p>
+                          </div>
+
+                          <div>
+                            <p className="text-xs text-slate-500 mb-1">Trạng thái</p>
+                            <span
+                              className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${
+                                statusConfig[battery.status as keyof typeof statusConfig]?.color
+                              }`}
+                            >
+                              {statusConfig[battery.status as keyof typeof statusConfig]?.label}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-4">
+                            <div>
+                              <p className="text-xs text-slate-500 mb-1">SoH</p>
+                              <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${healthColor}`}>
+                                {battery.health_percentage}%
+                              </span>
+                            </div>
+
+                            <div>
+                              <p className="text-xs text-slate-500 mb-1">Chu kỳ</p>
+                              <p className="font-semibold text-slate-700">{battery.cycle_count}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setEditingBattery(battery.battery_id);
+                              setNewBattery({
+                                station_id: battery.station_id,
+                                model: battery.model,
+                                battery_code: battery.battery_code,
+                                status: battery.status,
+                                health_percentage: battery.health_percentage,
+                                cycle_count: battery.cycle_count,
+                              });
+                              setShowBatteryForm(true);
+                            }}
+                            className="p-2 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg transition-all"
+                            title="Chỉnh sửa"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (battery.status === 'in_use') {
+                                toast.error('Không thể xóa pin đang được sử dụng');
+                                return;
+                              }
+
+                              if (window.confirm(`Xác nhận xóa pin ${battery.battery_code}?`)) {
+                                setLoading(true);
+                                try {
+                                  await adminBatteryService.deleteBattery(battery.battery_id);
+                                  toast.success('Xóa pin thành công!');
+                                  fetchBatteries();
+                                  fetchBatteryStats();
+                                } catch (err: any) {
+                                  console.error('Delete battery error', err);
+                                  toast.error(err?.message || 'Xóa thất bại');
+                                } finally {
+                                  setLoading(false);
+                                }
+                              }
+                            }}
+                            className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition-all"
+                            title="Xóa"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Empty State */}
+              {filteredBatteries.length === 0 && !loading && (
+                <div className="text-center py-16 bg-gradient-to-br from-slate-50 to-purple-50 rounded-2xl border-2 border-dashed border-slate-300">
+                  <div className="relative inline-block">
+                    <div className="absolute inset-0 bg-purple-500/20 blur-3xl"></div>
+                    <Package className="relative h-24 w-24 mx-auto mb-6 text-slate-300" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-slate-700 mb-2">
+                    Chưa có pin trong kho
+                  </h3>
+                  <p className="text-slate-500 mb-6 max-w-md mx-auto">
+                    Thêm pin mới vào hệ thống để bắt đầu quản lý kho
+                  </p>
+                  <button
+                    onClick={() => setShowBatteryForm(true)}
+                    className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all hover:scale-105 inline-flex items-center gap-2"
+                  >
+                    <Plus className="h-5 w-5" />
+                    Thêm pin đầu tiên
+                  </button>
+                </div>
+              )}
+
+              {/* Loading State */}
+              {loading && batteries.length === 0 && (
+                <div className="text-center py-16">
+                  <div className="relative inline-block">
+                    <div className="w-16 h-16 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin"></div>
+                  </div>
+                  <p className="text-slate-600 font-medium mt-4">Đang tải dữ liệu...</p>
                 </div>
               )}
             </CardContent>

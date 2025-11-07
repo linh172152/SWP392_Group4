@@ -42,6 +42,7 @@ import staffBookingRoutes from "./routes/staff-booking.routes";
 import adminUserRoutes from "./routes/admin-user.routes";
 import adminStationRoutes from "./routes/admin-station.routes";
 import adminStaffRoutes from "./routes/admin-staff.routes";
+import adminBatteryRoutes from "./routes/admin-battery.routes";
 
 // Import new Shared API routes
 import publicStationRoutes from "./routes/public-station.routes";
@@ -208,6 +209,7 @@ app.use("/api/staff", staffRoutes); // Placeholder routes last
 app.use("/api/admin/users", adminUserRoutes);
 app.use("/api/admin/stations", adminStationRoutes);
 app.use("/api/admin/staff", adminStaffRoutes);
+app.use("/api/admin/batteries", adminBatteryRoutes);
 app.use("/api/admin/packages", adminPackageRoutes);
 app.use("/api/admin/battery-transfers", adminBatteryTransferRoutes);
 app.use("/api/admin/support", adminSupportRoutes);
