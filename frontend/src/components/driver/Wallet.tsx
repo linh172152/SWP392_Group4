@@ -11,8 +11,10 @@ import {
   History,
   Loader2
 } from 'lucide-react';
-import { walletService, WalletTransaction } from '../../services/wallet.service';
-import { getTopUpPackages, TopUpPackage } from '../../services/topup-package.service';
+import walletService from '../../services/wallet.service';
+import type { WalletTransaction } from '../../services/wallet.service';
+import { getTopUpPackages } from '../../services/topup-package.service';
+import type { TopUpPackage } from '../../services/topup-package.service';
 import TopUpModal from './TopUpModal';
 import { formatCurrency } from '../../utils/format';
 

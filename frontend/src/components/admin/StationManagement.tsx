@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '../ui/card';
-import { Dialog, DialogContent } from '../ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import StationForm from './StationForm';
 import StationDetails from './StationDetails';
 import { Button } from '../ui/button';
@@ -706,7 +706,15 @@ const StationManagement: React.FC = () => {
       {/* Station Details Dialog */}
       {showDetails && selectedStation && (
         <Dialog open={showDetails} onOpenChange={setShowDetails}>
-          <DialogContent className="max-w-4xl">
+          <DialogContent className="max-w-[98vw] w-[98vw] h-[98vh] p-0 overflow-hidden flex flex-col gap-0">
+            {/* Hidden accessibility header */}
+            <DialogHeader className="sr-only">
+              <DialogTitle>Chi tiết Trạm</DialogTitle>
+              <DialogDescription>
+                Xem thông tin chi tiết về trạm thay pin và hiệu suất hoạt động
+              </DialogDescription>
+            </DialogHeader>
+            
             <StationDetails
               stationId={selectedStation.id}
               onClose={() => {

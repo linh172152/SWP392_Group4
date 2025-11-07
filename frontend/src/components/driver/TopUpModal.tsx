@@ -9,8 +9,8 @@ import {
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Loader2, Wallet, Gift, Check } from 'lucide-react';
-import { TopUpPackage } from '../../services/topup-package.service';
-import { walletService } from '../../services/wallet.service';
+import type { TopUpPackage } from '../../services/topup-package.service';
+import walletService from '../../services/wallet.service';
 import { formatCurrency } from '../../utils/format';
 
 interface TopUpModalProps {

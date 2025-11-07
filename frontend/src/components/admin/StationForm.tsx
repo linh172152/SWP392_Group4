@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '../ui/form';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
@@ -157,6 +157,9 @@ const StationForm: React.FC<StationFormProps> = ({
             <MapPin className="h-6 w-6 text-blue-600" />
             {title}
           </DialogTitle>
+          <DialogDescription className="text-slate-600 dark:text-slate-400">
+            {initialData ? 'Chỉnh sửa thông tin trạm thay pin' : 'Thêm trạm thay pin mới vào hệ thống'}
+          </DialogDescription>
         </DialogHeader>
         
         <div className="overflow-y-auto flex-1 px-1">
