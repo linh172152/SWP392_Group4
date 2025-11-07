@@ -1,4 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma, PaymentType } from '@prisma/client';
+import type { Payment } from '@prisma/client';
 import { 
   generateVNPayUrl, 
   verifyVNPayResponse, 
@@ -19,6 +20,8 @@ export interface CreatePaymentData {
   orderType?: string;
   bankCode?: string;
   language?: string;
+  paymentType?: PaymentType;
+  metadata?: Record<string, unknown>;
 }
 
 export interface PaymentResult {
@@ -33,7 +36,7 @@ export interface PaymentResult {
  */
 export const createVNPayPayment = async (data: CreatePaymentData): Promise<PaymentResult> => {
   try {
-    const { userId, amount, orderDescription, orderType, bankCode, language } = data;
+    const { userId, amount, orderDescription, orderType, bankCode, language, paymentType, metadata } = data;
 
     // Validate user
     const user = await prisma.user.findUnique({
@@ -52,6 +55,17 @@ export const createVNPayPayment = async (data: CreatePaymentData): Promise<Payme
     const orderId = `EVBSS${Date.now()}${Math.random().toString(36).substr(2, 9)}`;
 
     // Create payment record
+    const baseMetadata: Record<string, any> = {
+      order_id: orderId,
+      order_description: orderDescription,
+      order_type: orderType || 'other',
+      ...(metadata ?? {}),
+    };
+
+    if (baseMetadata.type === 'wallet_topup' && typeof baseMetadata.wallet_topup_processed === 'undefined') {
+      baseMetadata.wallet_topup_processed = false;
+    }
+
     await prisma.payment.create({
       data: {
         user_id: userId,
@@ -60,11 +74,8 @@ export const createVNPayPayment = async (data: CreatePaymentData): Promise<Payme
         payment_status: 'pending',
         payment_gateway_ref: orderId,
         created_at: new Date(),
-        payment_type: 'OTHER',
-        metadata: {
-          order_description: orderDescription,
-          order_type: orderType || 'other',
-        }
+        payment_type: paymentType ?? 'OTHER',
+        metadata: baseMetadata,
       }
     });
 
@@ -135,19 +146,24 @@ export const handleVNPayReturn = async (response: VNPayResponse): Promise<{
     }
 
     // Update payment status
+    const metadata = (payment.metadata as Record<string, any> | null) ?? {};
+
     const updatedPayment = await prisma.payment.update({
       where: { payment_id: payment.payment_id },
       data: {
         payment_status: 'completed',
-        payment_gateway_ref: response.vnp_TransactionNo,
         paid_at: new Date(),
         metadata: {
-          ...((payment.metadata as Record<string, unknown> | null) ?? {}),
+          ...metadata,
           bank_code: response.vnp_BankCode,
           card_type: response.vnp_CardType,
+          vnp_transaction_no: response.vnp_TransactionNo,
+          vnp_response_code: response.vnp_ResponseCode,
         }
       }
     });
+
+    await applyWalletTopupIfNeeded(payment, updatedPayment);
 
     return {
       success: true,
@@ -201,14 +217,26 @@ export const handleVNPayIPN = async (response: VNPayResponse): Promise<{
     }
 
     // Update payment
-    await prisma.payment.update({
+    const metadata = (payment.metadata as Record<string, any> | null) ?? {};
+
+    const updatedPayment = await prisma.payment.update({
       where: { payment_id: payment.payment_id },
       data: {
         payment_status: paymentStatus,
-        payment_gateway_ref: response.vnp_TransactionNo,
-        paid_at: paymentStatus === 'completed' ? new Date() : null
+        paid_at: paymentStatus === 'completed' ? new Date() : payment.paid_at,
+        metadata: {
+          ...metadata,
+          bank_code: response.vnp_BankCode ?? metadata.bank_code,
+          card_type: response.vnp_CardType ?? metadata.card_type,
+          vnp_transaction_no: response.vnp_TransactionNo,
+          vnp_response_code: response.vnp_ResponseCode,
+        },
       }
     });
+
+    if (paymentStatus === 'completed') {
+      await applyWalletTopupIfNeeded(payment, updatedPayment);
+    }
 
     return {
       success: true,
@@ -220,6 +248,56 @@ export const handleVNPayIPN = async (response: VNPayResponse): Promise<{
       message: 'Failed to process VNPay IPN'
     };
   }
+};
+
+const applyWalletTopupIfNeeded = async (
+  originalPayment: Payment,
+  updatedPayment: Payment
+) => {
+  const metadata = (updatedPayment.metadata as Record<string, any> | null) ?? {};
+
+  if (metadata?.type !== 'wallet_topup') {
+    return;
+  }
+
+  if (metadata.wallet_topup_processed) {
+    return;
+  }
+
+  const actualAmountNumber = Number(metadata.actual_amount ?? metadata.topup_amount ?? 0);
+
+  if (!Number.isFinite(actualAmountNumber) || actualAmountNumber <= 0) {
+    return;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const actualAmountDecimal = new Prisma.Decimal(actualAmountNumber);
+
+    await tx.wallet.upsert({
+      where: { user_id: originalPayment.user_id },
+      update: {
+        balance: {
+          increment: actualAmountDecimal,
+        },
+      },
+      create: {
+        user_id: originalPayment.user_id,
+        balance: actualAmountDecimal,
+      },
+    });
+
+    await tx.payment.update({
+      where: { payment_id: originalPayment.payment_id },
+      data: {
+        payment_type: 'TOPUP',
+        metadata: {
+          ...metadata,
+          wallet_topup_processed: true,
+          wallet_topup_processed_at: new Date().toISOString(),
+        },
+      },
+    });
+  });
 };
 
 /**
