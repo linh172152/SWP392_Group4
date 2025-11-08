@@ -11,6 +11,7 @@ export async function authFetch(input: string, options: FetchOptions = {}) {
   const accessToken = localStorage.getItem("accessToken");
 
   const baseHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
     ...(options.headers as Record<string, string> | undefined),
   };
 
@@ -53,6 +54,13 @@ export async function authFetch(input: string, options: FetchOptions = {}) {
     console.error(' Response:', data);
     console.error(' Request Body:', requestBody);
     console.groupEnd();
+    
+    // Handle 401 - redirect to login
+    if (res.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/admin/login';
+    }
     
     const err = new Error((data && data.message) || res.statusText || "Request failed");
     (err as any).status = res.status;

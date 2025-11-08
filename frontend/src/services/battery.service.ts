@@ -66,6 +66,24 @@ export interface BatteryTransferLog {
 }
 
 /**
+ * Lấy danh sách pin cho admin (tất cả pin từ tất cả trạm)
+ */
+export async function getAdminBatteries(params?: {
+  status?: string;
+  model?: string;
+  station_id?: string;
+}) {
+  const qs = new URLSearchParams();
+  if (params?.status) qs.set('status', params.status);
+  if (params?.model) qs.set('model', params.model);
+  if (params?.station_id) qs.set('station_id', params.station_id);
+
+  const url = `${API_ENDPOINTS.ADMIN.BATTERIES}${qs.toString() ? `?${qs.toString()}` : ''}`;
+  const res = await authFetch(url);
+  return res; // { success, message, data: Battery[] }
+}
+
+/**
  * Lấy danh sách pin của trạm (cho staff)
  */
 export async function getStationBatteries(params?: {
@@ -144,6 +162,7 @@ export async function deleteBattery(batteryId: string) {
 }
 
 export default {
+  getAdminBatteries,
   getStationBatteries,
   getBatteryDetails,
   getBatteryHistory,

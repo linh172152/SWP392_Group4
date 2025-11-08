@@ -78,9 +78,26 @@ class BatteryTransferService {
 
   async createBatteryTransfer(data: CreateBatteryTransferDto) {
     const url = this.baseURL;
+    // Backend chỉ cần battery_id, to_station_id, transfer_reason, notes
+    // from_station_id được tự động xác định từ pin hiện tại
+    // Backend production có thể expect format khác
+    const payload: any = {
+      battery_id: data.battery_id?.toString().trim(),
+      to_station_id: data.to_station_id?.toString().trim(), 
+      transfer_reason: data.transfer_reason?.toString().trim()
+    };
+    
+    // Chỉ thêm notes nếu có
+    if (data.notes && data.notes.trim()) {
+      payload.notes = data.notes.trim();
+    }
+    
+    console.log('Service payload:', payload);
+    console.log('Original data:', data);
+    
     return await authFetch(url, {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     });
   }
 
@@ -89,6 +106,17 @@ class BatteryTransferService {
     return await authFetch(url, {
       method: 'PUT',
       body: JSON.stringify(data),
+    });
+  }
+
+  async updateBatteryTransferStatus(id: string, status: 'pending' | 'in_transit' | 'completed' | 'cancelled', notes?: string) {
+    const url = `${this.baseURL}/${id}/status`;
+    const payload: any = { status };
+    if (notes) payload.notes = notes;
+    
+    return await authFetch(url, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
     });
   }
 
