@@ -38,7 +38,8 @@ export interface CreateBatteryDto {
   station_id: string;
   model: string;
   battery_code: string;
-  status?: 'available' | 'charging' | 'in_use' | 'maintenance' | 'damaged';
+  capacity_kwh?: number;
+  status?: 'full' | 'reserved' | 'charging' | 'in_use' | 'maintenance' | 'damaged';
   health_percentage?: number;
   cycle_count?: number;
 }
@@ -47,7 +48,8 @@ export interface UpdateBatteryDto {
   station_id?: string;
   model?: string;
   battery_code?: string;
-  status?: 'available' | 'charging' | 'in_use' | 'maintenance' | 'damaged';
+  capacity_kwh?: number;
+  status?: 'full' | 'reserved' | 'charging' | 'in_use' | 'maintenance' | 'damaged';
   health_percentage?: number;
   cycle_count?: number;
 }
