@@ -64,6 +64,7 @@ const BookingForm: React.FC = () => {
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>('');
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('');
   const [customTime, setCustomTime] = useState<string>('');
+  const [useSubscription, setUseSubscription] = useState<boolean>(true); // Driver có thể chọn có dùng subscription hay không
   
   // State messages
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +93,29 @@ const BookingForm: React.FC = () => {
       }
     }
   }, [stationDetails, vehicles, pricingList, selectedBatteryType]);
+
+  // Tự động set useSubscription mặc định khi có subscription áp dụng được
+  useEffect(() => {
+    if (selectedBatteryType && currentSubscription) {
+      const subscriptionCanApply = doesSubscriptionCoverModel(currentSubscription, selectedBatteryType) &&
+                                  (currentSubscription.remaining_swaps === null || (currentSubscription.remaining_swaps ?? 0) > 0);
+      // Mặc định bật subscription nếu áp dụng được, nhưng driver có thể tắt
+      if (subscriptionCanApply) {
+        // Chỉ auto-set khi chưa có lựa chọn (lần đầu chọn pin này)
+        // Giữ nguyên lựa chọn của driver nếu đã chọn rồi
+        setUseSubscription(prev => {
+          // Nếu subscription có thể áp dụng và chưa có lựa chọn trước đó, mặc định bật
+          return prev === false && !selectedVehicleId ? true : prev;
+        });
+      } else {
+        // Nếu subscription không áp dụng được, tắt
+        setUseSubscription(false);
+      }
+    } else if (!currentSubscription) {
+      // Không có subscription thì tắt
+      setUseSubscription(false);
+    }
+  }, [selectedBatteryType, currentSubscription]);
 
   const loadAllData = async () => {
     if (!stationId) return;
@@ -282,14 +306,14 @@ const BookingForm: React.FC = () => {
   // Tính giá
   const batteryPrice = selectedBatteryInfo?.price || 0;
   
-  // Kiểm tra subscription có áp dụng không
-  const subscriptionApplies = currentSubscription && 
+  // Kiểm tra subscription có áp dụng được không (để hiển thị thông tin)
+  const subscriptionCanApply = currentSubscription && 
                               selectedBatteryType &&
                               doesSubscriptionCoverModel(currentSubscription, selectedBatteryType) &&
                               (currentSubscription.remaining_swaps === null || (currentSubscription.remaining_swaps ?? 0) > 0);
   
-  // Tổng cộng dự kiến: Nếu có subscription áp dụng → Miễn phí, không thì = giá pin
-  const totalPrice = subscriptionApplies ? 0 : batteryPrice;
+  // Tổng cộng dự kiến: Dựa trên lựa chọn của driver (useSubscription state)
+  const totalPrice = (useSubscription && subscriptionCanApply) ? 0 : batteryPrice;
   
   // Debug log để kiểm tra
   if (selectedBatteryType && currentSubscription) {
@@ -299,12 +323,14 @@ const BookingForm: React.FC = () => {
       hasSubscription: !!currentSubscription,
       subscriptionName: currentSubscription.package?.name,
       remaining_swaps: currentSubscription.remaining_swaps,
-      subscriptionApplies,
+      subscriptionCanApply,
+      useSubscription,
       totalPrice,
       reason: !currentSubscription ? 'No subscription' :
               !selectedBatteryType ? 'No battery selected' :
               !doesSubscriptionCoverModel(currentSubscription, selectedBatteryType) ? 'Model not covered' :
               (currentSubscription.remaining_swaps !== null && currentSubscription.remaining_swaps <= 0) ? 'No swaps left' :
+              !useSubscription ? 'Driver chose not to use subscription' :
               'Should apply'
     });
   }
@@ -400,6 +426,7 @@ const BookingForm: React.FC = () => {
         notes: undefined,
       };
 
+      // Sử dụng state useSubscription mà driver đã chọn
       if (selectedTimeSlot === 'instant') {
         // Đặt chỗ đổi pin ngay
         booking = await bookingService.createInstantBooking(bookingData);
@@ -410,22 +437,48 @@ const BookingForm: React.FC = () => {
         if (isNaN(scheduledDate.getTime())) {
           throw new Error('Thời gian hẹn không hợp lệ');
         }
-        booking = await bookingService.createBooking({
+        const result = await bookingService.createBooking({
           ...bookingData,
           scheduled_at: scheduledDate.toISOString(),
+          use_subscription: useSubscription, // Driver đã chọn có dùng subscription hay không
         });
-        setSuccess('Đã đặt lịch hẹn thành công!');
+        booking = result.booking || result;
+        
+        // Hiển thị thông tin hold_summary
+        if (result.hold_summary) {
+          const hold = result.hold_summary;
+          if (hold.use_subscription && hold.subscription_name) {
+            setSuccess(`Đã đặt lịch hẹn thành công! Gói "${hold.subscription_name}" sẽ được sử dụng.${hold.subscription_remaining_after !== null ? ` Còn ${hold.subscription_remaining_after} lượt sau giao dịch này.` : ''}`);
+          } else {
+            setSuccess('Đã đặt lịch hẹn thành công!');
+          }
+        } else {
+          setSuccess('Đã đặt lịch hẹn thành công!');
+        }
       } else if (customTime) {
         // Đặt lịch hẹn với custom time
         const scheduledDate = new Date(customTime);
         if (isNaN(scheduledDate.getTime())) {
           throw new Error('Thời gian hẹn không hợp lệ');
         }
-        booking = await bookingService.createBooking({
+        const result = await bookingService.createBooking({
           ...bookingData,
           scheduled_at: scheduledDate.toISOString(),
+          use_subscription: useSubscription, // Driver đã chọn có dùng subscription hay không
         });
-        setSuccess('Đã đặt lịch hẹn thành công!');
+        booking = result.booking || result;
+        
+        // Hiển thị thông tin hold_summary
+        if (result.hold_summary) {
+          const hold = result.hold_summary;
+          if (hold.use_subscription && hold.subscription_name) {
+            setSuccess(`Đã đặt lịch hẹn thành công! Gói "${hold.subscription_name}" sẽ được sử dụng.${hold.subscription_remaining_after !== null ? ` Còn ${hold.subscription_remaining_after} lượt sau giao dịch này.` : ''}`);
+          } else {
+            setSuccess('Đã đặt lịch hẹn thành công!');
+          }
+        } else {
+          setSuccess('Đã đặt lịch hẹn thành công!');
+        }
       } else {
         throw new Error('Vui lòng chọn thời gian');
       }
@@ -805,11 +858,30 @@ const BookingForm: React.FC = () => {
                         </span>
                       </div>
                       
-                      {subscriptionApplies && (
-                        <div className="bg-green-50 dark:bg-green-900/20 p-2 rounded-lg border border-green-200 dark:border-green-800">
-                          <div className="text-xs text-green-700 dark:text-green-300">
-                            ✓ Gói "{currentSubscription.package?.name || 'Gói dịch vụ'}" sẽ áp dụng cho loại pin này
-                          </div>
+                      {/* Checkbox cho phép driver chọn có dùng subscription hay không */}
+                      {subscriptionCanApply && (
+                        <div className="mt-3 p-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/10">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={useSubscription}
+                              onChange={(e) => setUseSubscription(e.target.checked)}
+                              className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                            />
+                            <span className="text-sm font-medium text-blue-900 dark:text-blue-300">
+                              Sử dụng gói "{currentSubscription.package?.name || 'Gói dịch vụ'}" cho lần đổi pin này
+                            </span>
+                          </label>
+                          {useSubscription && (
+                            <div className="mt-2 text-xs text-green-700 dark:text-green-300">
+                              ✓ Gói sẽ được áp dụng → Miễn phí
+                            </div>
+                          )}
+                          {!useSubscription && (
+                            <div className="mt-2 text-xs text-slate-600 dark:text-slate-400">
+                              ⚠️ Sẽ thanh toán từ ví: {batteryPrice > 0 ? `${batteryPrice.toLocaleString('vi-VN')}₫` : 'Liên hệ'}
+                            </div>
+                          )}
                         </div>
                       )}
                       
@@ -819,18 +891,18 @@ const BookingForm: React.FC = () => {
                             Tổng cộng (dự kiến)
                           </span>
                           <span className={`font-bold ${
-                            totalPrice === 0 && subscriptionApplies ? 'text-green-600 dark:text-green-400' : 'text-green-600'
+                            totalPrice === 0 && (useSubscription && subscriptionCanApply) ? 'text-green-600 dark:text-green-400' : 'text-green-600'
                           } ${totalPrice > 0 ? 'text-2xl' : 'text-lg'}`}>
                             {(() => {
                               // Nếu chưa chọn pin hoặc không có giá → "Liên hệ"
                               if (!selectedBatteryType || batteryPrice === 0) {
                                 return 'Liên hệ';
                               }
-                              // Nếu có subscription áp dụng → "Miễn phí"
-                              if (subscriptionApplies && totalPrice === 0) {
+                              // Nếu có subscription áp dụng và driver chọn dùng → "Miễn phí"
+                              if (useSubscription && subscriptionCanApply && totalPrice === 0) {
                                 return 'Miễn phí';
                               }
-                              // Nếu không có subscription → hiển thị giá
+                              // Nếu không có subscription hoặc driver không chọn dùng → hiển thị giá
                               return `${totalPrice.toLocaleString('vi-VN')}₫`;
                             })()}
                           </span>

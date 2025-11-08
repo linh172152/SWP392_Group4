@@ -52,6 +52,7 @@ export interface CreateBookingData {
   battery_model: string;
   scheduled_at: string;
   notes?: string;
+  use_subscription?: boolean; // Ưu tiên sử dụng subscription nếu có (default: true)
 }
 
 export interface CreateInstantBookingData {
@@ -66,10 +67,38 @@ export interface UpdateBookingData {
   notes?: string;
 }
 
+export interface HoldSummary {
+  battery_code?: string | null;
+  use_subscription: boolean;
+  subscription_unlimited?: boolean;
+  subscription_remaining_after?: number | null;
+  subscription_name?: string | null;
+  wallet_amount_locked?: number;
+  wallet_balance_after?: number | null;
+  hold_expires_at?: string | null;
+}
+
+export interface PricingPreview {
+  currency: string;
+  base_price: number | null;
+  estimated_price: number | null;
+  pricing_source: "subscription" | "wallet" | "unavailable";
+  has_active_subscription: boolean;
+  is_covered_by_subscription: boolean;
+  subscription?: any;
+  message: string;
+}
+
+export interface CreateBookingResponse {
+  booking: Booking;
+  pricing_preview?: PricingPreview;
+  hold_summary?: HoldSummary;
+}
+
 export interface BookingResponse {
   success: boolean;
   message: string;
-  data: Booking | {
+  data: Booking | CreateBookingResponse | {
     bookings: Booking[];
     pagination: {
       page: number;
@@ -118,11 +147,17 @@ export const bookingService = {
   },
 
   // Tạo booking mới (đặt lịch)
-  async createBooking(bookingData: CreateBookingData): Promise<Booking> {
+  async createBooking(bookingData: CreateBookingData): Promise<CreateBookingResponse> {
+    // Default use_subscription = true nếu không được chỉ định
+    const requestData = {
+      ...bookingData,
+      use_subscription: bookingData.use_subscription !== undefined ? bookingData.use_subscription : true,
+    };
+
     const response = await fetch(API_ENDPOINTS.DRIVER.BOOKINGS, {
       method: "POST",
       headers: getAuthHeaders(),
-      body: JSON.stringify(bookingData),
+      body: JSON.stringify(requestData),
     });
 
     const data = await response.json();
@@ -131,6 +166,7 @@ export const bookingService = {
       throw new Error(data.message || "Không thể tạo đặt chỗ");
     }
 
+    // Response có thể chứa hold_summary và pricing_preview
     return data.data;
   },
 

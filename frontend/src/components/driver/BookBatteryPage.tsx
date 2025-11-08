@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
@@ -52,6 +52,8 @@ const BookBatteryPage: React.FC = () => {
   const [pricingList, setPricingList] = useState<BatteryPricing[]>([]);
   const [currentSubscription, setCurrentSubscription] = useState<any|null>(null);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [useSubscription, setUseSubscription] = useState<boolean>(true); // Driver có thể chọn có dùng subscription hay không
+  const lastBatteryCountRef = useRef<Map<string, number>>(new Map()); // Lưu số pin lần trước để so sánh (dùng ref để tránh re-render)
 
   // Load pricing
   const loadPricing = async () => {
@@ -223,7 +225,68 @@ const BookBatteryPage: React.FC = () => {
     // Tự động set thời gian mặc định: 1 giờ từ bây giờ
     const defaultTime = new Date(Date.now() + 60 * 60 * 1000);
     setScheduledAt(defaultTime.toISOString().slice(0, 16)); // Format: YYYY-MM-DDTHH:mm
-  }, [id]);
+
+    // Refresh danh sách pin định kỳ để cập nhật số lượng real-time (mỗi 10 giây)
+    const refreshBatteries = async () => {
+      if (!id) return;
+      try {
+        const batteriesRes = await fetchWithAuth(`${API_ENDPOINTS.DRIVER.STATIONS}/${id}/batteries`);
+        if (batteriesRes.ok) {
+          const batteriesData = await batteriesRes.json();
+          if (batteriesData.success && batteriesData.data) {
+            // So sánh số pin trước và sau để cảnh báo nếu thay đổi
+            const newBatteries = batteriesData.data;
+            const newAvailableOnly = newBatteries.filter((b: BatteryItem) => b.status === 'full');
+            const newBatteryModels = [...new Set(newAvailableOnly.map((b: BatteryItem) => b.model))];
+            
+            const newCounts = new Map<string, number>();
+            (newBatteryModels as string[]).forEach((model: string) => {
+              const count = newAvailableOnly.filter((b: BatteryItem) => b.model === model).length;
+              newCounts.set(model, count);
+            });
+
+            // Kiểm tra xem có thay đổi không
+            let hasChanged = false;
+            newCounts.forEach((newCount, model) => {
+              const oldCount = lastBatteryCountRef.current.get(model);
+              if (oldCount !== undefined && oldCount !== newCount) {
+                hasChanged = true;
+                console.log(`⚠️ [BATTERY] Pin ${model} thay đổi: ${oldCount} → ${newCount}`);
+              }
+            });
+
+            setBatteries(newBatteries);
+            lastBatteryCountRef.current = newCounts; // Update ref thay vì state
+            
+            if (hasChanged && selectedModel) {
+              // Cảnh báo nếu số pin thay đổi khi đang chọn pin
+              const currentCount = newCounts.get(selectedModel);
+              const oldCount = lastBatteryCountRef.current.get(selectedModel);
+              if (oldCount !== undefined && currentCount !== undefined && currentCount < oldCount) {
+                console.warn(`⚠️ [BATTERY] Số pin ${selectedModel} giảm từ ${oldCount} xuống ${currentCount}`);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('⚠️ [BATTERY] Failed to refresh battery list:', error);
+        // Không block UI nếu refresh fail
+      }
+    };
+
+    // Refresh ngay lần đầu sau 2 giây
+    const initialRefresh = setTimeout(() => {
+      refreshBatteries();
+    }, 2000);
+
+    // Refresh định kỳ mỗi 10 giây
+    const refreshInterval = setInterval(refreshBatteries, 10000);
+
+    return () => {
+      clearTimeout(initialRefresh);
+      clearInterval(refreshInterval);
+    };
+  }, [id]); // Chỉ phụ thuộc vào id, không phụ thuộc vào lastBatteryCount hoặc selectedModel để tránh re-render liên tục
   
   // Tính thời gian tối thiểu (30 phút từ bây giờ)
   const getMinDateTime = () => {
@@ -241,18 +304,22 @@ const BookBatteryPage: React.FC = () => {
 
   // Tất cả model pin khả dụng của trạm (unique - chỉ lấy pin status full)
   const availableOnly = batteries.filter(b => b.status === 'full');
+  // Pin đang được reserve (để hiển thị thông tin)
+  const reservedOnly = batteries.filter(b => b.status === 'reserved');
   const batteryModels = [...new Set(availableOnly.map(b => b.model))];
   // Map: model pin => số pin khả dụng hiện có
   // FIX: Chỉ hiển thị những loại pin có ít nhất 1 xe tương thích (dùng matchBatteryModel để matching linh hoạt)
   const pinStats = batteryModels.map(model => {
     const pins = availableOnly.filter(b => b.model === model);
+    const reservedPins = reservedOnly.filter(b => b.model === model);
     // Dùng matchBatteryModel để matching linh hoạt (ví dụ: "VinFast VF8" ↔ "VinFast VF8 Battery")
     const compatibleVehiclesCount = vehicles.filter(v => 
       v.battery_model && matchBatteryModel(model, v.battery_model)
     ).length;
     return { 
       model, 
-      count: pins.length, 
+      count: pins.length, // Số pin khả dụng (status = full)
+      reservedCount: reservedPins.length, // Số pin đang được reserve
       example: pins[0],
       hasCompatibleVehicle: compatibleVehiclesCount > 0
     };
@@ -285,6 +352,29 @@ const BookBatteryPage: React.FC = () => {
       }
     }
   }, [vehicles.length, batteries.length, pinStats.length]); // Chỉ chạy khi dữ liệu load xong lần đầu
+
+  // Tự động set useSubscription mặc định khi có subscription áp dụng được
+  useEffect(() => {
+    if (selectedModel && currentSubscription) {
+      const subscriptionCanApply = doesSubscriptionCoverModel(currentSubscription, selectedModel) &&
+                                  (currentSubscription.remaining_swaps === null || (currentSubscription.remaining_swaps ?? 0) > 0);
+      // Mặc định bật subscription nếu áp dụng được, nhưng driver có thể tắt
+      if (subscriptionCanApply) {
+        // Chỉ auto-set khi chưa có lựa chọn (lần đầu chọn pin này)
+        // Giữ nguyên lựa chọn của driver nếu đã chọn rồi
+        setUseSubscription(prev => {
+          // Nếu subscription có thể áp dụng và chưa có lựa chọn trước đó, mặc định bật
+          return prev === false && !selectedVehicle ? true : prev;
+        });
+      } else {
+        // Nếu subscription không áp dụng được, tắt
+        setUseSubscription(false);
+      }
+    } else if (!currentSubscription) {
+      // Không có subscription thì tắt
+      setUseSubscription(false);
+    }
+  }, [selectedModel, currentSubscription]);
 
   // Đặt chỗ khi đã chọn model và chọn xe phù hợp
   // NOTE về Subscription:
@@ -327,11 +417,30 @@ const BookBatteryPage: React.FC = () => {
       setError('Thời gian hẹn không được quá 12 giờ từ bây giờ!'); return;
     }
     
-    // Có battery khả dụng?
-    const hasAvailable = batteries.some(b => b.model === selectedModel && b.status === 'full');
-    if (!hasAvailable) {
-      setError('Hiện tại không còn pin khả dụng cho loại này!'); return;
+    // Refresh lại danh sách pin TRƯỚC KHI đặt để đảm bảo số liệu chính xác
+    let refreshedBatteries = batteries;
+    try {
+      const batteriesRes = await fetchWithAuth(`${API_ENDPOINTS.DRIVER.STATIONS}/${id}/batteries`);
+      if (batteriesRes.ok) {
+        const batteriesData = await batteriesRes.json();
+        if (batteriesData.success && batteriesData.data) {
+          refreshedBatteries = batteriesData.data;
+          setBatteries(refreshedBatteries);
+          console.log('✅ [BOOKING] Refreshed battery list before booking');
+        }
+      }
+    } catch (refreshError) {
+      console.error('⚠️ [BOOKING] Failed to refresh battery list before booking:', refreshError);
+      // Vẫn tiếp tục đặt nếu refresh fail
     }
+
+    // Kiểm tra lại sau khi refresh
+    const currentBatteries = refreshedBatteries.filter(b => b.model === selectedModel && b.status === 'full');
+    if (currentBatteries.length === 0) {
+      setError('Hiện tại không còn pin khả dụng cho loại này! Có thể pin vừa được đặt bởi người khác. Vui lòng chọn loại pin khác hoặc thử lại sau.');
+      return;
+    }
+    
     setLoading(true);
     
     // Tối ưu: Thêm timeout và AbortController để tránh chờ quá lâu
@@ -340,11 +449,14 @@ const BookBatteryPage: React.FC = () => {
     
     try {
       const scheduledAtISO = scheduledDate.toISOString();
+      
+      // Sử dụng state useSubscription mà driver đã chọn
       const body = {
         vehicle_id: selectedVehicle.vehicle_id,
         station_id: id,
         battery_model: selectedModel,
-        scheduled_at: scheduledAtISO
+        scheduled_at: scheduledAtISO,
+        use_subscription: useSubscription // Driver đã chọn có dùng subscription hay không
       };
       
       // Tối ưu: Sử dụng signal để có thể abort request
@@ -368,9 +480,34 @@ const BookBatteryPage: React.FC = () => {
         throw new Error(data.message || 'Đặt pin thất bại');
       }
       
-      // Tối ưu: Hiển thị message ngay lập tức
-      // BE sẽ tự động check subscription khi staff complete booking → Không cần hiển thị subscription ở đây
-      setBookingMsg('Đặt Pin thành công! Bạn sẽ thanh toán khi hoàn tất đổi pin tại trạm.');
+      // Hiển thị thông tin hold_summary nếu có
+      const holdSummary = data.data?.hold_summary;
+      if (holdSummary) {
+        if (holdSummary.use_subscription && holdSummary.subscription_name) {
+          setBookingMsg(`Đặt Pin thành công! Gói "${holdSummary.subscription_name}" sẽ được sử dụng cho lần đổi pin này.${holdSummary.subscription_remaining_after !== null ? ` Còn ${holdSummary.subscription_remaining_after} lượt sau giao dịch này.` : ''}`);
+        } else if (holdSummary.wallet_amount_locked && holdSummary.wallet_amount_locked > 0) {
+          setBookingMsg(`Đặt Pin thành công! Đã giữ ${holdSummary.wallet_amount_locked.toLocaleString('vi-VN')}₫ từ ví của bạn. Số dư sau: ${holdSummary.wallet_balance_after ? holdSummary.wallet_balance_after.toLocaleString('vi-VN') + '₫' : 'N/A'}`);
+        } else {
+          setBookingMsg('Đặt Pin thành công! Bạn sẽ thanh toán khi hoàn tất đổi pin tại trạm.');
+        }
+      } else {
+        setBookingMsg('Đặt Pin thành công! Bạn sẽ thanh toán khi hoàn tất đổi pin tại trạm.');
+      }
+      
+      // Refresh lại danh sách pin để cập nhật số lượng (pin đã được reserve sẽ không còn trong danh sách khả dụng)
+      try {
+        const batteriesRes = await fetchWithAuth(`${API_ENDPOINTS.DRIVER.STATIONS}/${id}/batteries`);
+        if (batteriesRes.ok) {
+          const batteriesData = await batteriesRes.json();
+          if (batteriesData.success && batteriesData.data) {
+            setBatteries(batteriesData.data);
+            console.log('✅ [BOOKING] Refreshed battery list after booking');
+          }
+        }
+      } catch (refreshError) {
+        console.error('⚠️ [BOOKING] Failed to refresh battery list:', refreshError);
+        // Không block UI nếu refresh fail
+      }
       
       // Tối ưu: Tự động chuyển về trang bookings sau 1.5 giây
       setTimeout(() => {
@@ -649,7 +786,14 @@ const BookBatteryPage: React.FC = () => {
                         )}
                       </div>
                       <div className="text-right">
-                        <div className="font-bold text-green-700 text-xl">{count} pin</div>
+                        <div className="font-bold text-green-700 text-xl">
+                          {count} pin khả dụng
+                          {pinStats.find(p => p.model === model)?.reservedCount && pinStats.find(p => p.model === model)!.reservedCount > 0 && (
+                            <span className="text-xs text-amber-600 dark:text-amber-400 ml-1">
+                              ({pinStats.find(p => p.model === model)!.reservedCount} đang được giữ)
+                            </span>
+                          )}
+                        </div>
                         <div className={`font-bold ${price > 0 ? 'text-green-600 text-lg' : 'text-green-600 text-base'}`}>
                           {price > 0 ? `${price.toLocaleString('vi-VN')}₫` : 'Liên hệ'}
                         </div>
@@ -703,7 +847,15 @@ const BookBatteryPage: React.FC = () => {
               <>
                 <div>Loại pin: <b>{selectedModel}</b></div>
                 <div>Xe: {selectedVehicle ? <span className="font-bold">{selectedVehicle.make} {selectedVehicle.model} ({selectedVehicle.license_plate})</span> : <span className="text-orange-500">Chọn xe</span>}</div>
-                <div>Số pin còn: <b>{pinStats.find(p=>p.model===selectedModel)?.count ?? 0}</b></div>
+                <div className="flex items-center gap-2">
+                  <span>Số pin khả dụng:</span>
+                  <b className="text-green-600">{pinStats.find(p=>p.model===selectedModel)?.count ?? 0}</b>
+                  {pinStats.find(p=>p.model===selectedModel)?.reservedCount && pinStats.find(p=>p.model===selectedModel)!.reservedCount > 0 && (
+                    <span className="text-xs text-amber-600 dark:text-amber-400">
+                      ({pinStats.find(p=>p.model===selectedModel)!.reservedCount} đang được giữ)
+                    </span>
+                  )}
+                </div>
                 
                 {/* Phần giá - Preview giá cuối cùng (bao gồm subscription) */}
                 <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
@@ -711,12 +863,13 @@ const BookBatteryPage: React.FC = () => {
                     const pricing = pricingList.find(p => matchBatteryModel(p.battery_model, selectedModel));
                     const batteryPrice = pricing ? Number(pricing.price) : 0;
                     
-                    // Kiểm tra subscription có áp dụng không
-                    const subscriptionApplies = currentSubscription && 
+                    // Kiểm tra subscription có áp dụng được không (để hiển thị thông tin)
+                    const subscriptionCanApply = currentSubscription && 
                                               doesSubscriptionCoverModel(currentSubscription, selectedModel) &&
                                               (currentSubscription.remaining_swaps === null || (currentSubscription.remaining_swaps ?? 0) > 0);
                     
-                    const finalTotal = subscriptionApplies ? 0 : batteryPrice;
+                    // Tính giá dựa trên lựa chọn của driver (useSubscription state)
+                    const finalTotal = (useSubscription && subscriptionCanApply) ? 0 : batteryPrice;
                     
                     return (
                       <div className="space-y-2">
@@ -748,11 +901,30 @@ const BookBatteryPage: React.FC = () => {
                           </span>
                         </div>
                         
-                        {subscriptionApplies && (
-                          <div className="bg-green-50 dark:bg-green-900/20 p-2 rounded-lg border border-green-200 dark:border-green-800">
-                            <div className="text-xs text-green-700 dark:text-green-300">
-                              ✓ Gói "{currentSubscription.package?.name || 'Gói dịch vụ'}" sẽ áp dụng cho loại pin này
-                            </div>
+                        {/* Checkbox cho phép driver chọn có dùng subscription hay không */}
+                        {subscriptionCanApply && (
+                          <div className="mt-3 p-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/10">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={useSubscription}
+                                onChange={(e) => setUseSubscription(e.target.checked)}
+                                className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                              />
+                              <span className="text-sm font-medium text-blue-900 dark:text-blue-300">
+                                Sử dụng gói "{currentSubscription.package?.name || 'Gói dịch vụ'}" cho lần đổi pin này
+                              </span>
+                            </label>
+                            {useSubscription && (
+                              <div className="mt-2 text-xs text-green-700 dark:text-green-300">
+                                ✓ Gói sẽ được áp dụng → Miễn phí
+                              </div>
+                            )}
+                            {!useSubscription && (
+                              <div className="mt-2 text-xs text-slate-600 dark:text-slate-400">
+                                ⚠️ Sẽ thanh toán từ ví: {batteryPrice > 0 ? `${batteryPrice.toLocaleString('vi-VN')}₫` : 'Liên hệ'}
+                              </div>
+                            )}
                           </div>
                         )}
                         
@@ -772,8 +944,8 @@ const BookBatteryPage: React.FC = () => {
                           * Giá cuối cùng sẽ được xác nhận trong lịch sử đặt chỗ sau khi đặt thành công.
                         </p>
                         
-                        {/* Wallet balance warning */}
-                        {walletBalance !== null && !subscriptionApplies && batteryPrice > 0 && (
+                        {/* Wallet balance warning - chỉ hiển thị khi không dùng subscription */}
+                        {walletBalance !== null && !(useSubscription && subscriptionCanApply) && batteryPrice > 0 && (
                           <div className={`mt-3 p-2 rounded-lg border ${
                             walletBalance < batteryPrice
                               ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
