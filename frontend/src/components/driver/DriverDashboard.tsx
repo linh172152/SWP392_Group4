@@ -1,18 +1,17 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { User } from '../../App';
+import type { User } from '../../App';
 import DriverLayout from './DriverLayout';
 import DriverHome from './StationFinding';
 import VehicleManagement from './VehicleManagement';
 import StationDetail from './StationDetail';
 import BookingHistory from './BookingHistory';
 import BookingForm from './BookingForm';
-import PaymentInvoices from './PaymentInvoices';
 import ServicePackages from './ServicePackages';
-import SupportTickets from './SupportTickets';
 import DriverProfile from './DriverProfile';
 import BookBatteryPage from './BookBatteryPage';
 import Wallet from './Wallet';
+import TransactionHistory from './TransactionHistory';
 
 interface DriverDashboardProps {
   user: User;
@@ -30,10 +29,10 @@ const DriverDashboard: React.FC<DriverDashboardProps> = ({ user, onLogout }) => 
         <Route path="/station/:id/book-battery" element={<BookBatteryPage />} />
         <Route path="/booking/:stationId" element={<BookingForm />} />
         <Route path="/bookings" element={<BookingHistory />} />
-        <Route path="/payments" element={<PaymentInvoices />} />
+        <Route path="/transactions" element={<TransactionHistory />} />
         <Route path="/wallet" element={<Wallet />} />
         <Route path="/subscriptions" element={<ServicePackages />} />
-        <Route path="/profile" element={<DriverProfile user={user} />} />
+        <Route path="/profile" element={<DriverProfile />} />
       </Routes>
     </DriverLayout>
   );

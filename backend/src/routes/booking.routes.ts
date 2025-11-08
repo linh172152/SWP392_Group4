@@ -7,7 +7,10 @@ import {
   updateBooking,
   cancelBooking,
 } from "../controllers/booking.controller";
-import { authenticateToken, authorizeRole } from "../middlewares/auth.middleware";
+import {
+  authenticateToken,
+  authorizeRole,
+} from "../middlewares/auth.middleware";
 
 const router = Router();
 
@@ -112,6 +115,10 @@ router.get("/", getUserBookings);
  *                 format: date-time
  *               notes:
  *                 type: string
+ *               use_subscription:
+ *                 type: boolean
+ *                 default: true
+ *                 description: "Ưu tiên sử dụng gói đăng ký nếu driver đang có (default true). Khi false, hệ thống giữ tiền ví ngay khi đặt."
  *     responses:
  *       201:
  *         description: Booking created successfully
@@ -122,8 +129,46 @@ router.get("/", getUserBookings);
  *               properties:
  *                 success:
  *                   type: boolean
+ *                 message:
+ *                   type: string
  *                 data:
- *                   $ref: '#/components/schemas/Booking'
+ *                   type: object
+ *                   properties:
+ *                     booking:
+ *                       $ref: '#/components/schemas/Booking'
+ *                     pricing_preview:
+ *                       type: object
+ *                       description: "Thông tin báo giá cho lần đổi pin này"
+ *                     hold_summary:
+ *                       type: object
+ *                       description: "Tóm tắt tài nguyên đã giữ cho booking"
+ *                       properties:
+ *                         battery_code:
+ *                           type: string
+ *                           nullable: true
+ *                           description: "Mã pin đang được giữ"
+ *                         use_subscription:
+ *                           type: boolean
+ *                           description: "Có sử dụng gói đăng ký hay không"
+ *                         subscription_unlimited:
+ *                           type: boolean
+ *                         subscription_remaining_after:
+ *                           type: integer
+ *                           nullable: true
+ *                         subscription_name:
+ *                           type: string
+ *                           nullable: true
+ *                         wallet_amount_locked:
+ *                           type: number
+ *                           format: float
+ *                           description: "Số tiền đã trừ khỏi ví (nếu không dùng gói)"
+ *                         wallet_balance_after:
+ *                           type: number
+ *                           nullable: true
+ *                         hold_expires_at:
+ *                           type: string
+ *                           format: date-time
+ *                           nullable: true
  *       401:
  *         description: Unauthorized
  *       400:
@@ -254,6 +299,30 @@ router.put("/:id", updateBooking);
  *     responses:
  *       200:
  *         description: Booking cancelled successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     booking:
+ *                       $ref: '#/components/schemas/Booking'
+ *                     cancellation_fee:
+ *                       type: number
+ *                       description: "Phí hủy muộn (nếu áp dụng)"
+ *                     wallet_forfeited_amount:
+ *                       type: number
+ *                       description: "Số tiền/gói đã bị giữ lại do driver không tới"
+ *                     wallet_balance:
+ *                       type: number
+ *                       nullable: true
+ *                       description: "Số dư ví sau khi trừ phí/forfeit"
  *       401:
  *         description: Unauthorized
  *       404:

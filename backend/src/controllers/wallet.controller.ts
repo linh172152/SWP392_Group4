@@ -182,12 +182,12 @@ export const topUpWallet = asyncHandler(
       paymentType: "TOPUP",
       metadata: {
         type: "wallet_topup",
-        topup_package_id: package_id,
+          topup_package_id: package_id,
         topup_amount: topupAmount,
         bonus_amount: bonusAmount,
         actual_amount: actualAmount,
-      },
-    });
+        },
+      });
 
     return res.status(200).json({
       success: true,
@@ -197,7 +197,7 @@ export const topUpWallet = asyncHandler(
         order_id: paymentResult.orderId,
         amount: paymentResult.amount,
         topup_package: {
-          package_id,
+        package_id,
           name: topupPackage.name,
           topup_amount: topupAmount,
           bonus_amount: bonusAmount,

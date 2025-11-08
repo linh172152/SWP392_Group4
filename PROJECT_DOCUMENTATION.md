@@ -21,17 +21,21 @@
 
 - **Auth & Users**: Registration/login, token refresh, role-based guard (`authenticateToken`, `authorizeRole`).
 - **Driver Experience**:
-  - Manage vehicles, search stations, book swaps (scheduled/instant), track wallet balance & history.
-  - Subscriptions (fixed-term service packages) provide bundled swaps; swap flow now deducts from `UserSubscription.remaining_swaps` (or applies unlimited coverage) before touching wallet. Wallet is charged only if no active subscription or swaps are depleted.
+  - Manage vehicles, search stations, book swaps (scheduled/instant), track wallet balance & history (`/api/driver/...`).
+  - Booking engine immediately **reserves a concrete battery** (`batteries.status = reserved`) and locks the funding source: subscription swap or wallet hold.
+  - Cancellation policy: nếu driver hủy/no-show, pin được trả lại nhưng lượt/tiền đã trừ **không tự hoàn**, chỉ admin mới hoàn lại ví thủ công.
+  - Pricing preview trả về thông tin `hold_summary` (pin, subscription, ví) để frontend thể hiện rõ.
+  - Subscriptions vẫn là ưu tiên số 1: swap trừ `remaining_swaps` (hoặc unlimited). Ví chỉ bị trừ khi không có gói bao phủ.
 - **Staff Console**:
-  - Handle on-site bookings: phone verification, swap completion without PIN entry, subscription-aware settlement, issue resolution.
-  - Manage personal schedules (`/api/staff/schedules`) and update shift statuses.
-  - Inventory oversight for station batteries, including SoH insight and transfer requests.
-- **Admin Console**:
-  - CRUD for stations, staff, users, `BatteryPricing`, `TopUpPackage`, and service packages.
+  - Handle on-site bookings: xác minh qua SĐT, hoàn tất swap **tiêu thụ hold** (đổi pin mới sang `in_use`, pin cũ về `charging`/`maintenance`), không nhập PIN.
+  - Giao dịch hoàn tất chỉ đánh dấu payment `reserved → completed`; không trừ ví/gói lần nữa.
+  - Manage personal schedules (`/api/staff/schedules`) và cập nhật ca trực.
+  - Inventory oversight cho pin trạm, bao gồm SoH và điều phối transfer.
+-- **Admin Console**:
+  - CRUD for stations, staff, users, station batteries, `BatteryPricing`, `TopUpPackage`, and service packages.
   - Staff scheduling management (`/api/admin/staff-schedules`) with overlap detection and station assignment.
   - Demand forecasting, dashboard reports, battery transfer approvals, support ticket workflow.
-- **Wallet & Transactions**: Ledger of wallet credits/debits, swap payment settlement (wallet only when subscription does not cover), VNPay top-ups. No cash handling, no promotion codes.
+- **Wallet & Transactions**: Ledger của các khoản nạp/rút, swap settlement (ví chỉ bị trừ khi gói không cover), VNPay top-up, **wallet hold** khi đặt booking và forfeited nếu hủy muộn. Không xử lý tiền mặt/promotion.
 - **Support & Notifications**: Ticket submission, assignment, replies, status transitions; real-time notification dispatch.
 - **Battery Lifecycle**: SoH metrics (`health_percentage`, `cycle_count`), capacity warnings, transfer logs, demand forecasting feed.
 
@@ -49,23 +53,28 @@
 ## API Surface (High Level)
 
 - `POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/logout`.
-- Driver: `/api/driver/*` for vehicles, bookings, transactions, wallet, subscriptions.
-- Staff: `/api/staff/batteries`, `/api/staff/bookings`, `/api/staff/schedules`.
-- Admin:
-  - `/api/admin/users`, `/stations`, `/staff`.
+- Driver: `/api/driver/vehicles`, `/api/driver/stations`, `/api/driver/bookings`, `/api/driver/wallet`, `/api/driver/transactions`, `/api/driver/subscriptions`, `/api/driver/notifications`.
+- Staff: `/api/staff/bookings`, `/api/staff/batteries`, `/api/staff/schedules`.
+-- Admin:
+  - `/api/admin/users`, `/stations`, `/staff`, `/batteries`.
   - `/api/admin/pricing` (`BatteryPricing`), `/topup-packages`, `/staff-schedules`.
   - `/api/admin/dashboard` (reports & metrics including SoH aggregates).
   - `/api/admin/battery-transfers` (create/list/detail transfers).
   - `/api/admin/support` (ticket assignment, replies, status updates).
   - `/api/admin/forecast/bookings` (7-day booking forecast from recent history).
 - Shared: `/api/support`, `/api/ratings`, `/api/maps`.
-- Public routes: `/api/packages` (active service packages), `/api/pricing` (read-only `BatteryPricing`).
+- Public routes: `/api/packages` (active service packages), `/api/pricing` (read-only `BatteryPricing`), `/api/stations/public` (public station directory & nearby search).
 
 ## Key Flows
 
-- **Subscription Purchase**: Driver selects package → `subscribeToPackage` validates availability → wallet charged or VNPay payment recorded → `UserSubscription` created/refreshed with `remaining_swaps`. Swap completion consumes subscription swaps first (or applies unlimited) before falling back to wallet pricing.
+- **Subscription Purchase**: Driver mua gói → `subscribeToPackage` trừ ví (hoặc ghi nhận VNPay) → tạo `UserSubscription`. Swap completion trừ gói trước, nếu hết lượt mới quay về ví.
+- **Subscription Cancellation**: `cancelSubscription` kiểm tra gói chưa dùng và không bị giữ ở booking nào, sau đó hoàn tiền về ví (`Payment` mới `PACKAGE_REFUND`) và cập nhật trạng thái `cancelled`.
 - **Wallet Funding**: VNPay transaction → callback updates `Wallet` balance, logs `Payment` record, notifies driver.
-- **Booking Lifecycle**: Creation (subscription-aware pricing preview returned) → staff check-in → swap completion auto-selects new battery, deducts subscription swaps or wallet funds → transactions/notifications dispatched.
+- **Booking Lifecycle**:
+  1. Driver đặt (scheduled/instant) → hệ thống chọn pin khả dụng, chuyển `status = reserved`, lock subscription/ ví.
+  2. Cancel/manual hoặc cron auto-cancel (quá hạn) → gọi `releaseBookingHold` để trả pin và chuyển payment hold sang `forfeited`.
+  3. Staff complete → xác định pin cũ, chuyển pin mới `in_use`, `vehicle.current_battery_id` cập nhật, payment `reserved → completed`, ghi `battery_history`.
+- **Auto-cancel**: Cron 5 phút kiểm tra booking pending/instant quá thời gian, auto release pin và giữ tiền như chính sách.
 - **Battery Transfer**: Admin triggers transfer → validations (station capacity, battery status) → log inserted with `transfer_status` → station inventory updated → SoH recalculated in reports.
 - **Support Ticket**: Driver submits ticket → admin assigns staff → replies preserved in `TicketReply` → status updates broadcast via Socket.IO.
 - **Reporting**: `report.controller` aggregates bookings, revenue, battery SoH metrics, low-health alerts.

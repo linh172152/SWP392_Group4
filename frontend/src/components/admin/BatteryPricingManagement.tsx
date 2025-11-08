@@ -1,20 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import batteryPricingService from '../../services/battery-pricing.service';
 import batteryTransferService from '../../services/battery-transfer.service';
-import adminBatteryService from '../../services/admin-battery.service';
 import { getAllStations } from '../../services/station.service';
+import { getAdminBatteries } from '../../services/battery.service';
 
 import { toast } from 'sonner';
 import type { BatteryPricing } from '../../services/battery-pricing.service';
 import type { BatteryTransfer, CreateBatteryTransferDto } from '../../services/battery-transfer.service';
-import type { Battery, CreateBatteryDto, BatteryStats } from '../../services/admin-battery.service';
-import type { Station } from '../../services/station.service';
 
-import { DollarSign, Edit2, Trash2, Plus, Check, X, Battery as BatteryIcon, Zap, TrendingUp, Search, ArrowRightLeft, Truck, Clock, CheckCircle, XCircle, AlertCircle, Package, Activity } from 'lucide-react';
+import { DollarSign, Edit2, Trash2, Plus, Check, X, Battery, Zap, TrendingUp, Search, ArrowRightLeft, Truck, Clock, CheckCircle, XCircle, AlertCircle, Eye, Info, MapPin, User, Calendar } from 'lucide-react';
 
 const BatteryPricingManagement: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'pricing' | 'transfer' | 'inventory'>('pricing');
+  const [activeTab, setActiveTab] = useState<'pricing' | 'transfer'>('pricing');
   const [loading, setLoading] = useState(false);
   
   // Pricing state
@@ -27,41 +26,31 @@ const BatteryPricingManagement: React.FC = () => {
   // Transfer state
   const [transfers, setTransfers] = useState<BatteryTransfer[]>([]);
   const [showTransferForm, setShowTransferForm] = useState(false);
-  const [newTransfer, setNewTransfer] = useState<CreateBatteryTransferDto>({
-    battery_id: '',
+  const [newTransfer, setNewTransfer] = useState<CreateBatteryTransferDto & { from_station_id?: string }>({
     from_station_id: '',
+    battery_id: '',
     to_station_id: '',
     transfer_reason: '',
     notes: ''
   });
   const [filterStatus, setFilterStatus] = useState<string>('all');
-
-  // Inventory state
-  const [batteries, setBatteries] = useState<Battery[]>([]);
-  const [stations, setStations] = useState<Station[]>([]);
-  const [showBatteryForm, setShowBatteryForm] = useState(false);
-  const [newBattery, setNewBattery] = useState<CreateBatteryDto>({
-    station_id: '',
-    model: '',
-    battery_code: '',
-    status: 'available',
-    health_percentage: 100,
-    cycle_count: 0
-  });
-  const [editingBattery, setEditingBattery] = useState<string | null>(null);
-  const [batteryStats, setBatteryStats] = useState<BatteryStats | null>(null);
-  const [filterBatteryStatus, setFilterBatteryStatus] = useState<string>('all');
-  const [searchBatteryQuery, setSearchBatteryQuery] = useState('');
+  const [selectedTransfer, setSelectedTransfer] = useState<BatteryTransfer | null>(null);
+  const [showTransferDetail, setShowTransferDetail] = useState(false);
+  
+  // Dropdown data
+  const [stations, setStations] = useState<any[]>([]);
+  const [batteries, setBatteries] = useState<any[]>([]);
+  const [loadingStations, setLoadingStations] = useState(false);
+  const [loadingBatteries, setLoadingBatteries] = useState(false);
 
   useEffect(() => {
     if (activeTab === 'pricing') {
       fetchPricing();
-    } else if (activeTab === 'transfer') {
-      fetchTransfers();
     } else {
-      fetchBatteries();
-      fetchBatteryStats();
-      fetchStations();
+      // Thêm delay giữa các API calls để tránh rate limit
+      fetchTransfers();
+      setTimeout(() => fetchStations(), 500);
+      setTimeout(() => fetchBatteries(), 1000);
     }
   }, [activeTab]);
 
@@ -95,46 +84,53 @@ const BatteryPricingManagement: React.FC = () => {
     }
   };
 
-  const fetchBatteries = async () => {
-    setLoading(true);
+  const fetchStations = async () => {
+    setLoadingStations(true);
     try {
-      const batteryRes = await adminBatteryService.getBatteries({ 
-        limit: 100,
-        status: filterBatteryStatus !== 'all' ? filterBatteryStatus : undefined,
-        model: searchBatteryQuery || undefined
-      });
+      const stationRes = await getAllStations();
+      if (stationRes && stationRes.success) {
+        setStations(stationRes.data || []);
+      }
+    } catch (err: any) {
+      console.error('Failed to fetch stations:', err);
+      toast.error('Failed to load station data');
+    } finally {
+      setLoadingStations(false);
+    }
+  };
+
+  const fetchBatteries = async () => {
+    setLoadingBatteries(true);
+    try {
+      const batteryRes = await getAdminBatteries();
       if (batteryRes && batteryRes.success) {
-        setBatteries(batteryRes.data.batteries || []);
+        setBatteries(batteryRes.data || []);
       }
     } catch (err: any) {
       console.error('Failed to fetch batteries:', err);
       toast.error('Failed to load battery data');
     } finally {
-      setLoading(false);
+      setLoadingBatteries(false);
     }
   };
 
-  const fetchBatteryStats = async () => {
-    try {
-      const statsRes = await adminBatteryService.getBatteryStats();
-      if (statsRes && statsRes.success) {
-        setBatteryStats(statsRes.data);
-      }
-    } catch (err: any) {
-      console.error('Failed to fetch battery stats:', err);
-    }
+  const handleBatteryChange = (batteryId: string) => {
+    const selectedBattery = batteries.find(b => b.battery_id === batteryId);
+    setNewTransfer((s: CreateBatteryTransferDto) => ({ 
+      ...s, 
+      battery_id: batteryId,
+      // Clear destination station if it's the same as selected battery's current station
+      to_station_id: selectedBattery?.station_id === s.to_station_id ? '' : s.to_station_id
+    }));
   };
 
-  const fetchStations = async () => {
-    try {
-      const stationRes = await getAllStations({ limit: 100 });
-      if (stationRes && stationRes.success) {
-        setStations(stationRes.data.stations || []);
-      }
-    } catch (err: any) {
-      console.error('Failed to fetch stations:', err);
-    }
-  };
+  // Get current station of selected battery
+  const selectedBattery = batteries.find(b => b.battery_id === newTransfer.battery_id);
+
+  // Filter batteries based on selected from_station for transfer
+  const filteredBatteriesForTransfer = newTransfer.from_station_id 
+    ? batteries.filter((battery) => battery.station_id === newTransfer.from_station_id)
+    : [];
 
   // Filter pricings based on search
   const filteredPricings = pricings.filter((p) =>
@@ -145,15 +141,6 @@ const BatteryPricingManagement: React.FC = () => {
   const filteredTransfers = transfers.filter((t) =>
     filterStatus === 'all' ? true : t.transfer_status === filterStatus
   );
-
-  // Filter batteries
-  const filteredBatteries = batteries.filter((b) => {
-    const statusMatch = filterBatteryStatus === 'all' || b.status === filterBatteryStatus;
-    const searchMatch = !searchBatteryQuery || 
-      b.battery_code.toLowerCase().includes(searchBatteryQuery.toLowerCase()) ||
-      b.model.toLowerCase().includes(searchBatteryQuery.toLowerCase());
-    return statusMatch && searchMatch;
-  });
 
   // Calculate stats
   const totalPricings = pricings.length;
@@ -219,22 +206,16 @@ const BatteryPricingManagement: React.FC = () => {
           <div className="relative z-10">
             <div className="flex items-center gap-4 mb-4">
               <div className="p-4 bg-white/20 rounded-2xl backdrop-blur-sm">
-                {activeTab === 'pricing' ? <DollarSign className="h-10 w-10 text-white" /> : 
-                 activeTab === 'transfer' ? <ArrowRightLeft className="h-10 w-10 text-white" /> :
-                 <Package className="h-10 w-10 text-white" />}
+                {activeTab === 'pricing' ? <Battery className="h-10 w-10 text-white" /> : <ArrowRightLeft className="h-10 w-10 text-white" />}
               </div>
               <div>
                 <h1 className="text-4xl font-black text-white tracking-tight">
-                  {activeTab === 'pricing' ? 'Quản lí Giá Pin' : 
-                   activeTab === 'transfer' ? 'Chuyển Pin Giữa Trạm' :
-                   'Kho Pin Hệ Thống'}
+                  {activeTab === 'pricing' ? 'Quản lí Giá Pin' : 'Chuyển Pin Giữa Trạm'}
                 </h1>
                 <p className="text-blue-100 text-lg mt-1">
                   {activeTab === 'pricing' 
                     ? 'Quản lý và cấu hình giá cho tất cả các mẫu pin'
-                    : activeTab === 'transfer'
-                    ? 'Quản lý việc chuyển pin giữa các trạm đổi pin'
-                    : 'Quản lý tồn kho pin của tất cả các trạm'
+                    : 'Quản lý việc chuyển pin giữa các trạm đổi pin'
                   }
                 </p>
               </div>
@@ -263,17 +244,6 @@ const BatteryPricingManagement: React.FC = () => {
               >
                 <ArrowRightLeft className="h-5 w-5" />
                 Chuyển Pin
-              </button>
-              <button
-                onClick={() => setActiveTab('inventory')}
-                className={`px-6 py-3 rounded-xl font-semibold transition-all flex items-center gap-2 ${
-                  activeTab === 'inventory'
-                    ? 'bg-white text-blue-600 shadow-lg'
-                    : 'bg-white/10 text-white hover:bg-white/20'
-                }`}
-              >
-                <Package className="h-5 w-5" />
-                Kho Pin
               </button>
             </div>
 
@@ -304,7 +274,7 @@ const BatteryPricingManagement: React.FC = () => {
                   </div>
                 </div>
               </div>
-            ) : activeTab === 'transfer' ? (
+            ) : (
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
                 <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20">
                   <div className="flex items-center gap-3">
@@ -350,56 +320,6 @@ const BatteryPricingManagement: React.FC = () => {
                     <div>
                       <p className="text-blue-100 text-sm">Hoàn thành</p>
                       <p className="text-3xl font-bold text-white">{completedTransfers}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
-                <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-purple-500/20 rounded-lg">
-                      <Package className="h-6 w-6 text-purple-200" />
-                    </div>
-                    <div>
-                      <p className="text-blue-100 text-sm">Tổng Pin</p>
-                      <p className="text-3xl font-bold text-white">{batteryStats?.total || 0}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-green-500/20 rounded-lg">
-                      <CheckCircle className="h-6 w-6 text-green-200" />
-                    </div>
-                    <div>
-                      <p className="text-blue-100 text-sm">Sẵn sàng</p>
-                      <p className="text-3xl font-bold text-white">{batteryStats?.by_status.available || 0}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-yellow-500/20 rounded-lg">
-                      <Activity className="h-6 w-6 text-yellow-200" />
-                    </div>
-                    <div>
-                      <p className="text-blue-100 text-sm">SoH thấp</p>
-                      <p className="text-3xl font-bold text-white">{batteryStats?.low_health_count || 0}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-blue-500/20 rounded-lg">
-                      <TrendingUp className="h-6 w-6 text-blue-200" />
-                    </div>
-                    <div>
-                      <p className="text-blue-100 text-sm">SoH TB</p>
-                      <p className="text-3xl font-bold text-white">{batteryStats?.avg_health.toFixed(1) || 0}%</p>
                     </div>
                   </div>
                 </div>
@@ -607,7 +527,7 @@ const BatteryPricingManagement: React.FC = () => {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
                           <div className={`p-2 rounded-lg ${pricing.is_active ? 'bg-gradient-to-br from-blue-500 to-indigo-600' : 'bg-slate-400'}`}>
-                            <BatteryIcon className="h-5 w-5 text-white" />
+                            <Battery className="h-5 w-5 text-white" />
                           </div>
                           <h3 className="text-xl font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
                             {pricing.battery_model}
@@ -748,7 +668,7 @@ const BatteryPricingManagement: React.FC = () => {
             )}
           </CardContent>
         </Card>
-        ) : activeTab === 'transfer' ? (
+        ) : (
           /* Transfer Tab */
           <Card className="shadow-2xl border-0 rounded-3xl overflow-hidden bg-white/80 backdrop-blur-sm">
             <CardHeader className="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50 p-6">
@@ -817,16 +737,51 @@ const BatteryPricingManagement: React.FC = () => {
                 <form
                   onSubmit={async (e) => {
                     e.preventDefault();
+                    
+                    // Validation
+                    if (!newTransfer.from_station_id) {
+                      toast.error('Vui lòng chọn trạm xuất phát');
+                      return;
+                    }
+                    
+                    if (!newTransfer.battery_id) {
+                      toast.error('Vui lòng chọn pin cần chuyển');
+                      return;
+                    }
+                    
+                    if (!newTransfer.to_station_id) {
+                      toast.error('Vui lòng chọn trạm đích');
+                      return;
+                    }
+                    
+                    if (!newTransfer.transfer_reason || newTransfer.transfer_reason.trim() === '') {
+                      toast.error('Vui lòng nhập lý do chuyển');
+                      return;
+                    }
+                    
+                    if (newTransfer.from_station_id === newTransfer.to_station_id) {
+                      toast.error('Trạm đích phải khác với trạm xuất phát');
+                      return;
+                    }
+                    
+                    // Validate pin thuộc trạm đã chọn
+                    const selectedBattery = batteries.find(b => b.battery_id === newTransfer.battery_id);
+                    if (selectedBattery && selectedBattery.station_id !== newTransfer.from_station_id) {
+                      toast.error('Pin đã chọn không thuộc trạm xuất phát');
+                      return;
+                    }
+                    
                     try {
                       setLoading(true);
+                      console.log('New Transfer Data:', newTransfer);
                       const res = await batteryTransferService.createBatteryTransfer(newTransfer);
                       if (res && res.success) {
                         setTransfers((prev) => [res.data, ...prev]);
                         toast.success('✅ Transfer request created successfully');
                         setShowTransferForm(false);
                         setNewTransfer({
-                          battery_id: '',
                           from_station_id: '',
+                          battery_id: '',
                           to_station_id: '',
                           transfer_reason: '',
                           notes: ''
@@ -843,7 +798,7 @@ const BatteryPricingManagement: React.FC = () => {
                   }}
                   className="mb-8 bg-gradient-to-br from-blue-50 to-indigo-50 p-6 border-2 border-blue-200 rounded-2xl shadow-lg"
                 >
-                  <div className="flex items-center gap-3 mb-6">
+                  <div className="flex items-center gap-3 mb-4">
                     <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg">
                       <Plus className="h-5 w-5 text-white" />
                     </div>
@@ -851,53 +806,209 @@ const BatteryPricingManagement: React.FC = () => {
                       Tạo yêu cầu chuyển pin
                     </h3>
                   </div>
+                  
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                    <div className="flex items-start gap-3">
+                      <Info className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <div className="text-sm text-blue-800">
+                        <p className="font-medium mb-1">Hướng dẫn sử dụng:</p>
+                        <ul className="space-y-1 text-blue-700">
+                          <li>• Bước 1: Chọn trạm xuất phát (trạm hiện tại của pin cần chuyển)</li>
+                          <li>• Bước 2: Chọn pin cụ thể từ trạm đã chọn</li>
+                          <li>• Bước 3: Chọn trạm đích (phải khác với trạm xuất phát)</li>
+                          <li>• Chỉ hiển thị pin sẵn sàng chuyển và có mức pin phù hợp</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-6">
                     <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        Battery ID <span className="text-red-500">*</span>
+                      <label className="block text-sm font-semibold text-slate-700 mb-3">
+                        Chọn trạm xuất phát <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        className="w-full p-3 border-2 border-slate-300 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all outline-none font-medium"
-                        placeholder="Nhập Battery ID"
-                        value={newTransfer.battery_id}
-                        onChange={(e) => setNewTransfer((s: CreateBatteryTransferDto) => ({ ...s, battery_id: e.target.value }))}
-                        required
-                      />
+                      <Select 
+                        value={newTransfer.from_station_id || ''} 
+                        onValueChange={(value) => {
+                          setNewTransfer((s: CreateBatteryTransferDto) => ({ 
+                            ...s, 
+                            from_station_id: value,
+                            battery_id: '' // Clear battery when station changes
+                          }));
+                        }}
+                        disabled={loadingStations}
+                      >
+                        <SelectTrigger className="w-full min-h-[50px] p-4 border-2 border-slate-300 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all font-medium bg-white text-gray-900 text-left">
+                          <SelectValue 
+                            placeholder={loadingStations ? "Đang tải..." : "Chọn trạm xuất phát"}
+                            className="text-gray-900 truncate pr-2"
+                          />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border border-gray-200 shadow-lg max-h-48 overflow-y-auto z-50">
+                          {stations.length > 0 && (
+                            <div className="sticky top-0 bg-gray-50 px-3 py-2 border-b border-gray-200">
+                              <span className="text-xs text-gray-500 font-medium">
+                                {stations.length} trạm khả dụng
+                              </span>
+                            </div>
+                          )}
+                          {stations.map((station, index) => (
+                            <SelectItem 
+                              key={station.station_id} 
+                              value={station.station_id}
+                              className={`hover:bg-blue-50 focus:bg-blue-100 cursor-pointer p-4 border-b border-gray-100 last:border-b-0 ${
+                                index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
+                              }`}
+                            >
+                              <div className="flex flex-col w-full max-w-full">
+                                <span className="font-medium text-gray-900 truncate">{station.name}</span>
+                                <span className="text-sm text-gray-600 mt-1 truncate">{station.address}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                          {stations.length === 0 && !loadingStations && (
+                            <SelectItem value="no-stations" disabled className="text-gray-500 italic p-4 text-center">
+                              Không có trạm khả dụng
+                            </SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        From Station ID <span className="text-red-500">*</span>
+                      <label className="block text-sm font-semibold text-slate-700 mb-3">
+                        Pin cần chuyển <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        className="w-full p-3 border-2 border-slate-300 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all outline-none font-medium"
-                        placeholder="Trạm xuất phát"
-                        value={newTransfer.from_station_id}
-                        onChange={(e) => setNewTransfer((s: CreateBatteryTransferDto) => ({ ...s, from_station_id: e.target.value }))}
-                        required
-                      />
+                      {!newTransfer.from_station_id && (
+                        <div className="mb-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                          <span className="text-sm text-yellow-700">
+                            ⚠️ Vui lòng chọn trạm xuất phát trước để xem danh sách pin
+                          </span>
+                        </div>
+                      )}
+                      {selectedBattery && (
+                        <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                          <span className="text-sm text-blue-700">
+                            📍 Trạm hiện tại: <span className="font-medium">{selectedBattery.station?.name}</span>
+                          </span>
+                        </div>
+                      )}
+                      <Select 
+                        value={newTransfer.battery_id} 
+                        onValueChange={handleBatteryChange}
+                        disabled={loadingBatteries || !newTransfer.from_station_id}
+                      >
+                        <SelectTrigger className="w-full min-h-[50px] p-4 border-2 border-slate-300 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all font-medium bg-white text-gray-900 text-left">
+                          <SelectValue 
+                            placeholder={
+                              !newTransfer.from_station_id ? "Chọn trạm xuất phát trước" :
+                              loadingBatteries ? "Đang tải..." : 
+                              `Chọn pin từ ${stations.find(s => s.station_id === newTransfer.from_station_id)?.name || 'trạm đã chọn'}`
+                            }
+                            className="text-gray-900 truncate pr-2"
+                          />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border border-gray-200 shadow-lg max-h-60 overflow-y-auto z-50">
+                          {filteredBatteriesForTransfer.length > 0 && (
+                            <div className="sticky top-0 bg-gray-50 px-3 py-2 border-b border-gray-200">
+                              <span className="text-xs text-gray-500 font-medium">
+                                {filteredBatteriesForTransfer.length} pin tại trạm {stations.find(s => s.station_id === newTransfer.from_station_id)?.name}
+                              </span>
+                            </div>
+                          )}
+                          {filteredBatteriesForTransfer.map((battery, index) => (
+                            <SelectItem 
+                              key={battery.battery_id} 
+                              value={battery.battery_id}
+                              className={`hover:bg-blue-50 focus:bg-blue-100 cursor-pointer p-4 border-b border-gray-100 last:border-b-0 ${
+                                index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
+                              }`}
+                            >
+                              <div className="flex flex-col w-full max-w-full">
+                                <div className="flex justify-between items-center gap-2">
+                                  <span className="font-medium text-gray-900 truncate flex-1">{battery.battery_code}</span>
+                                  <span className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
+                                    battery.current_charge >= 90 ? 'bg-green-100 text-green-800' :
+                                    battery.current_charge >= 70 ? 'bg-yellow-100 text-yellow-800' :
+                                    'bg-red-100 text-red-800'
+                                  }`}>
+                                    {battery.current_charge}%
+                                  </span>
+                                </div>
+                                <span className="text-sm text-gray-600 mt-1 truncate">
+                                  {battery.model} - {battery.capacity_kwh}kWh
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                          {filteredBatteriesForTransfer.length === 0 && !loadingBatteries && newTransfer.from_station_id && (
+                            <SelectItem value="no-batteries" disabled className="text-gray-500 italic p-4 text-center">
+                              Không có pin khả dụng tại trạm này
+                            </SelectItem>
+                          )}
+                          {!newTransfer.from_station_id && (
+                            <SelectItem value="no-station" disabled className="text-gray-500 italic p-4 text-center">
+                              Vui lòng chọn trạm xuất phát trước
+                            </SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        To Station ID <span className="text-red-500">*</span>
+                      <label className="block text-sm font-semibold text-slate-700 mb-3">
+                        Trạm đích <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        className="w-full p-3 border-2 border-slate-300 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all outline-none font-medium"
-                        placeholder="Trạm đích"
-                        value={newTransfer.to_station_id}
-                        onChange={(e) => setNewTransfer((s: CreateBatteryTransferDto) => ({ ...s, to_station_id: e.target.value }))}
-                        required
-                      />
+                      <Select 
+                        value={newTransfer.to_station_id} 
+                        onValueChange={(value) => setNewTransfer((s: CreateBatteryTransferDto) => ({ ...s, to_station_id: value }))}
+                        disabled={loadingStations}
+                      >
+                        <SelectTrigger className="w-full min-h-[50px] p-4 border-2 border-slate-300 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all font-medium bg-white text-gray-900 text-left">
+                          <SelectValue 
+                            placeholder={loadingStations ? "Đang tải..." : "Chọn trạm đích"}
+                            className="text-gray-900 truncate pr-2"
+                          />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border border-gray-200 shadow-lg max-h-48 overflow-y-auto z-50">
+                          {stations.filter((station) => station.station_id !== newTransfer.from_station_id).length > 0 && (
+                            <div className="sticky top-0 bg-gray-50 px-3 py-2 border-b border-gray-200">
+                              <span className="text-xs text-gray-500 font-medium">
+                                {stations.filter((station) => station.station_id !== newTransfer.from_station_id).length} trạm khả dụng
+                              </span>
+                            </div>
+                          )}
+                          {stations
+                            .filter((station) => station.station_id !== newTransfer.from_station_id)
+                            .map((station, index) => (
+                              <SelectItem 
+                                key={station.station_id} 
+                                value={station.station_id}
+                                className={`hover:bg-blue-50 focus:bg-blue-100 cursor-pointer p-4 border-b border-gray-100 last:border-b-0 ${
+                                  index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
+                                }`}
+                              >
+                                <div className="flex flex-col w-full max-w-full">
+                                  <span className="font-medium text-gray-900 truncate">{station.name}</span>
+                                  <span className="text-sm text-gray-600 mt-1 truncate">{station.address}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          {stations.filter((station) => station.station_id !== newTransfer.from_station_id).length === 0 && !loadingStations && (
+                            <SelectItem value="no-stations" disabled className="text-gray-500 italic p-4 text-center">
+                              {newTransfer.from_station_id ? "Chọn trạm khác với trạm xuất phát" : "Vui lòng chọn trạm xuất phát trước"}
+                            </SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      <label className="block text-sm font-semibold text-slate-700 mb-3">
                         Lý do chuyển <span className="text-red-500">*</span>
                       </label>
                       <input
-                        className="w-full p-3 border-2 border-slate-300 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all outline-none font-medium"
+                        className="w-full min-h-[50px] p-4 border-2 border-slate-300 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all outline-none font-medium"
                         placeholder="Ví dụ: Cân bằng tồn kho"
                         value={newTransfer.transfer_reason}
                         onChange={(e) => setNewTransfer((s: CreateBatteryTransferDto) => ({ ...s, transfer_reason: e.target.value }))}
@@ -905,14 +1016,14 @@ const BatteryPricingManagement: React.FC = () => {
                       />
                     </div>
 
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-3">
                         Ghi chú
                       </label>
                       <textarea
-                        className="w-full p-3 border-2 border-slate-300 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all outline-none font-medium"
+                        className="w-full p-4 border-2 border-slate-300 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all outline-none font-medium resize-y"
                         placeholder="Thêm ghi chú..."
-                        rows={3}
+                        rows={4}
                         value={newTransfer.notes}
                         onChange={(e) => setNewTransfer((s: CreateBatteryTransferDto) => ({ ...s, notes: e.target.value }))}
                       />
@@ -939,10 +1050,10 @@ const BatteryPricingManagement: React.FC = () => {
                     <button
                       type="submit"
                       disabled={loading}
-                      className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      className="min-h-[50px] px-8 py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-lg"
                     >
-                      <Check className="h-5 w-5" />
-                      Tạo yêu cầu
+                      <Check className="h-6 w-6" />
+                      Tạo yêu cầu chuyển pin
                     </button>
                   </div>
                 </form>
@@ -1031,24 +1142,33 @@ const BatteryPricingManagement: React.FC = () => {
                           })}
                         </p>
 
+                        {/* Xem chi tiết button */}
+                        <button
+                          onClick={() => {
+                            setSelectedTransfer(transfer);
+                            setShowTransferDetail(true);
+                          }}
+                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition-all flex items-center gap-1"
+                        >
+                          <Eye className="h-3 w-3" />
+                          Chi tiết
+                        </button>
+
                         {transfer.transfer_status === 'pending' && (
                           <button
                             onClick={async () => {
                               try {
                                 setLoading(true);
-                                const res = await batteryTransferService.updateBatteryTransfer(
-                                  transfer.transfer_id,
-                                  { transfer_status: 'in_transit' }
+                                const res = await batteryTransferService.updateBatteryTransferStatus(
+                                  transfer.transfer_id, 
+                                  'in_transit',
+                                  'Bắt đầu vận chuyển'
                                 );
                                 if (res && res.success) {
-                                  setTransfers((prev) =>
-                                    prev.map((t) =>
-                                      t.transfer_id === transfer.transfer_id ? res.data : t
-                                    )
-                                  );
-                                  toast.success('✅ Transfer status updated');
+                                  toast.success('✅ Đã cập nhật trạng thái thành "Đang vận chuyển"');
+                                  fetchTransfers(); // Reload data
                                 } else {
-                                  toast.error(res?.message || 'Failed to update status');
+                                  toast.error(res?.message || 'Không thể cập nhật trạng thái');
                                 }
                               } catch (err: any) {
                                 console.error('Update transfer error', err);
@@ -1057,9 +1177,39 @@ const BatteryPricingManagement: React.FC = () => {
                                 setLoading(false);
                               }
                             }}
-                            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-semibold transition-all"
+                            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-semibold transition-all flex items-center gap-1"
                           >
+                            <Truck className="h-3 w-3" />
                             Bắt đầu chuyển
+                          </button>
+                        )}
+
+                        {transfer.transfer_status === 'pending' && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                setLoading(true);
+                                const res = await batteryTransferService.updateBatteryTransferStatus(
+                                  transfer.transfer_id, 
+                                  'cancelled',
+                                  'Hủy bởi admin'
+                                );
+                                if (res && res.success) {
+                                  toast.success('✅ Đã hủy yêu cầu chuyển pin');
+                                  fetchTransfers(); // Reload data
+                                } else {
+                                  toast.error(res?.message || 'Không thể hủy yêu cầu');
+                                }
+                              } catch (err: any) {
+                                toast.error(err?.message || 'Có lỗi xảy ra');
+                              } finally {
+                                setLoading(false);
+                              }
+                            }}
+                            className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-semibold transition-all flex items-center gap-1"
+                          >
+                            <XCircle className="h-3 w-3" />
+                            Hủy yêu cầu
                           </button>
                         )}
 
@@ -1068,19 +1218,16 @@ const BatteryPricingManagement: React.FC = () => {
                             onClick={async () => {
                               try {
                                 setLoading(true);
-                                const res = await batteryTransferService.updateBatteryTransfer(
-                                  transfer.transfer_id,
-                                  { transfer_status: 'completed' }
+                                const res = await batteryTransferService.updateBatteryTransferStatus(
+                                  transfer.transfer_id, 
+                                  'completed',
+                                  'Hoàn thành chuyển pin'
                                 );
                                 if (res && res.success) {
-                                  setTransfers((prev) =>
-                                    prev.map((t) =>
-                                      t.transfer_id === transfer.transfer_id ? res.data : t
-                                    )
-                                  );
-                                  toast.success('✅ Transfer completed');
+                                  toast.success('✅ Đã hoàn thành chuyển pin');
+                                  fetchTransfers(); // Reload data
                                 } else {
-                                  toast.error(res?.message || 'Failed to update status');
+                                  toast.error(res?.message || 'Không thể hoàn thành');
                                 }
                               } catch (err: any) {
                                 console.error('Update transfer error', err);
@@ -1089,10 +1236,48 @@ const BatteryPricingManagement: React.FC = () => {
                                 setLoading(false);
                               }
                             }}
-                            className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs font-semibold transition-all"
+                            className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs font-semibold transition-all flex items-center gap-1"
                           >
+                            <CheckCircle className="h-3 w-3" />
                             Hoàn thành
                           </button>
+                        )}
+
+                        {transfer.transfer_status === 'in_transit' && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                setLoading(true);
+                                const res = await batteryTransferService.updateBatteryTransferStatus(
+                                  transfer.transfer_id, 
+                                  'cancelled',
+                                  'Hủy trong quá trình vận chuyển'
+                                );
+                                if (res && res.success) {
+                                  toast.success('✅ Đã hủy yêu cầu chuyển pin');
+                                  fetchTransfers(); // Reload data
+                                } else {
+                                  toast.error(res?.message || 'Không thể hủy yêu cầu');
+                                }
+                              } catch (err: any) {
+                                toast.error(err?.message || 'Có lỗi xảy ra');
+                              } finally {
+                                setLoading(false);
+                              }
+                            }}
+                            className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-semibold transition-all flex items-center gap-1"
+                          >
+                            <XCircle className="h-3 w-3" />
+                            Hủy chuyển
+                          </button>
+                        )}
+
+                        {transfer.transfer_status === 'cancelled' && (
+                          <div className="text-center">
+                            <p className="text-xs text-slate-500">
+                              ❌ Đã bị hủy
+                            </p>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -1134,385 +1319,246 @@ const BatteryPricingManagement: React.FC = () => {
               )}
             </CardContent>
           </Card>
-        ) : (
-          <Card className="shadow-2xl border-0 rounded-3xl overflow-hidden bg-white/80 backdrop-blur-sm">
-            <CardHeader className="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-purple-50 p-6">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                  <CardTitle className="text-2xl font-bold text-slate-800 flex items-center gap-3">
-                    <div className="p-2 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg">
-                      <Package className="h-6 w-6 text-white" />
-                    </div>
-                    Quản lý kho pin
-                  </CardTitle>
-                  <CardDescription className="text-slate-600 mt-1">
-                    Theo dõi và quản lý toàn bộ pin trong hệ thống
-                  </CardDescription>
-                </div>
+        )}
+      </div>
 
-                <div className="flex items-center gap-3 flex-wrap">
-                  {/* Station Filter */}
-                  <select
-                    value={filterBatteryStatus}
-                    onChange={(e) => setFilterBatteryStatus(e.target.value)}
-                    className="px-4 py-2.5 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all outline-none bg-white"
-                  >
-                    <option value="all">Tất cả trạng thái</option>
-                    <option value="available">Sẵn sàng</option>
-                    <option value="charging">Đang sạc</option>
-                    <option value="in_use">Đang sử dụng</option>
-                    <option value="maintenance">Bảo trì</option>
-                    <option value="damaged">Hư hỏng</option>
-                  </select>
-
-                  {/* Search Bar */}
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder="Tìm mã pin hoặc model..."
-                      value={searchBatteryQuery}
-                      onChange={(e) => setSearchBatteryQuery(e.target.value)}
-                      className="pl-10 pr-4 py-2.5 w-64 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all outline-none"
-                    />
+      {/* Transfer Detail Modal */}
+      {showTransferDetail && selectedTransfer && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-t-2xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white/20 rounded-lg">
+                    <ArrowRightLeft className="h-6 w-6" />
                   </div>
+                  <div>
+                    <h2 className="text-xl font-bold">Chi tiết chuyển pin</h2>
+                    <p className="text-blue-100 text-sm">
+                      ID: {selectedTransfer.transfer_id}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowTransferDetail(false);
+                    setSelectedTransfer(null);
+                  }}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+            </div>
 
-                  {/* Add Button */}
-                  <button
-                    onClick={() => {
-                      setShowBatteryForm((v) => !v);
-                      setNewBattery({
-                        station_id: '',
-                        model: '',
-                        battery_code: '',
-                        status: 'available',
-                        health_percentage: 100,
-                        cycle_count: 0,
-                      });
-                      setEditingBattery(null);
-                    }}
-                    className={`px-6 py-2.5 rounded-xl font-semibold transition-all shadow-lg flex items-center gap-2 ${
-                      showBatteryForm
-                        ? 'bg-gradient-to-r from-slate-600 to-slate-700 text-white hover:from-slate-700 hover:to-slate-800'
-                        : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700 hover:shadow-xl hover:scale-105'
-                    }`}
-                  >
-                    {showBatteryForm ? (
-                      <>
-                        <X className="h-5 w-5" /> Đóng
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="h-5 w-5" /> Thêm Pin
-                      </>
-                    )}
-                  </button>
+            {/* Modal Content */}
+            <div className="p-6 space-y-6">
+              {/* Status Section */}
+              <div className="bg-gradient-to-r from-slate-50 to-blue-50 rounded-xl p-4 border-l-4 border-blue-500">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${getStatusColor(selectedTransfer.transfer_status)}`}>
+                      {getStatusIcon(selectedTransfer.transfer_status)}
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-slate-900">Trạng thái hiện tại</h3>
+                      <p className="text-slate-600 text-sm">{getStatusText(selectedTransfer.transfer_status)}</p>
+                    </div>
+                  </div>
+                  <span className={`px-3 py-1.5 rounded-full text-xs font-bold text-white ${getStatusColor(selectedTransfer.transfer_status)}`}>
+                    {getStatusText(selectedTransfer.transfer_status)}
+                  </span>
                 </div>
               </div>
-            </CardHeader>
 
-            <CardContent className="p-6">
-              {/* Add/Edit Battery Form */}
-              {showBatteryForm && (
-                <div className="mb-6 p-6 bg-gradient-to-br from-purple-50 to-blue-50 rounded-2xl border-2 border-purple-200 shadow-inner">
-                  <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    <Package className="h-5 w-5 text-purple-600" />
-                    {editingBattery ? 'Chỉnh sửa pin' : 'Thêm pin mới'}
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        Trạm
-                      </label>
-                      <select
-                        value={newBattery.station_id}
-                        onChange={(e) => setNewBattery({ ...newBattery, station_id: e.target.value })}
-                        className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all outline-none"
-                        required
-                      >
-                        <option value="">Chọn trạm</option>
-                        {stations.map((station) => (
-                          <option key={station.station_id} value={station.station_id}>
-                            {station.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        Model
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="VD: VF-48V-20Ah"
-                        value={newBattery.model}
-                        onChange={(e) => setNewBattery({ ...newBattery, model: e.target.value })}
-                        className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all outline-none"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        Mã pin
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="VD: BAT001"
-                        value={newBattery.battery_code}
-                        onChange={(e) => setNewBattery({ ...newBattery, battery_code: e.target.value })}
-                        className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all outline-none"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        Trạng thái
-                      </label>
-                      <select
-                        value={newBattery.status}
-                        onChange={(e) => setNewBattery({ ...newBattery, status: e.target.value as any })}
-                        className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all outline-none"
-                      >
-                        <option value="available">Sẵn sàng</option>
-                        <option value="charging">Đang sạc</option>
-                        <option value="in_use">Đang sử dụng</option>
-                        <option value="maintenance">Bảo trì</option>
-                        <option value="damaged">Hư hỏng</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        SoH (%)
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={newBattery.health_percentage}
-                        onChange={(e) => setNewBattery({ ...newBattery, health_percentage: Number(e.target.value) })}
-                        className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        Số chu kỳ sạc
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={newBattery.cycle_count}
-                        onChange={(e) => setNewBattery({ ...newBattery, cycle_count: Number(e.target.value) })}
-                        className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all outline-none"
-                      />
+              {/* Battery Information */}
+              <div className="bg-white border border-slate-200 rounded-xl p-4">
+                <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                  <Battery className="h-5 w-5 text-blue-600" />
+                  Thông tin pin
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Mã pin</p>
+                    <p className="font-medium">{selectedTransfer.battery?.battery_code || selectedTransfer.battery_id}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Mẫu pin</p>
+                    <p className="font-medium">{selectedTransfer.battery?.model || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Dung lượng</p>
+                    <p className="font-medium">{(selectedTransfer.battery as any)?.capacity || 'N/A'}kWh</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Mức pin hiện tại</p>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 bg-slate-200 rounded-full h-2">
+                        <div 
+                          className="bg-gradient-to-r from-green-500 to-emerald-500 h-2 rounded-full"
+                          style={{ width: `${(selectedTransfer.battery as any)?.current_charge || 0}%` }}
+                        />
+                      </div>
+                      <span className="text-sm font-medium">{(selectedTransfer.battery as any)?.current_charge || 0}%</span>
                     </div>
                   </div>
+                </div>
+              </div>
 
-                  <div className="flex gap-3 mt-6">
+              {/* Route Information */}
+              <div className="bg-white border border-slate-200 rounded-xl p-4">
+                <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                  <MapPin className="h-5 w-5 text-blue-600" />
+                  Thông tin tuyến đường
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 bg-red-50 border border-red-200 rounded-lg p-3">
+                      <p className="text-xs text-red-600 mb-1">TRẠM XUẤT PHÁT</p>
+                      <p className="font-semibold text-red-900">{selectedTransfer.from_station?.name || 'N/A'}</p>
+                      <p className="text-sm text-red-700">{selectedTransfer.from_station?.address || ''}</p>
+                    </div>
+                    <div className="flex-shrink-0">
+                      <ArrowRightLeft className="h-6 w-6 text-slate-400" />
+                    </div>
+                    <div className="flex-1 bg-green-50 border border-green-200 rounded-lg p-3">
+                      <p className="text-xs text-green-600 mb-1">TRẠM ĐÍCH</p>
+                      <p className="font-semibold text-green-900">{selectedTransfer.to_station?.name || 'N/A'}</p>
+                      <p className="text-sm text-green-700">{selectedTransfer.to_station?.address || ''}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Transfer Details */}
+              <div className="bg-white border border-slate-200 rounded-xl p-4">
+                <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                  <Info className="h-5 w-5 text-blue-600" />
+                  Chi tiết yêu cầu
+                </h3>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Lý do chuyển</p>
+                    <p className="font-medium bg-slate-50 p-2 rounded-lg">{selectedTransfer.transfer_reason}</p>
+                  </div>
+                  {selectedTransfer.notes && (
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">Ghi chú</p>
+                      <p className="font-medium bg-slate-50 p-2 rounded-lg">{selectedTransfer.notes}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* User & Time Information */}
+              <div className="bg-white border border-slate-200 rounded-xl p-4">
+                <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                  <User className="h-5 w-5 text-blue-600" />
+                  Thông tin tạo yêu cầu
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Người tạo</p>
+                    <p className="font-medium">{selectedTransfer.transferred_by_user?.full_name || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Thời gian tạo</p>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-slate-400" />
+                      <p className="font-medium">
+                        {new Date(selectedTransfer.transferred_at).toLocaleString('vi-VN', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit'
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4 border-t border-slate-200">
+                <button
+                  onClick={() => {
+                    setShowTransferDetail(false);
+                    setSelectedTransfer(null);
+                  }}
+                  className="flex-1 px-6 py-3 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl font-semibold transition-all"
+                >
+                  Đóng
+                </button>
+                {selectedTransfer.transfer_status === 'pending' && (
+                  <>
                     <button
                       onClick={async () => {
-                        if (!newBattery.station_id || !newBattery.model || !newBattery.battery_code) {
-                          toast.error('Vui lòng điền đầy đủ thông tin');
-                          return;
-                        }
-
-                        setLoading(true);
                         try {
-                          if (editingBattery) {
-                            await adminBatteryService.updateBattery(editingBattery, newBattery);
-                            toast.success('Cập nhật pin thành công!');
+                          setLoading(true);
+                          const res = await batteryTransferService.updateBatteryTransferStatus(
+                            selectedTransfer.transfer_id, 
+                            'in_transit',
+                            'Bắt đầu vận chuyển từ modal chi tiết'
+                          );
+                          if (res && res.success) {
+                            toast.success('✅ Đã cập nhật trạng thái thành "Đang vận chuyển"');
+                            fetchTransfers();
+                            setShowTransferDetail(false);
+                            setSelectedTransfer(null);
                           } else {
-                            await adminBatteryService.createBattery(newBattery);
-                            toast.success('Thêm pin mới thành công!');
+                            toast.error(res?.message || 'Không thể cập nhật trạng thái');
                           }
-                          setShowBatteryForm(false);
-                          setEditingBattery(null);
-                          fetchBatteries();
-                          fetchBatteryStats();
                         } catch (err: any) {
-                          console.error('Battery operation error', err);
-                          toast.error(err?.message || 'Thao tác thất bại');
+                          toast.error(err?.message || 'Update failed');
                         } finally {
                           setLoading(false);
                         }
                       }}
-                      disabled={loading}
-                      className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
+                      className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-all flex items-center justify-center gap-2"
                     >
-                      {loading ? 'Đang xử lý...' : editingBattery ? 'Cập nhật' : 'Thêm pin'}
+                      <Truck className="h-5 w-5" />
+                      Bắt đầu chuyển
                     </button>
-                    <button
-                      onClick={() => {
-                        setShowBatteryForm(false);
-                        setEditingBattery(null);
-                      }}
-                      className="px-6 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-semibold transition-all"
-                    >
-                      Hủy
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Battery List */}
-              <div className="space-y-3">
-                {filteredBatteries.map((battery) => {
-                  const healthColor =
-                    battery.health_percentage >= 85
-                      ? 'text-green-600 bg-green-100'
-                      : battery.health_percentage >= 70
-                      ? 'text-yellow-600 bg-yellow-100'
-                      : 'text-red-600 bg-red-100';
-
-                  const statusConfig = {
-                    available: { label: 'Sẵn sàng', color: 'bg-green-100 text-green-700' },
-                    charging: { label: 'Đang sạc', color: 'bg-blue-100 text-blue-700' },
-                    in_use: { label: 'Đang dùng', color: 'bg-purple-100 text-purple-700' },
-                    maintenance: { label: 'Bảo trì', color: 'bg-orange-100 text-orange-700' },
-                    damaged: { label: 'Hư hỏng', color: 'bg-red-100 text-red-700' },
-                  };
-
-                  return (
-                    <div
-                      key={battery.battery_id}
-                      className="group bg-gradient-to-br from-white to-slate-50 hover:from-purple-50 hover:to-blue-50 p-5 rounded-2xl border-2 border-slate-200 hover:border-purple-300 transition-all shadow-sm hover:shadow-lg"
-                    >
-                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div className="flex-1 grid grid-cols-1 md:grid-cols-5 gap-4">
-                          <div>
-                            <p className="text-xs text-slate-500 mb-1">Mã pin</p>
-                            <p className="font-bold text-slate-800">{battery.battery_code}</p>
-                          </div>
-
-                          <div>
-                            <p className="text-xs text-slate-500 mb-1">Model</p>
-                            <p className="font-semibold text-slate-700">{battery.model}</p>
-                          </div>
-
-                          <div>
-                            <p className="text-xs text-slate-500 mb-1">Trạm</p>
-                            <p className="font-semibold text-slate-700">{battery.station?.name || 'N/A'}</p>
-                          </div>
-
-                          <div>
-                            <p className="text-xs text-slate-500 mb-1">Trạng thái</p>
-                            <span
-                              className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${
-                                statusConfig[battery.status as keyof typeof statusConfig]?.color
-                              }`}
-                            >
-                              {statusConfig[battery.status as keyof typeof statusConfig]?.label}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-4">
-                            <div>
-                              <p className="text-xs text-slate-500 mb-1">SoH</p>
-                              <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${healthColor}`}>
-                                {battery.health_percentage}%
-                              </span>
-                            </div>
-
-                            <div>
-                              <p className="text-xs text-slate-500 mb-1">Chu kỳ</p>
-                              <p className="font-semibold text-slate-700">{battery.cycle_count}</p>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => {
-                              setEditingBattery(battery.battery_id);
-                              setNewBattery({
-                                station_id: battery.station_id,
-                                model: battery.model,
-                                battery_code: battery.battery_code,
-                                status: battery.status,
-                                health_percentage: battery.health_percentage,
-                                cycle_count: battery.cycle_count,
-                              });
-                              setShowBatteryForm(true);
-                            }}
-                            className="p-2 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg transition-all"
-                            title="Chỉnh sửa"
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={async () => {
-                              if (battery.status === 'in_use') {
-                                toast.error('Không thể xóa pin đang được sử dụng');
-                                return;
-                              }
-
-                              if (window.confirm(`Xác nhận xóa pin ${battery.battery_code}?`)) {
-                                setLoading(true);
-                                try {
-                                  await adminBatteryService.deleteBattery(battery.battery_id);
-                                  toast.success('Xóa pin thành công!');
-                                  fetchBatteries();
-                                  fetchBatteryStats();
-                                } catch (err: any) {
-                                  console.error('Delete battery error', err);
-                                  toast.error(err?.message || 'Xóa thất bại');
-                                } finally {
-                                  setLoading(false);
-                                }
-                              }
-                            }}
-                            className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition-all"
-                            title="Xóa"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Empty State */}
-              {filteredBatteries.length === 0 && !loading && (
-                <div className="text-center py-16 bg-gradient-to-br from-slate-50 to-purple-50 rounded-2xl border-2 border-dashed border-slate-300">
-                  <div className="relative inline-block">
-                    <div className="absolute inset-0 bg-purple-500/20 blur-3xl"></div>
-                    <Package className="relative h-24 w-24 mx-auto mb-6 text-slate-300" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-slate-700 mb-2">
-                    Chưa có pin trong kho
-                  </h3>
-                  <p className="text-slate-500 mb-6 max-w-md mx-auto">
-                    Thêm pin mới vào hệ thống để bắt đầu quản lý kho
-                  </p>
+                  </>
+                )}
+                {selectedTransfer.transfer_status === 'in_transit' && (
                   <button
-                    onClick={() => setShowBatteryForm(true)}
-                    className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all hover:scale-105 inline-flex items-center gap-2"
+                    onClick={async () => {
+                      try {
+                        setLoading(true);
+                        const res = await batteryTransferService.updateBatteryTransferStatus(
+                          selectedTransfer.transfer_id, 
+                          'completed',
+                          'Hoàn thành chuyển pin từ modal chi tiết'
+                        );
+                        if (res && res.success) {
+                          toast.success('✅ Đã hoàn thành chuyển pin');
+                          fetchTransfers();
+                          setShowTransferDetail(false);
+                          setSelectedTransfer(null);
+                        } else {
+                          toast.error(res?.message || 'Không thể hoàn thành');
+                        }
+                      } catch (err: any) {
+                        toast.error(err?.message || 'Update failed');
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold transition-all flex items-center justify-center gap-2"
                   >
-                    <Plus className="h-5 w-5" />
-                    Thêm pin đầu tiên
+                    <CheckCircle className="h-5 w-5" />
+                    Hoàn thành
                   </button>
-                </div>
-              )}
-
-              {/* Loading State */}
-              {loading && batteries.length === 0 && (
-                <div className="text-center py-16">
-                  <div className="relative inline-block">
-                    <div className="w-16 h-16 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin"></div>
-                  </div>
-                  <p className="text-slate-600 font-medium mt-4">Đang tải dữ liệu...</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-      </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

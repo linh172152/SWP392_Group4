@@ -32,15 +32,22 @@ interface TicketItem {
 }
 interface ReplyItem { reply_id: string; message: string; is_staff_reply: boolean; created_at: string; user?: { full_name?: string } }
 
+// Categories match với BE enum TicketCategory trong schema.prisma
 const categories = [
-  'Technical Issue',
-  'Billing',
-  'Feature Request',
-  'Account',
-  'General Inquiry'
+  { value: 'battery_issue', label: 'Vấn đề về Pin' },
+  { value: 'station_issue', label: 'Vấn đề về Trạm' },
+  { value: 'payment_issue', label: 'Vấn đề thanh toán' },
+  { value: 'service_complaint', label: 'Khiếu nại dịch vụ' },
+  { value: 'other', label: 'Khác' }
 ];
 
-const priorities = ['low', 'medium', 'high', 'urgent'];
+// Priorities match với BE enum TicketPriority
+const priorities = [
+  { value: 'low', label: 'Thấp' },
+  { value: 'medium', label: 'Trung bình' },
+  { value: 'high', label: 'Cao' },
+  { value: 'urgent', label: 'Khẩn cấp' }
+];
 
 const SupportTickets: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -87,7 +94,7 @@ const SupportTickets: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const url = new URL(API_ENDPOINTS.SUPPORT);
+      const url = new URL(API_ENDPOINTS.SUPPORT.LIST);
       if (statusFilter !== 'all') url.searchParams.set('status', statusFilter.toUpperCase());
       const res = await fetchWithAuth(url.toString());
       const data = await res.json();
@@ -127,14 +134,28 @@ const SupportTickets: React.FC = () => {
     }
   };
 
-  const createTicket = async (form: { subject: string; description: string; priority?: string }) => {
+  const createTicket = async () => {
+    if (!newSubject || !newDescription || !newCategory) {
+      setError('Vui lòng điền đầy đủ thông tin');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
-      const res = await fetchWithAuth(API_ENDPOINTS.SUPPORT, { method: 'POST', body: JSON.stringify(form) });
+      const form = {
+        subject: newSubject,
+        description: newDescription,
+        category: newCategory,
+        priority: newPriority || 'medium'
+      };
+      const res = await fetchWithAuth(API_ENDPOINTS.SUPPORT.CREATE, { method: 'POST', body: JSON.stringify(form) });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message || 'Tạo ticket thất bại');
       setIsCreateDialogOpen(false);
+      setNewSubject('');
+      setNewDescription('');
+      setNewCategory('');
+      setNewPriority('medium');
       await loadTickets();
     } catch (e: any) {
       setError(e.message || 'Có lỗi xảy ra');
@@ -188,7 +209,7 @@ const SupportTickets: React.FC = () => {
                     </SelectTrigger>
                     <SelectContent>
                       {categories.map((category) => (
-                        <SelectItem key={category} value={category.toLowerCase().replace(' ', '-')}>{category}</SelectItem>
+                        <SelectItem key={category.value} value={category.value}>{category.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -201,7 +222,7 @@ const SupportTickets: React.FC = () => {
                     </SelectTrigger>
                     <SelectContent>
                       {priorities.map((priority) => (
-                        <SelectItem key={priority} value={priority}>{priority.charAt(0).toUpperCase() + priority.slice(1)}</SelectItem>
+                        <SelectItem key={priority.value} value={priority.value}>{priority.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

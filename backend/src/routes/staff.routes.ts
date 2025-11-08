@@ -12,85 +12,44 @@ router.use(authorizeRole("STAFF"));
 
 /**
  * @swagger
- * /api/staff/batteries:
+ * /api/staff:
  *   get:
- *     summary: Get staff batteries management
+ *     summary: Staff API root summary
+ *     description: Provides an overview of staff modules available in the system. Detailed Swagger docs are defined on specific routes such as bookings, batteries, schedules, and support operations.
  *     tags: [Staff]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Staff batteries endpoint
+ *         description: Staff API overview returned
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
+ *                 success:
+ *                   type: boolean
  *                 message:
  *                   type: string
+ *                 modules:
+ *                   type: array
+ *                   items:
+ *                     type: string
  *       401:
  *         description: Unauthorized
- *       403:
- *         description: Forbidden - Staff role required
  */
-router.get("/batteries", (_req, res) => {
-  res.json({ message: "Staff batteries endpoint - coming soon" });
+router.get("/", (_req, res) => {
+  res.json({
+    success: true,
+    message: "Staff API modules",
+    modules: [
+      "bookings",
+      "batteries",
+      "schedules",
+      "support",
+      "notifications",
+    ],
+  });
 });
-
-/**
- * @swagger
- * /api/staff/bookings:
- *   get:
- *     summary: Get staff bookings management
- *     tags: [Staff]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Staff bookings endpoint
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden - Staff role required
- */
-router.get("/bookings", (_req, res) => {
-  res.json({ message: "Staff bookings endpoint - coming soon" });
-});
-
-/**
- * @swagger
- * /api/staff/transactions:
- *   get:
- *     summary: Get staff transactions management
- *     tags: [Staff]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Staff transactions endpoint
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden - Staff role required
- */
-router.get("/transactions", (_req, res) => {
-  res.json({ message: "Staff transactions endpoint - coming soon" });
-});
-
-// Placeholder routes - will be implemented later
 
 export default router;

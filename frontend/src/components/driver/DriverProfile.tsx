@@ -3,7 +3,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Textarea } from '../ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { 
   Battery,
@@ -22,8 +21,6 @@ const DriverProfile: React.FC = () => {
     name: '',
     email: '',
     phone: '',
-    address: '',
-    dateOfBirth: '',
     totalSwaps: 0,
     monthlySwaps: 0,
     monthlyCost: 0
@@ -165,29 +162,6 @@ const DriverProfile: React.FC = () => {
                   className="glass border-slate-200/50 dark:border-slate-700/50"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="dob" className="text-slate-700 dark:text-slate-300">Ngày sinh</Label>
-                <Input
-                  id="dob"
-                  type="date"
-                  value={profile.dateOfBirth}
-                  disabled={!isEditing}
-                  onChange={(e) => setProfile({...profile, dateOfBirth: e.target.value})}
-                  className="glass border-slate-200/50 dark:border-slate-700/50"
-                />
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="address" className="text-slate-700 dark:text-slate-300">Địa chỉ</Label>
-              <Textarea
-                id="address"
-                value={profile.address}
-                disabled={!isEditing}
-                onChange={(e) => setProfile({...profile, address: e.target.value})}
-                className="glass border-slate-200/50 dark:border-slate-700/50"
-                rows={3}
-              />
             </div>
           </CardContent>
         </Card>

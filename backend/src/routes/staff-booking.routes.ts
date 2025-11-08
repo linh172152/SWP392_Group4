@@ -157,12 +157,11 @@ router.post("/:id/confirm", confirmBooking);
  *           schema:
  *             type: object
  *             required:
- *               - old_battery_code
  *               - battery_model
  *             properties:
  *               old_battery_code:
  *                 type: string
- *                 description: Code of the old battery being returned
+ *                 description: "Mã pin cũ (tùy chọn). Nếu không nhập, hệ thống sẽ cố gắng tự phát hiện dựa trên lịch sử giao dịch."
  *               battery_model:
  *                 type: string
  *                 description: Model of the new battery to assign
@@ -187,7 +186,6 @@ router.post("/:id/confirm", confirmBooking);
  *         description: Booking not found
  */
 router.post("/:id/complete", completeBooking);
-
 
 /**
  * @swagger

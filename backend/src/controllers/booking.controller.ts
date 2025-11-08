@@ -1,8 +1,14 @@
 import { Request, Response } from "express";
+import { Prisma, BatteryStatus, PaymentStatus } from "@prisma/client";
 import type { ServicePackage, UserSubscription } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
 import { prisma, notificationService } from "../server";
+import {
+  releaseBookingHold,
+  type BookingHoldFields,
+  buildBookingUncheckedUpdate,
+} from "../services/booking-hold.service";
 
 type PricingCacheMaps = {
   pricing?: Map<string, number | null>;
@@ -32,7 +38,8 @@ type BookingPricingPreview = {
   message: string;
 };
 
-const normalizeBatteryModel = (value: string): string => value.trim().toLowerCase();
+const normalizeBatteryModel = (value: string): string =>
+  value.trim().toLowerCase();
 
 const extractPackageModels = (pkg: ServicePackage | null): string[] => {
   if (!pkg || pkg.battery_models === null || pkg.battery_models === undefined) {
@@ -176,7 +183,7 @@ const doesSubscriptionCoverModel = async (
 };
 
 const buildSubscriptionInfo = (
-  subscription: UserSubscription & { package: ServicePackage | null } | null
+  subscription: (UserSubscription & { package: ServicePackage | null }) | null
 ) => {
   if (!subscription || !subscription.package) {
     return undefined;
@@ -264,6 +271,133 @@ const calculateBookingPricingPreview = async (
       : `Gói "${subscription.package?.name ?? ""}" đã hết lượt đổi và hiện chưa có bảng giá. Vui lòng kiểm tra với nhân viên.`;
 
   return preview;
+};
+
+const HOLD_GRACE_MINUTES = 15;
+const BOOKING_MIN_LEAD_MINUTES = 30;
+const BOOKING_MAX_LEAD_HOURS = 12;
+const BATTERY_STATUS_RESERVED = "reserved" as unknown as BatteryStatus;
+const PAYMENT_STATUS_RESERVED = "reserved" as unknown as PaymentStatus;
+
+type TxClient = Prisma.TransactionClient;
+
+const reserveBatteryForBooking = async (
+  tx: TxClient,
+  params: {
+    stationId: string;
+    batteryModel: string;
+    allowChargingFallback: boolean;
+  }
+) => {
+  const { stationId, batteryModel, allowChargingFallback } = params;
+
+  const normalizedModel = batteryModel.trim();
+
+  const pickBattery = async (status: BatteryStatus) =>
+    tx.battery.findFirst({
+      where: {
+        station_id: stationId,
+        status: {
+          equals: status,
+        },
+        model: {
+          equals: normalizedModel,
+          mode: "insensitive",
+        },
+      },
+      orderBy: {
+        updated_at: "asc",
+      },
+    });
+
+  let candidate = await pickBattery(BatteryStatus.full);
+  let candidateStatus: BatteryStatus | null = candidate
+    ? BatteryStatus.full
+    : null;
+
+  if (!candidate && allowChargingFallback) {
+    candidate = await pickBattery(BatteryStatus.charging);
+    candidateStatus = candidate ? BatteryStatus.charging : null;
+  }
+
+  if (!candidate || !candidateStatus) {
+    throw new CustomError(
+      `Không còn pin phù hợp để giữ chỗ cho model "${batteryModel}" tại trạm này. Vui lòng chọn thời gian khác hoặc trạm khác.`,
+      409
+    );
+  }
+
+  const updateResult = await tx.battery.updateMany({
+    where: {
+      battery_id: candidate.battery_id,
+      status: {
+        equals: candidateStatus,
+      },
+    },
+    data: {
+      status: BATTERY_STATUS_RESERVED,
+      updated_at: new Date(),
+    },
+  });
+
+  if (updateResult.count === 0) {
+    throw new CustomError(
+      "Pin vừa được giữ bởi booking khác. Vui lòng thử lại sau vài giây.",
+      409
+    );
+  }
+
+  return {
+    battery: candidate,
+    previousStatus: candidateStatus,
+  };
+};
+
+const ensureWalletRecord = async (tx: TxClient, userId: string) => {
+  let wallet = await tx.wallet.findUnique({ where: { user_id: userId } });
+
+  if (!wallet) {
+    wallet = await tx.wallet.create({
+      data: {
+        user_id: userId,
+        balance: new Prisma.Decimal(0),
+      },
+    });
+  }
+
+  return wallet;
+};
+
+const createBatteryHistoryEntry = async (
+  tx: TxClient,
+  params: {
+    batteryId: string;
+    bookingId: string;
+    stationId: string;
+    actorUserId: string;
+    action?: string;
+    notes?: string;
+  }
+) => {
+  const {
+    batteryId,
+    bookingId,
+    stationId,
+    actorUserId,
+    action = "reserved",
+    notes,
+  } = params;
+
+  await (tx as any).batteryHistory.create({
+    data: {
+      battery_id: batteryId,
+      booking_id: bookingId,
+      station_id: stationId,
+      actor_user_id: actorUserId,
+      action,
+      notes,
+    },
+  });
 };
 
 /**
@@ -367,8 +501,14 @@ export const getUserBookings = asyncHandler(
 export const createBooking = asyncHandler(
   async (req: Request, res: Response) => {
     const userId = req.user?.userId;
-    const { vehicle_id, station_id, battery_model, scheduled_at, notes } =
-      req.body;
+    const {
+      vehicle_id,
+      station_id,
+      battery_model,
+      scheduled_at,
+      notes,
+      use_subscription: useSubscriptionInput,
+    } = req.body;
 
     if (!userId) {
       throw new CustomError("User not authenticated", 401);
@@ -381,7 +521,6 @@ export const createBooking = asyncHandler(
       );
     }
 
-    // Validate UUIDs format (basic check)
     const uuidRegex =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(vehicle_id)) {
@@ -391,7 +530,6 @@ export const createBooking = asyncHandler(
       throw new CustomError("Invalid station ID format", 400);
     }
 
-    // Check if vehicle belongs to user
     const vehicle = await prisma.vehicle.findFirst({
       where: {
         vehicle_id,
@@ -406,7 +544,6 @@ export const createBooking = asyncHandler(
       );
     }
 
-    // Check if station exists and is active
     const station = await prisma.station.findUnique({
       where: { station_id },
     });
@@ -415,7 +552,6 @@ export const createBooking = asyncHandler(
       throw new CustomError("Station not found or not active", 404);
     }
 
-    // Check if battery model is compatible with vehicle (case-insensitive)
     if (
       vehicle.battery_model.toLowerCase().trim() !==
       battery_model.toLowerCase().trim()
@@ -426,11 +562,9 @@ export const createBooking = asyncHandler(
       );
     }
 
-    // Validate and parse scheduled_at
     let scheduledTime: Date;
     try {
       scheduledTime = new Date(scheduled_at);
-      // Check if date is valid
       if (isNaN(scheduledTime.getTime())) {
         throw new CustomError(
           "Invalid date format for scheduled_at. Please use ISO 8601 format (e.g., 2024-01-15T14:00:00Z)",
@@ -452,152 +586,226 @@ export const createBooking = asyncHandler(
       throw new CustomError("Scheduled time must be in the future", 400);
     }
 
-    // Option 3: Strict validation
-    // Minimum: 30 minutes before
-    const minTime = new Date(now.getTime() + 30 * 60 * 1000); // 30 minutes
+    const minTime = new Date(
+      now.getTime() + BOOKING_MIN_LEAD_MINUTES * 60 * 1000
+    );
     if (scheduledTime < minTime) {
       throw new CustomError(
-        "Scheduled time must be at least 30 minutes from now",
+        `Scheduled time must be at least ${BOOKING_MIN_LEAD_MINUTES} minutes from now`,
         400
       );
     }
 
-    // Maximum: 12 hours before
-    const maxTime = new Date(now.getTime() + 12 * 60 * 60 * 1000); // 12 hours
+    const maxTime = new Date(
+      now.getTime() + BOOKING_MAX_LEAD_HOURS * 60 * 60 * 1000
+    );
     if (scheduledTime > maxTime) {
       throw new CustomError(
-        "Scheduled time cannot be more than 12 hours from now",
+        `Scheduled time cannot be more than ${BOOKING_MAX_LEAD_HOURS} hours from now`,
         400
       );
     }
 
-    // Normalize battery_model for comparison (case-insensitive, trim)
-    const normalizedBatteryModel = battery_model.toLowerCase().trim();
+    const normalizedBatteryModel = battery_model.trim();
+    const useSubscription = useSubscriptionInput !== false;
+    const allowChargingFallback =
+      (scheduledTime.getTime() - now.getTime()) / (1000 * 60 * 60) >= 1;
 
-    // Get all batteries at station and filter by model (case-insensitive)
-    const allBatteriesAtStation = await prisma.battery.findMany({
-      where: {
-        station_id,
-      },
-      select: {
-        model: true,
-        status: true,
-      },
-    });
-
-    // Filter batteries by model (case-insensitive)
-    const batteriesOfModel = allBatteriesAtStation.filter(
-      (b) => b.model.toLowerCase().trim() === normalizedBatteryModel
+    const timestamp = Date.now().toString().slice(-10);
+    const random = Math.random().toString(36).substr(2, 2).toUpperCase();
+    const bookingCode = `BK${timestamp}${random}`;
+    const holdExpiresAt = new Date(
+      scheduledTime.getTime() + HOLD_GRACE_MINUTES * 60 * 1000
     );
 
-    if (batteriesOfModel.length === 0) {
-      // Get unique models for error message
-      const availableModels = [
-        ...new Set(allBatteriesAtStation.map((b) => b.model)),
-      ];
-      throw new CustomError(
-        `No batteries of model "${battery_model}" found at this station. Available models: ${availableModels.join(", ") || "none"}.`,
-        400
-      );
-    }
+    const txResult = await prisma.$transaction(async (tx) => {
+      const reserveResult = await reserveBatteryForBooking(tx, {
+        stationId: station_id,
+        batteryModel: normalizedBatteryModel,
+        allowChargingFallback,
+      });
 
-    // Check if there are available batteries at scheduled time
-    // Exclude batteries that are reserved for confirmed bookings at the same scheduled time
-    // Query bookings with case-insensitive battery_model comparison
-    const allBookingsAtTime = await prisma.booking.findMany({
-      where: {
-        station_id,
-        scheduled_at: {
-          gte: new Date(scheduledTime.getTime() - 30 * 60 * 1000), // 30 minutes before
-          lte: new Date(scheduledTime.getTime() + 30 * 60 * 1000), // 30 minutes after
+      let lockedSubscriptionId: string | null = null;
+      let lockedSwapCount = 0;
+      let lockedWalletAmount = new Prisma.Decimal(0);
+      let lockedWalletPaymentId: string | null = null;
+      let walletBalanceAfter: number | null = null;
+      let subscriptionRemainingAfter: number | null = null;
+      let subscriptionUnlimited = false;
+      let subscriptionName: string | null = null;
+
+      const activeSubscription = useSubscription
+        ? await tx.userSubscription.findFirst({
+            where: {
+              user_id: userId,
+              status: "active",
+              start_date: { lte: now },
+              end_date: { gte: now },
+            },
+            include: { package: true },
+            orderBy: { created_at: "desc" },
+          })
+        : null;
+
+      const pricingRow = await tx.batteryPricing.findFirst({
+        where: {
+          battery_model: {
+            equals: normalizedBatteryModel,
+            mode: "insensitive",
+          },
+          is_active: true,
         },
-        status: { in: ["pending", "confirmed"] },
-      },
-      select: {
-        battery_model: true,
-      },
-    });
+      });
 
-    // Filter bookings by battery_model (case-insensitive)
-    const confirmedBookingsAtTime = allBookingsAtTime.filter(
-      (b) => b.battery_model.toLowerCase().trim() === normalizedBatteryModel
-    ).length;
+      const basePriceDecimal = pricingRow?.price ?? null;
+      if (!basePriceDecimal && !activeSubscription) {
+        throw new CustomError(
+          `Hiện chưa có bảng giá cho loại pin "${battery_model}" và bạn không có gói phù hợp. Vui lòng liên hệ nhân viên.`,
+          400
+        );
+      }
 
-    // Get time difference in hours
-    const hoursUntilScheduled =
-      (scheduledTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+      let useSubscriptionFinal = false;
 
-    // Check total available batteries:
-    // 1. Batteries with status = "full" (ready now)
-    const fullBatteries = batteriesOfModel.filter(
-      (b) => b.status === "full"
-    ).length;
+      if (activeSubscription) {
+        const coversModel = await doesSubscriptionCoverModel(
+          activeSubscription,
+          normalizedBatteryModel
+        );
 
-    // 2. Batteries with status = "charging" that will be ready by scheduled time
-    // Estimate: if battery is charging and scheduled time is >= 1 hour away,
-    // assume it will be ready (conservative estimate: charging takes 1-2 hours typically)
-    const chargingBatteries =
-      hoursUntilScheduled >= 1
-        ? batteriesOfModel.filter((b) => b.status === "charging").length
-        : 0;
+        if (coversModel) {
+          subscriptionName = activeSubscription.package?.name ?? null;
 
-    // Total available = full batteries + charging batteries that will be ready
-    const totalAvailableBatteries = fullBatteries + chargingBatteries;
+          if (activeSubscription.remaining_swaps === null) {
+            subscriptionUnlimited = true;
+            useSubscriptionFinal = true;
+            lockedSubscriptionId = activeSubscription.subscription_id;
+          } else if ((activeSubscription.remaining_swaps ?? 0) > 0) {
+            useSubscriptionFinal = true;
+            lockedSubscriptionId = activeSubscription.subscription_id;
+            lockedSwapCount = 1;
+            subscriptionRemainingAfter =
+              (activeSubscription.remaining_swaps ?? 0) - 1;
 
-    // Available batteries = total - reserved for other bookings
-    const availableBatteries =
-      totalAvailableBatteries - confirmedBookingsAtTime;
+            await tx.userSubscription.update({
+              where: { subscription_id: activeSubscription.subscription_id },
+              data: { remaining_swaps: subscriptionRemainingAfter },
+            });
+          }
+        }
+      }
 
-    if (availableBatteries <= 0) {
-      // Provide detailed error message
-      const reason =
-        totalAvailableBatteries === 0
-          ? `No batteries are ready (${fullBatteries} full, ${chargingBatteries} charging)`
-          : `All ${totalAvailableBatteries} available batteries are reserved by other bookings (${confirmedBookingsAtTime} bookings in ±30 min window)`;
+      if (!useSubscriptionFinal) {
+        if (!basePriceDecimal) {
+          throw new CustomError(
+            `Không thể xác định giá đổi pin cho model "${battery_model}".`,
+            400
+          );
+        }
 
-      throw new CustomError(
-        `No available batteries for model "${battery_model}" at this station at ${scheduledTime.toLocaleString()}. ${reason}. Please choose another time or station.`,
-        400
-      );
-    }
+        const wallet = await ensureWalletRecord(tx, userId);
+        if (wallet.balance.lessThan(basePriceDecimal)) {
+          const needed = Number(basePriceDecimal);
+          const current = Number(wallet.balance);
+          throw new CustomError(
+            `Số dư ví không đủ. Cần ${needed.toLocaleString("vi-VN")}đ, hiện có ${current.toLocaleString("vi-VN")}đ. Vui lòng nạp thêm ${(needed - current).toLocaleString("vi-VN")}đ trước khi đặt lịch.`,
+            400
+          );
+        }
 
-    // Generate booking code (max 20 chars: BK + timestamp last 10 digits + 2 random chars)
-    const timestamp = Date.now().toString().slice(-10); // Last 10 digits
-    const random = Math.random().toString(36).substr(2, 2).toUpperCase();
-    const bookingCode = `BK${timestamp}${random}`; // BK + 10 + 2 = 14 chars
+        const updatedWallet = await tx.wallet.update({
+          where: { user_id: userId },
+          data: {
+            balance: wallet.balance.minus(basePriceDecimal),
+          },
+        });
 
-    const booking = await prisma.booking.create({
-      data: {
+        walletBalanceAfter = Number(updatedWallet.balance);
+        lockedWalletAmount = basePriceDecimal;
+
+        const holdPayment = await tx.payment.create({
+          data: {
+            user_id: userId,
+            amount: basePriceDecimal,
+            payment_method: "wallet",
+            payment_status: PAYMENT_STATUS_RESERVED,
+            payment_type: "SWAP",
+            metadata: {
+              type: "booking_hold",
+              booking_code: bookingCode,
+              station_id,
+            },
+          },
+        });
+
+        lockedWalletPaymentId = holdPayment.payment_id;
+      }
+
+      const bookingData = {
         booking_code: bookingCode,
         user_id: userId,
         vehicle_id,
         station_id,
-        battery_model,
-        scheduled_at: scheduledTime, // Use validated date
-        notes,
+        battery_model: normalizedBatteryModel,
+        scheduled_at: scheduledTime,
+        notes: notes ?? null,
         status: "pending",
-      },
-      include: {
-        station: {
-          select: {
-            station_id: true,
-            name: true,
-            address: true,
-            latitude: true,
-            longitude: true,
+        locked_battery_id: reserveResult.battery.battery_id,
+        locked_battery_previous_status: reserveResult.previousStatus ?? null,
+        locked_subscription_id: lockedSubscriptionId ?? null,
+        locked_swap_count: lockedSwapCount,
+        locked_wallet_amount: lockedWalletAmount,
+        locked_wallet_payment_id: lockedWalletPaymentId ?? null,
+        use_subscription: useSubscriptionFinal,
+        hold_expires_at: holdExpiresAt,
+      } as Prisma.BookingUncheckedCreateInput;
+
+      const booking = await tx.booking.create({
+        data: bookingData,
+        include: {
+          station: {
+            select: {
+              station_id: true,
+              name: true,
+              address: true,
+              latitude: true,
+              longitude: true,
+            },
+          },
+          vehicle: {
+            select: {
+              vehicle_id: true,
+              license_plate: true,
+              vehicle_type: true,
+              make: true,
+              model: true,
+              year: true,
+            },
           },
         },
-        vehicle: {
-          select: {
-            vehicle_id: true,
-            license_plate: true,
-            vehicle_type: true,
-            make: true,
-            model: true,
-            year: true,
-          },
-        },
-      },
+      });
+
+      await createBatteryHistoryEntry(tx, {
+        batteryId: reserveResult.battery.battery_id,
+        bookingId: booking.booking_id,
+        stationId: station_id,
+        actorUserId: userId,
+        action: "reserved",
+        notes: reserveResult.previousStatus
+          ? `Giữ từ trạng thái ${reserveResult.previousStatus}`
+          : undefined,
+      });
+
+      return {
+        booking,
+        reserveBattery: reserveResult.battery,
+        useSubscriptionFinal,
+        subscriptionUnlimited,
+        subscriptionRemainingAfter,
+        subscriptionName,
+        walletBalanceAfter,
+        lockedWalletAmount: Number(lockedWalletAmount),
+      };
     });
 
     const pricing_preview = await calculateBookingPricingPreview({
@@ -605,9 +813,10 @@ export const createBooking = asyncHandler(
       batteryModel: battery_model,
     });
 
-    // Send notification to user
+    const holdExpiresAtValue =
+      (txResult.booking as any).hold_expires_at ?? null;
+
     try {
-      // Get user info for notification
       const user = await prisma.user.findUnique({
         where: { user_id: userId },
         select: { email: true, full_name: true },
@@ -617,15 +826,16 @@ export const createBooking = asyncHandler(
         type: "booking_confirmed",
         userId: userId,
         title: "Đặt chỗ thành công!",
-        message: `Đặt chỗ của bạn đã được xác nhận. Mã đặt chỗ: ${bookingCode}`,
+        message: `Đặt chỗ của bạn đã được giữ pin. Mã đặt chỗ: ${txResult.booking.booking_code}`,
         data: {
           email: user?.email || "",
           userName: user?.full_name || "User",
-          bookingId: bookingCode,
+          bookingId: txResult.booking.booking_code,
           stationName: station.name,
           stationAddress: station.address,
           bookingTime: scheduled_at,
           batteryType: battery_model,
+          hold_expires_at: holdExpiresAtValue,
         },
       });
     } catch (error) {
@@ -636,8 +846,18 @@ export const createBooking = asyncHandler(
       success: true,
       message: "Booking created successfully",
       data: {
-        booking,
+        booking: txResult.booking,
         pricing_preview,
+        hold_summary: {
+          battery_code: txResult.reserveBattery.battery_code,
+          use_subscription: txResult.useSubscriptionFinal,
+          subscription_unlimited: txResult.subscriptionUnlimited,
+          subscription_remaining_after: txResult.subscriptionRemainingAfter,
+          subscription_name: txResult.subscriptionName ?? null,
+          wallet_amount_locked: txResult.lockedWalletAmount,
+          wallet_balance_after: txResult.walletBalanceAfter,
+          hold_expires_at: holdExpiresAtValue,
+        },
       },
     });
   }
@@ -1051,7 +1271,7 @@ export const cancelBooking = asyncHandler(
       (scheduledTime.getTime() - now.getTime()) / (1000 * 60);
 
     const cancellationFee = 0;
-    const cancelMessage = "Booking cancelled successfully";
+    const baseCancelMessage = "Booking cancelled successfully";
 
     // Nếu hủy trong vòng 15 phút trước giờ hẹn → Không cho hủy HOẶC phạt phí
     if (minutesUntilScheduled < 15 && minutesUntilScheduled > 0) {
@@ -1065,15 +1285,16 @@ export const cancelBooking = asyncHandler(
       // cancelMessage = `Booking cancelled with late cancellation fee: ${cancellationFee.toLocaleString("vi-VN")}đ`;
     }
 
-    // Transaction để xử lý phí hủy (nếu có)
+    const releaseNote = "User cancelled booking before swap";
+
     const result = await prisma.$transaction(async (tx) => {
-      // Cập nhật booking status
-      const updatedBooking = await tx.booking.update({
-        where: { booking_id: id },
-        data: { status: "cancelled" },
+      const release = await releaseBookingHold({
+        tx,
+        booking: booking as unknown as BookingHoldFields,
+        actorUserId: userId,
+        notes: releaseNote,
       });
 
-      // Nếu có phí hủy → Trừ ví
       if (cancellationFee > 0) {
         let wallet = await tx.wallet.findUnique({
           where: { user_id: userId },
@@ -1095,7 +1316,6 @@ export const cancelBooking = asyncHandler(
             data: { balance: balance - cancellationFee },
           });
         } else {
-          // Không đủ tiền → Ghi nợ hoặc báo lỗi
           throw new CustomError(
             `Insufficient wallet balance. Cancellation fee: ${cancellationFee.toLocaleString("vi-VN")}đ, Balance: ${Number(wallet.balance).toLocaleString("vi-VN")}đ`,
             400
@@ -1103,38 +1323,66 @@ export const cancelBooking = asyncHandler(
         }
       }
 
-      return { updatedBooking, cancellationFee };
+      const bookingUpdateData: Prisma.BookingUncheckedUpdateInput = {
+        ...buildBookingUncheckedUpdate(release.bookingUpdate),
+        status: "cancelled",
+        notes: booking.notes ? `${booking.notes}\n${releaseNote}` : releaseNote,
+      };
+
+      const updatedBooking = await tx.booking.update({
+        where: { booking_id: id },
+        data: bookingUpdateData,
+      });
+
+      return {
+        updatedBooking,
+        cancellationFee,
+        walletForfeitedAmount: release.walletForfeitedAmount,
+        batteryReleasedId: release.batteryReleasedId,
+      };
     });
 
     // ✅ Send notification
     try {
       const { notificationService } = await import("../server");
+      const notificationMessage =
+        cancellationFee > 0
+          ? `Đã hủy đặt chỗ. Phí hủy muộn: ${cancellationFee.toLocaleString("vi-VN")}đ`
+          : result.walletForfeitedAmount > 0
+            ? `Đã hủy đặt chỗ. Khoản đã thanh toán ${result.walletForfeitedAmount.toLocaleString("vi-VN")}đ sẽ không được hoàn.`
+            : "Đã hủy đặt chỗ thành công";
       await notificationService.sendNotification({
         type: "booking_cancelled",
         userId: userId,
         title: "Đã hủy đặt chỗ",
-        message:
-          cancellationFee > 0
-            ? `Đã hủy đặt chỗ. Phí hủy muộn: ${cancellationFee.toLocaleString("vi-VN")}đ`
-            : "Đã hủy đặt chỗ thành công",
+        message: notificationMessage,
         data: {
           booking_id: booking.booking_id,
           booking_code: booking.booking_code,
           cancellation_fee: cancellationFee,
+          wallet_forfeited_amount: result.walletForfeitedAmount,
         },
       });
     } catch (error) {
       console.error("Failed to send cancellation notification:", error);
     }
 
+    const responseMessage =
+      cancellationFee > 0
+        ? `Đã hủy đặt chỗ. Phí hủy muộn: ${cancellationFee.toLocaleString("vi-VN")}đ`
+        : result.walletForfeitedAmount > 0
+          ? `Đã hủy đặt chỗ. Khoản đã thanh toán ${result.walletForfeitedAmount.toLocaleString("vi-VN")}đ sẽ không được hoàn.`
+          : baseCancelMessage;
+
     res.status(200).json({
       success: true,
-      message: cancelMessage,
+      message: responseMessage,
       data: {
         booking: result.updatedBooking,
         cancellation_fee: result.cancellationFee,
+        wallet_forfeited_amount: result.walletForfeitedAmount,
         wallet_balance:
-          cancellationFee > 0
+          cancellationFee > 0 || result.walletForfeitedAmount > 0
             ? await prisma.wallet
                 .findUnique({
                   where: { user_id: userId },

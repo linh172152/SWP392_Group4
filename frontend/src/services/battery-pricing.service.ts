@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "../config/api";
+import { API_BASE_URL, API_ENDPOINTS } from "../config/api";
 import authFetch from "./apiClient";
 
 export interface BatteryPricing {
@@ -37,7 +37,7 @@ export interface SingleBatteryPricingResponse {
 }
 
 /**
- * Get all battery pricing
+ * Get all battery pricing (public endpoint - no auth required)
  */
 export async function getBatteryPricing(filters?: BatteryPricingFilters): Promise<BatteryPricingResponse> {
   const qs = new URLSearchParams();
@@ -45,8 +45,19 @@ export async function getBatteryPricing(filters?: BatteryPricingFilters): Promis
   if (filters?.page) qs.set("page", String(filters.page));
   if (filters?.limit) qs.set("limit", String(filters.limit));
 
-  const url = `${API_BASE_URL}/admin/pricing${qs.toString() ? `?${qs.toString()}` : ""}`;
-  const res = await authFetch(url);
+  // Use public pricing endpoint (no auth required)
+  // Endpoint: /api/pricing (mounted from public-pricing.routes.ts)
+  const url = `${API_ENDPOINTS.PUBLIC.PRICING}${qs.toString() ? `?${qs.toString()}` : ""}`;
+  
+  // Public endpoint doesn't need auth
+  const response = await fetch(url);
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Pricing API error:', response.status, errorText);
+    throw new Error(`Failed to fetch pricing: ${response.statusText}`);
+  }
+  const res = await response.json();
+  console.log('Pricing response:', res);
   return res;
 }
 

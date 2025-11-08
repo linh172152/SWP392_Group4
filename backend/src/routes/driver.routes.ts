@@ -55,83 +55,44 @@ router.get("/topup-packages", getTopUpPackages);
  * @swagger
  * /api/driver/vehicles:
  *   get:
- *     summary: Get driver vehicles management
+ *     summary: Driver API root summary
+ *     description: Returns a quick overview of available driver-facing modules. Detailed documentation for each module is defined on their respective routes (wallet, vehicles, stations, bookings, transactions, subscriptions, notifications).
  *     tags: [Driver]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Driver vehicles endpoint
+ *         description: Driver API overview returned
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
+ *                 success:
+ *                   type: boolean
  *                 message:
  *                   type: string
+ *                 modules:
+ *                   type: array
+ *                   items:
+ *                     type: string
  *       401:
  *         description: Unauthorized
- *       403:
- *         description: Forbidden - Driver role required
  */
-router.get("/vehicles", (_req, res) => {
-  res.json({ message: "Driver vehicles endpoint - coming soon" });
+router.get("/", (_req, res) => {
+  res.json({
+    success: true,
+    message: "Driver API modules",
+    modules: [
+      "wallet",
+      "vehicles",
+      "stations",
+      "bookings",
+      "transactions",
+      "subscriptions",
+      "notifications",
+    ],
+  });
 });
-
-/**
- * @swagger
- * /api/driver/stations:
- *   get:
- *     summary: Get driver stations management
- *     tags: [Driver]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Driver stations endpoint
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden - Driver role required
- */
-router.get("/stations", (_req, res) => {
-  res.json({ message: "Driver stations endpoint - coming soon" });
-});
-
-/**
- * @swagger
- * /api/driver/bookings:
- *   get:
- *     summary: Get driver bookings management
- *     tags: [Driver]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Driver bookings endpoint
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden - Driver role required
- */
-router.get("/bookings", (_req, res) => {
-  res.json({ message: "Driver bookings endpoint - coming soon" });
-});
-
-// Placeholder routes - will be implemented later
 
 export default router;
