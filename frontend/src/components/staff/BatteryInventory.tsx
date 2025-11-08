@@ -65,6 +65,7 @@ const BatteryInventory: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(''); // Debounced search để tối ưu performance
   const [statusFilter, setStatusFilter] = useState('all');
   const [modelFilter, setModelFilter] = useState('all');
   
@@ -105,7 +106,11 @@ const BatteryInventory: React.FC = () => {
       
       if (response.success && response.data) {
         setAllBatteries(response.data);
-        applyFiltersAndSort(response.data);
+        // ✅ Không gọi applyFiltersAndSort ở đây, để useEffect tự động xử lý
+        // Điều này đảm bảo logic filter/sort/pagination được áp dụng đúng cách
+      } else {
+        // Nếu không có data, set empty array
+        setAllBatteries([]);
       }
     } catch (error: any) {
       toast({
@@ -113,19 +118,38 @@ const BatteryInventory: React.FC = () => {
         description: error.message || 'Không thể tải danh sách pin',
         variant: 'destructive',
       });
+      setAllBatteries([]); // Set empty array khi có lỗi
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  // Apply filters, search, sorting and pagination
-  const applyFiltersAndSort = (batteriesToProcess: BatteryType[]) => {
-    let processed = [...batteriesToProcess];
+  useEffect(() => {
+    fetchBatteries();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter, modelFilter]);
+
+  // Debounce search term để tránh gọi quá nhiều lần khi user đang gõ
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+      if (searchTerm.trim() && currentPage !== 1) {
+        setCurrentPage(1);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Apply filters, search, sorting and pagination khi có thay đổi
+  useEffect(() => {
+    // Sử dụng debouncedSearchTerm thay vì searchTerm trực tiếp
+    let processed = [...allBatteries];
     
-    // Apply search
-    if (searchTerm.trim()) {
-      const searchLower = searchTerm.toLowerCase();
+    // Apply search với debounced term
+    if (debouncedSearchTerm.trim()) {
+      const searchLower = debouncedSearchTerm.toLowerCase();
       processed = processed.filter(b => 
         b.battery_code.toLowerCase().includes(searchLower) ||
         b.model.toLowerCase().includes(searchLower) ||
@@ -183,31 +207,8 @@ const BatteryInventory: React.FC = () => {
     setBatteries(paginated);
     setTotalPages(totalPages);
     setTotalItems(processed.length);
-  };
-
-  useEffect(() => {
-    fetchBatteries();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter, modelFilter]);
-
-  useEffect(() => {
-    applyFiltersAndSort(allBatteries);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, sortField, sortOrder, currentPage, pageSize, allBatteries]);
-
-  // Debounce search
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (currentPage !== 1) {
-        setCurrentPage(1);
-      } else {
-        applyFiltersAndSort(allBatteries);
-      }
-    }, 500);
-
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm]);
+  }, [debouncedSearchTerm, sortField, sortOrder, currentPage, pageSize, allBatteries]);
 
   // Handle sort change
   const handleSort = (field: SortField) => {

@@ -667,19 +667,22 @@ const SwapTransactions: React.FC = () => {
                       <Eye className="mr-1 h-3 w-3" />
                       Chi tiết
                     </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="text-red-600 hover:text-red-700"
-                      onClick={() => handleOpenCancelDialog(booking)}
-                      disabled={actionLoading === booking.booking_id}
-                    >
-                      {actionLoading === booking.booking_id ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <X className="h-3 w-3" />
-                      )}
-                    </Button>
+                    {/* Chỉ hiển thị nút hủy khi booking chưa bị hủy */}
+                    {booking.status !== 'cancelled' && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="text-red-600 hover:text-red-700"
+                        onClick={() => handleOpenCancelDialog(booking)}
+                        disabled={actionLoading === booking.booking_id}
+                      >
+                        {actionLoading === booking.booking_id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <X className="h-3 w-3" />
+                        )}
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
