@@ -770,6 +770,13 @@ const BatteryPricingManagement: React.FC = () => {
                       toast.error('Pin đã chọn không thuộc trạm xuất phát');
                       return;
                     }
+
+                    // Validate trạm đích phải ở trạng thái active
+                    const destinationStation = stations.find(s => s.station_id === newTransfer.to_station_id);
+                    if (destinationStation && destinationStation.status !== 'active') {
+                      toast.error(`Trạm đích "${destinationStation.name}" không hoạt động. Vui lòng chọn trạm khác.`);
+                      return;
+                    }
                     
                     try {
                       setLoading(true);
@@ -815,8 +822,8 @@ const BatteryPricingManagement: React.FC = () => {
                         <ul className="space-y-1 text-blue-700">
                           <li>• Bước 1: Chọn trạm xuất phát (trạm hiện tại của pin cần chuyển)</li>
                           <li>• Bước 2: Chọn pin cụ thể từ trạm đã chọn</li>
-                          <li>• Bước 3: Chọn trạm đích (phải khác với trạm xuất phát)</li>
-                          <li>• Chỉ hiển thị pin sẵn sàng chuyển và có mức pin phù hợp</li>
+                          <li>• Bước 3: Chọn trạm đích (phải khác với trạm xuất phát và đang hoạt động)</li>
+                          <li>• Chỉ hiển thị pin sẵn sàng chuyển và trạm đang hoạt động</li>
                         </ul>
                       </div>
                     </div>
@@ -971,15 +978,15 @@ const BatteryPricingManagement: React.FC = () => {
                           />
                         </SelectTrigger>
                         <SelectContent className="bg-white border border-gray-200 shadow-lg max-h-48 overflow-y-auto z-50">
-                          {stations.filter((station) => station.station_id !== newTransfer.from_station_id).length > 0 && (
+                          {stations.filter((station) => station.station_id !== newTransfer.from_station_id && station.status === 'active').length > 0 && (
                             <div className="sticky top-0 bg-gray-50 px-3 py-2 border-b border-gray-200">
                               <span className="text-xs text-gray-500 font-medium">
-                                {stations.filter((station) => station.station_id !== newTransfer.from_station_id).length} trạm khả dụng
+                                {stations.filter((station) => station.station_id !== newTransfer.from_station_id && station.status === 'active').length} trạm hoạt động
                               </span>
                             </div>
                           )}
                           {stations
-                            .filter((station) => station.station_id !== newTransfer.from_station_id)
+                            .filter((station) => station.station_id !== newTransfer.from_station_id && station.status === 'active')
                             .map((station, index) => (
                               <SelectItem 
                                 key={station.station_id} 
@@ -989,14 +996,17 @@ const BatteryPricingManagement: React.FC = () => {
                                 }`}
                               >
                                 <div className="flex flex-col w-full max-w-full">
-                                  <span className="font-medium text-gray-900 truncate">{station.name}</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium text-gray-900 truncate">{station.name}</span>
+                                    <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">Hoạt động</span>
+                                  </div>
                                   <span className="text-sm text-gray-600 mt-1 truncate">{station.address}</span>
                                 </div>
                               </SelectItem>
                             ))}
-                          {stations.filter((station) => station.station_id !== newTransfer.from_station_id).length === 0 && !loadingStations && (
+                          {stations.filter((station) => station.station_id !== newTransfer.from_station_id && station.status === 'active').length === 0 && !loadingStations && (
                             <SelectItem value="no-stations" disabled className="text-gray-500 italic p-4 text-center">
-                              {newTransfer.from_station_id ? "Chọn trạm khác với trạm xuất phát" : "Vui lòng chọn trạm xuất phát trước"}
+                              {newTransfer.from_station_id ? "Không có trạm đích nào đang hoạt động" : "Vui lòng chọn trạm xuất phát trước"}
                             </SelectItem>
                           )}
                         </SelectContent>
