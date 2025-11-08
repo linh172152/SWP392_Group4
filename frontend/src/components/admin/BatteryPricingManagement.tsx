@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import batteryPricingService from '../../services/battery-pricing.service';
 import batteryTransferService from '../../services/battery-transfer.service';
+import { getAllStations } from '../../services/station.service';
+import { getAdminBatteries } from '../../services/battery.service';
 
 import { toast } from 'sonner';
 import type { BatteryPricing } from '../../services/battery-pricing.service';
 import type { BatteryTransfer, CreateBatteryTransferDto } from '../../services/battery-transfer.service';
 
-import { DollarSign, Edit2, Trash2, Plus, Check, X, Battery, Zap, TrendingUp, Search, ArrowRightLeft, Truck, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { DollarSign, Edit2, Trash2, Plus, Check, X, Battery, Zap, TrendingUp, Search, ArrowRightLeft, Truck, Clock, CheckCircle, XCircle, AlertCircle, Eye, Info, MapPin, User, Calendar } from 'lucide-react';
 
 const BatteryPricingManagement: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'pricing' | 'transfer'>('pricing');
@@ -23,20 +26,31 @@ const BatteryPricingManagement: React.FC = () => {
   // Transfer state
   const [transfers, setTransfers] = useState<BatteryTransfer[]>([]);
   const [showTransferForm, setShowTransferForm] = useState(false);
-  const [newTransfer, setNewTransfer] = useState<CreateBatteryTransferDto>({
-    battery_id: '',
+  const [newTransfer, setNewTransfer] = useState<CreateBatteryTransferDto & { from_station_id?: string }>({
     from_station_id: '',
+    battery_id: '',
     to_station_id: '',
     transfer_reason: '',
     notes: ''
   });
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [selectedTransfer, setSelectedTransfer] = useState<BatteryTransfer | null>(null);
+  const [showTransferDetail, setShowTransferDetail] = useState(false);
+  
+  // Dropdown data
+  const [stations, setStations] = useState<any[]>([]);
+  const [batteries, setBatteries] = useState<any[]>([]);
+  const [loadingStations, setLoadingStations] = useState(false);
+  const [loadingBatteries, setLoadingBatteries] = useState(false);
 
   useEffect(() => {
     if (activeTab === 'pricing') {
       fetchPricing();
     } else {
+      // Thêm delay giữa các API calls để tránh rate limit
       fetchTransfers();
+      setTimeout(() => fetchStations(), 500);
+      setTimeout(() => fetchBatteries(), 1000);
     }
   }, [activeTab]);
 
@@ -69,6 +83,54 @@ const BatteryPricingManagement: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const fetchStations = async () => {
+    setLoadingStations(true);
+    try {
+      const stationRes = await getAllStations();
+      if (stationRes && stationRes.success) {
+        setStations(stationRes.data || []);
+      }
+    } catch (err: any) {
+      console.error('Failed to fetch stations:', err);
+      toast.error('Failed to load station data');
+    } finally {
+      setLoadingStations(false);
+    }
+  };
+
+  const fetchBatteries = async () => {
+    setLoadingBatteries(true);
+    try {
+      const batteryRes = await getAdminBatteries();
+      if (batteryRes && batteryRes.success) {
+        setBatteries(batteryRes.data || []);
+      }
+    } catch (err: any) {
+      console.error('Failed to fetch batteries:', err);
+      toast.error('Failed to load battery data');
+    } finally {
+      setLoadingBatteries(false);
+    }
+  };
+
+  const handleBatteryChange = (batteryId: string) => {
+    const selectedBattery = batteries.find(b => b.battery_id === batteryId);
+    setNewTransfer((s: CreateBatteryTransferDto) => ({ 
+      ...s, 
+      battery_id: batteryId,
+      // Clear destination station if it's the same as selected battery's current station
+      to_station_id: selectedBattery?.station_id === s.to_station_id ? '' : s.to_station_id
+    }));
+  };
+
+  // Get current station of selected battery
+  const selectedBattery = batteries.find(b => b.battery_id === newTransfer.battery_id);
+
+  // Filter batteries based on selected from_station for transfer
+  const filteredBatteriesForTransfer = newTransfer.from_station_id 
+    ? batteries.filter((battery) => battery.station_id === newTransfer.from_station_id)
+    : [];
 
   // Filter pricings based on search
   const filteredPricings = pricings.filter((p) =>
@@ -675,16 +737,51 @@ const BatteryPricingManagement: React.FC = () => {
                 <form
                   onSubmit={async (e) => {
                     e.preventDefault();
+                    
+                    // Validation
+                    if (!newTransfer.from_station_id) {
+                      toast.error('Vui lòng chọn trạm xuất phát');
+                      return;
+                    }
+                    
+                    if (!newTransfer.battery_id) {
+                      toast.error('Vui lòng chọn pin cần chuyển');
+                      return;
+                    }
+                    
+                    if (!newTransfer.to_station_id) {
+                      toast.error('Vui lòng chọn trạm đích');
+                      return;
+                    }
+                    
+                    if (!newTransfer.transfer_reason || newTransfer.transfer_reason.trim() === '') {
+                      toast.error('Vui lòng nhập lý do chuyển');
+                      return;
+                    }
+                    
+                    if (newTransfer.from_station_id === newTransfer.to_station_id) {
+                      toast.error('Trạm đích phải khác với trạm xuất phát');
+                      return;
+                    }
+                    
+                    // Validate pin thuộc trạm đã chọn
+                    const selectedBattery = batteries.find(b => b.battery_id === newTransfer.battery_id);
+                    if (selectedBattery && selectedBattery.station_id !== newTransfer.from_station_id) {
+                      toast.error('Pin đã chọn không thuộc trạm xuất phát');
+                      return;
+                    }
+                    
                     try {
                       setLoading(true);
+                      console.log('New Transfer Data:', newTransfer);
                       const res = await batteryTransferService.createBatteryTransfer(newTransfer);
                       if (res && res.success) {
                         setTransfers((prev) => [res.data, ...prev]);
                         toast.success('✅ Transfer request created successfully');
                         setShowTransferForm(false);
                         setNewTransfer({
-                          battery_id: '',
                           from_station_id: '',
+                          battery_id: '',
                           to_station_id: '',
                           transfer_reason: '',
                           notes: ''
@@ -701,7 +798,7 @@ const BatteryPricingManagement: React.FC = () => {
                   }}
                   className="mb-8 bg-gradient-to-br from-blue-50 to-indigo-50 p-6 border-2 border-blue-200 rounded-2xl shadow-lg"
                 >
-                  <div className="flex items-center gap-3 mb-6">
+                  <div className="flex items-center gap-3 mb-4">
                     <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg">
                       <Plus className="h-5 w-5 text-white" />
                     </div>
@@ -709,53 +806,209 @@ const BatteryPricingManagement: React.FC = () => {
                       Tạo yêu cầu chuyển pin
                     </h3>
                   </div>
+                  
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                    <div className="flex items-start gap-3">
+                      <Info className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <div className="text-sm text-blue-800">
+                        <p className="font-medium mb-1">Hướng dẫn sử dụng:</p>
+                        <ul className="space-y-1 text-blue-700">
+                          <li>• Bước 1: Chọn trạm xuất phát (trạm hiện tại của pin cần chuyển)</li>
+                          <li>• Bước 2: Chọn pin cụ thể từ trạm đã chọn</li>
+                          <li>• Bước 3: Chọn trạm đích (phải khác với trạm xuất phát)</li>
+                          <li>• Chỉ hiển thị pin sẵn sàng chuyển và có mức pin phù hợp</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-6">
                     <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        Battery ID <span className="text-red-500">*</span>
+                      <label className="block text-sm font-semibold text-slate-700 mb-3">
+                        Chọn trạm xuất phát <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        className="w-full p-3 border-2 border-slate-300 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all outline-none font-medium"
-                        placeholder="Nhập Battery ID"
-                        value={newTransfer.battery_id}
-                        onChange={(e) => setNewTransfer((s: CreateBatteryTransferDto) => ({ ...s, battery_id: e.target.value }))}
-                        required
-                      />
+                      <Select 
+                        value={newTransfer.from_station_id || ''} 
+                        onValueChange={(value) => {
+                          setNewTransfer((s: CreateBatteryTransferDto) => ({ 
+                            ...s, 
+                            from_station_id: value,
+                            battery_id: '' // Clear battery when station changes
+                          }));
+                        }}
+                        disabled={loadingStations}
+                      >
+                        <SelectTrigger className="w-full min-h-[50px] p-4 border-2 border-slate-300 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all font-medium bg-white text-gray-900 text-left">
+                          <SelectValue 
+                            placeholder={loadingStations ? "Đang tải..." : "Chọn trạm xuất phát"}
+                            className="text-gray-900 truncate pr-2"
+                          />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border border-gray-200 shadow-lg max-h-48 overflow-y-auto z-50">
+                          {stations.length > 0 && (
+                            <div className="sticky top-0 bg-gray-50 px-3 py-2 border-b border-gray-200">
+                              <span className="text-xs text-gray-500 font-medium">
+                                {stations.length} trạm khả dụng
+                              </span>
+                            </div>
+                          )}
+                          {stations.map((station, index) => (
+                            <SelectItem 
+                              key={station.station_id} 
+                              value={station.station_id}
+                              className={`hover:bg-blue-50 focus:bg-blue-100 cursor-pointer p-4 border-b border-gray-100 last:border-b-0 ${
+                                index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
+                              }`}
+                            >
+                              <div className="flex flex-col w-full max-w-full">
+                                <span className="font-medium text-gray-900 truncate">{station.name}</span>
+                                <span className="text-sm text-gray-600 mt-1 truncate">{station.address}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                          {stations.length === 0 && !loadingStations && (
+                            <SelectItem value="no-stations" disabled className="text-gray-500 italic p-4 text-center">
+                              Không có trạm khả dụng
+                            </SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        From Station ID <span className="text-red-500">*</span>
+                      <label className="block text-sm font-semibold text-slate-700 mb-3">
+                        Pin cần chuyển <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        className="w-full p-3 border-2 border-slate-300 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all outline-none font-medium"
-                        placeholder="Trạm xuất phát"
-                        value={newTransfer.from_station_id}
-                        onChange={(e) => setNewTransfer((s: CreateBatteryTransferDto) => ({ ...s, from_station_id: e.target.value }))}
-                        required
-                      />
+                      {!newTransfer.from_station_id && (
+                        <div className="mb-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                          <span className="text-sm text-yellow-700">
+                            ⚠️ Vui lòng chọn trạm xuất phát trước để xem danh sách pin
+                          </span>
+                        </div>
+                      )}
+                      {selectedBattery && (
+                        <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                          <span className="text-sm text-blue-700">
+                            📍 Trạm hiện tại: <span className="font-medium">{selectedBattery.station?.name}</span>
+                          </span>
+                        </div>
+                      )}
+                      <Select 
+                        value={newTransfer.battery_id} 
+                        onValueChange={handleBatteryChange}
+                        disabled={loadingBatteries || !newTransfer.from_station_id}
+                      >
+                        <SelectTrigger className="w-full min-h-[50px] p-4 border-2 border-slate-300 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all font-medium bg-white text-gray-900 text-left">
+                          <SelectValue 
+                            placeholder={
+                              !newTransfer.from_station_id ? "Chọn trạm xuất phát trước" :
+                              loadingBatteries ? "Đang tải..." : 
+                              `Chọn pin từ ${stations.find(s => s.station_id === newTransfer.from_station_id)?.name || 'trạm đã chọn'}`
+                            }
+                            className="text-gray-900 truncate pr-2"
+                          />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border border-gray-200 shadow-lg max-h-60 overflow-y-auto z-50">
+                          {filteredBatteriesForTransfer.length > 0 && (
+                            <div className="sticky top-0 bg-gray-50 px-3 py-2 border-b border-gray-200">
+                              <span className="text-xs text-gray-500 font-medium">
+                                {filteredBatteriesForTransfer.length} pin tại trạm {stations.find(s => s.station_id === newTransfer.from_station_id)?.name}
+                              </span>
+                            </div>
+                          )}
+                          {filteredBatteriesForTransfer.map((battery, index) => (
+                            <SelectItem 
+                              key={battery.battery_id} 
+                              value={battery.battery_id}
+                              className={`hover:bg-blue-50 focus:bg-blue-100 cursor-pointer p-4 border-b border-gray-100 last:border-b-0 ${
+                                index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
+                              }`}
+                            >
+                              <div className="flex flex-col w-full max-w-full">
+                                <div className="flex justify-between items-center gap-2">
+                                  <span className="font-medium text-gray-900 truncate flex-1">{battery.battery_code}</span>
+                                  <span className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
+                                    battery.current_charge >= 90 ? 'bg-green-100 text-green-800' :
+                                    battery.current_charge >= 70 ? 'bg-yellow-100 text-yellow-800' :
+                                    'bg-red-100 text-red-800'
+                                  }`}>
+                                    {battery.current_charge}%
+                                  </span>
+                                </div>
+                                <span className="text-sm text-gray-600 mt-1 truncate">
+                                  {battery.model} - {battery.capacity_kwh}kWh
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                          {filteredBatteriesForTransfer.length === 0 && !loadingBatteries && newTransfer.from_station_id && (
+                            <SelectItem value="no-batteries" disabled className="text-gray-500 italic p-4 text-center">
+                              Không có pin khả dụng tại trạm này
+                            </SelectItem>
+                          )}
+                          {!newTransfer.from_station_id && (
+                            <SelectItem value="no-station" disabled className="text-gray-500 italic p-4 text-center">
+                              Vui lòng chọn trạm xuất phát trước
+                            </SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        To Station ID <span className="text-red-500">*</span>
+                      <label className="block text-sm font-semibold text-slate-700 mb-3">
+                        Trạm đích <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        className="w-full p-3 border-2 border-slate-300 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all outline-none font-medium"
-                        placeholder="Trạm đích"
-                        value={newTransfer.to_station_id}
-                        onChange={(e) => setNewTransfer((s: CreateBatteryTransferDto) => ({ ...s, to_station_id: e.target.value }))}
-                        required
-                      />
+                      <Select 
+                        value={newTransfer.to_station_id} 
+                        onValueChange={(value) => setNewTransfer((s: CreateBatteryTransferDto) => ({ ...s, to_station_id: value }))}
+                        disabled={loadingStations}
+                      >
+                        <SelectTrigger className="w-full min-h-[50px] p-4 border-2 border-slate-300 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all font-medium bg-white text-gray-900 text-left">
+                          <SelectValue 
+                            placeholder={loadingStations ? "Đang tải..." : "Chọn trạm đích"}
+                            className="text-gray-900 truncate pr-2"
+                          />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border border-gray-200 shadow-lg max-h-48 overflow-y-auto z-50">
+                          {stations.filter((station) => station.station_id !== newTransfer.from_station_id).length > 0 && (
+                            <div className="sticky top-0 bg-gray-50 px-3 py-2 border-b border-gray-200">
+                              <span className="text-xs text-gray-500 font-medium">
+                                {stations.filter((station) => station.station_id !== newTransfer.from_station_id).length} trạm khả dụng
+                              </span>
+                            </div>
+                          )}
+                          {stations
+                            .filter((station) => station.station_id !== newTransfer.from_station_id)
+                            .map((station, index) => (
+                              <SelectItem 
+                                key={station.station_id} 
+                                value={station.station_id}
+                                className={`hover:bg-blue-50 focus:bg-blue-100 cursor-pointer p-4 border-b border-gray-100 last:border-b-0 ${
+                                  index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
+                                }`}
+                              >
+                                <div className="flex flex-col w-full max-w-full">
+                                  <span className="font-medium text-gray-900 truncate">{station.name}</span>
+                                  <span className="text-sm text-gray-600 mt-1 truncate">{station.address}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          {stations.filter((station) => station.station_id !== newTransfer.from_station_id).length === 0 && !loadingStations && (
+                            <SelectItem value="no-stations" disabled className="text-gray-500 italic p-4 text-center">
+                              {newTransfer.from_station_id ? "Chọn trạm khác với trạm xuất phát" : "Vui lòng chọn trạm xuất phát trước"}
+                            </SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      <label className="block text-sm font-semibold text-slate-700 mb-3">
                         Lý do chuyển <span className="text-red-500">*</span>
                       </label>
                       <input
-                        className="w-full p-3 border-2 border-slate-300 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all outline-none font-medium"
+                        className="w-full min-h-[50px] p-4 border-2 border-slate-300 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all outline-none font-medium"
                         placeholder="Ví dụ: Cân bằng tồn kho"
                         value={newTransfer.transfer_reason}
                         onChange={(e) => setNewTransfer((s: CreateBatteryTransferDto) => ({ ...s, transfer_reason: e.target.value }))}
@@ -763,14 +1016,14 @@ const BatteryPricingManagement: React.FC = () => {
                       />
                     </div>
 
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-3">
                         Ghi chú
                       </label>
                       <textarea
-                        className="w-full p-3 border-2 border-slate-300 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all outline-none font-medium"
+                        className="w-full p-4 border-2 border-slate-300 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all outline-none font-medium resize-y"
                         placeholder="Thêm ghi chú..."
-                        rows={3}
+                        rows={4}
                         value={newTransfer.notes}
                         onChange={(e) => setNewTransfer((s: CreateBatteryTransferDto) => ({ ...s, notes: e.target.value }))}
                       />
@@ -797,10 +1050,10 @@ const BatteryPricingManagement: React.FC = () => {
                     <button
                       type="submit"
                       disabled={loading}
-                      className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      className="min-h-[50px] px-8 py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-lg"
                     >
-                      <Check className="h-5 w-5" />
-                      Tạo yêu cầu
+                      <Check className="h-6 w-6" />
+                      Tạo yêu cầu chuyển pin
                     </button>
                   </div>
                 </form>
@@ -889,24 +1142,33 @@ const BatteryPricingManagement: React.FC = () => {
                           })}
                         </p>
 
+                        {/* Xem chi tiết button */}
+                        <button
+                          onClick={() => {
+                            setSelectedTransfer(transfer);
+                            setShowTransferDetail(true);
+                          }}
+                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition-all flex items-center gap-1"
+                        >
+                          <Eye className="h-3 w-3" />
+                          Chi tiết
+                        </button>
+
                         {transfer.transfer_status === 'pending' && (
                           <button
                             onClick={async () => {
                               try {
                                 setLoading(true);
-                                const res = await batteryTransferService.updateBatteryTransfer(
-                                  transfer.transfer_id,
-                                  { transfer_status: 'in_transit' }
+                                const res = await batteryTransferService.updateBatteryTransferStatus(
+                                  transfer.transfer_id, 
+                                  'in_transit',
+                                  'Bắt đầu vận chuyển'
                                 );
                                 if (res && res.success) {
-                                  setTransfers((prev) =>
-                                    prev.map((t) =>
-                                      t.transfer_id === transfer.transfer_id ? res.data : t
-                                    )
-                                  );
-                                  toast.success('✅ Transfer status updated');
+                                  toast.success('✅ Đã cập nhật trạng thái thành "Đang vận chuyển"');
+                                  fetchTransfers(); // Reload data
                                 } else {
-                                  toast.error(res?.message || 'Failed to update status');
+                                  toast.error(res?.message || 'Không thể cập nhật trạng thái');
                                 }
                               } catch (err: any) {
                                 console.error('Update transfer error', err);
@@ -915,9 +1177,39 @@ const BatteryPricingManagement: React.FC = () => {
                                 setLoading(false);
                               }
                             }}
-                            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-semibold transition-all"
+                            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-semibold transition-all flex items-center gap-1"
                           >
+                            <Truck className="h-3 w-3" />
                             Bắt đầu chuyển
+                          </button>
+                        )}
+
+                        {transfer.transfer_status === 'pending' && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                setLoading(true);
+                                const res = await batteryTransferService.updateBatteryTransferStatus(
+                                  transfer.transfer_id, 
+                                  'cancelled',
+                                  'Hủy bởi admin'
+                                );
+                                if (res && res.success) {
+                                  toast.success('✅ Đã hủy yêu cầu chuyển pin');
+                                  fetchTransfers(); // Reload data
+                                } else {
+                                  toast.error(res?.message || 'Không thể hủy yêu cầu');
+                                }
+                              } catch (err: any) {
+                                toast.error(err?.message || 'Có lỗi xảy ra');
+                              } finally {
+                                setLoading(false);
+                              }
+                            }}
+                            className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-semibold transition-all flex items-center gap-1"
+                          >
+                            <XCircle className="h-3 w-3" />
+                            Hủy yêu cầu
                           </button>
                         )}
 
@@ -926,19 +1218,16 @@ const BatteryPricingManagement: React.FC = () => {
                             onClick={async () => {
                               try {
                                 setLoading(true);
-                                const res = await batteryTransferService.updateBatteryTransfer(
-                                  transfer.transfer_id,
-                                  { transfer_status: 'completed' }
+                                const res = await batteryTransferService.updateBatteryTransferStatus(
+                                  transfer.transfer_id, 
+                                  'completed',
+                                  'Hoàn thành chuyển pin'
                                 );
                                 if (res && res.success) {
-                                  setTransfers((prev) =>
-                                    prev.map((t) =>
-                                      t.transfer_id === transfer.transfer_id ? res.data : t
-                                    )
-                                  );
-                                  toast.success('✅ Transfer completed');
+                                  toast.success('✅ Đã hoàn thành chuyển pin');
+                                  fetchTransfers(); // Reload data
                                 } else {
-                                  toast.error(res?.message || 'Failed to update status');
+                                  toast.error(res?.message || 'Không thể hoàn thành');
                                 }
                               } catch (err: any) {
                                 console.error('Update transfer error', err);
@@ -947,10 +1236,48 @@ const BatteryPricingManagement: React.FC = () => {
                                 setLoading(false);
                               }
                             }}
-                            className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs font-semibold transition-all"
+                            className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs font-semibold transition-all flex items-center gap-1"
                           >
+                            <CheckCircle className="h-3 w-3" />
                             Hoàn thành
                           </button>
+                        )}
+
+                        {transfer.transfer_status === 'in_transit' && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                setLoading(true);
+                                const res = await batteryTransferService.updateBatteryTransferStatus(
+                                  transfer.transfer_id, 
+                                  'cancelled',
+                                  'Hủy trong quá trình vận chuyển'
+                                );
+                                if (res && res.success) {
+                                  toast.success('✅ Đã hủy yêu cầu chuyển pin');
+                                  fetchTransfers(); // Reload data
+                                } else {
+                                  toast.error(res?.message || 'Không thể hủy yêu cầu');
+                                }
+                              } catch (err: any) {
+                                toast.error(err?.message || 'Có lỗi xảy ra');
+                              } finally {
+                                setLoading(false);
+                              }
+                            }}
+                            className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-semibold transition-all flex items-center gap-1"
+                          >
+                            <XCircle className="h-3 w-3" />
+                            Hủy chuyển
+                          </button>
+                        )}
+
+                        {transfer.transfer_status === 'cancelled' && (
+                          <div className="text-center">
+                            <p className="text-xs text-slate-500">
+                              ❌ Đã bị hủy
+                            </p>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -994,6 +1321,244 @@ const BatteryPricingManagement: React.FC = () => {
           </Card>
         )}
       </div>
+
+      {/* Transfer Detail Modal */}
+      {showTransferDetail && selectedTransfer && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-t-2xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white/20 rounded-lg">
+                    <ArrowRightLeft className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold">Chi tiết chuyển pin</h2>
+                    <p className="text-blue-100 text-sm">
+                      ID: {selectedTransfer.transfer_id}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowTransferDetail(false);
+                    setSelectedTransfer(null);
+                  }}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-6">
+              {/* Status Section */}
+              <div className="bg-gradient-to-r from-slate-50 to-blue-50 rounded-xl p-4 border-l-4 border-blue-500">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${getStatusColor(selectedTransfer.transfer_status)}`}>
+                      {getStatusIcon(selectedTransfer.transfer_status)}
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-slate-900">Trạng thái hiện tại</h3>
+                      <p className="text-slate-600 text-sm">{getStatusText(selectedTransfer.transfer_status)}</p>
+                    </div>
+                  </div>
+                  <span className={`px-3 py-1.5 rounded-full text-xs font-bold text-white ${getStatusColor(selectedTransfer.transfer_status)}`}>
+                    {getStatusText(selectedTransfer.transfer_status)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Battery Information */}
+              <div className="bg-white border border-slate-200 rounded-xl p-4">
+                <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                  <Battery className="h-5 w-5 text-blue-600" />
+                  Thông tin pin
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Mã pin</p>
+                    <p className="font-medium">{selectedTransfer.battery?.battery_code || selectedTransfer.battery_id}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Mẫu pin</p>
+                    <p className="font-medium">{selectedTransfer.battery?.model || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Dung lượng</p>
+                    <p className="font-medium">{(selectedTransfer.battery as any)?.capacity || 'N/A'}kWh</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Mức pin hiện tại</p>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 bg-slate-200 rounded-full h-2">
+                        <div 
+                          className="bg-gradient-to-r from-green-500 to-emerald-500 h-2 rounded-full"
+                          style={{ width: `${(selectedTransfer.battery as any)?.current_charge || 0}%` }}
+                        />
+                      </div>
+                      <span className="text-sm font-medium">{(selectedTransfer.battery as any)?.current_charge || 0}%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Route Information */}
+              <div className="bg-white border border-slate-200 rounded-xl p-4">
+                <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                  <MapPin className="h-5 w-5 text-blue-600" />
+                  Thông tin tuyến đường
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 bg-red-50 border border-red-200 rounded-lg p-3">
+                      <p className="text-xs text-red-600 mb-1">TRẠM XUẤT PHÁT</p>
+                      <p className="font-semibold text-red-900">{selectedTransfer.from_station?.name || 'N/A'}</p>
+                      <p className="text-sm text-red-700">{selectedTransfer.from_station?.address || ''}</p>
+                    </div>
+                    <div className="flex-shrink-0">
+                      <ArrowRightLeft className="h-6 w-6 text-slate-400" />
+                    </div>
+                    <div className="flex-1 bg-green-50 border border-green-200 rounded-lg p-3">
+                      <p className="text-xs text-green-600 mb-1">TRẠM ĐÍCH</p>
+                      <p className="font-semibold text-green-900">{selectedTransfer.to_station?.name || 'N/A'}</p>
+                      <p className="text-sm text-green-700">{selectedTransfer.to_station?.address || ''}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Transfer Details */}
+              <div className="bg-white border border-slate-200 rounded-xl p-4">
+                <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                  <Info className="h-5 w-5 text-blue-600" />
+                  Chi tiết yêu cầu
+                </h3>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Lý do chuyển</p>
+                    <p className="font-medium bg-slate-50 p-2 rounded-lg">{selectedTransfer.transfer_reason}</p>
+                  </div>
+                  {selectedTransfer.notes && (
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">Ghi chú</p>
+                      <p className="font-medium bg-slate-50 p-2 rounded-lg">{selectedTransfer.notes}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* User & Time Information */}
+              <div className="bg-white border border-slate-200 rounded-xl p-4">
+                <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                  <User className="h-5 w-5 text-blue-600" />
+                  Thông tin tạo yêu cầu
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Người tạo</p>
+                    <p className="font-medium">{selectedTransfer.transferred_by_user?.full_name || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Thời gian tạo</p>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-slate-400" />
+                      <p className="font-medium">
+                        {new Date(selectedTransfer.transferred_at).toLocaleString('vi-VN', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit'
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4 border-t border-slate-200">
+                <button
+                  onClick={() => {
+                    setShowTransferDetail(false);
+                    setSelectedTransfer(null);
+                  }}
+                  className="flex-1 px-6 py-3 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl font-semibold transition-all"
+                >
+                  Đóng
+                </button>
+                {selectedTransfer.transfer_status === 'pending' && (
+                  <>
+                    <button
+                      onClick={async () => {
+                        try {
+                          setLoading(true);
+                          const res = await batteryTransferService.updateBatteryTransferStatus(
+                            selectedTransfer.transfer_id, 
+                            'in_transit',
+                            'Bắt đầu vận chuyển từ modal chi tiết'
+                          );
+                          if (res && res.success) {
+                            toast.success('✅ Đã cập nhật trạng thái thành "Đang vận chuyển"');
+                            fetchTransfers();
+                            setShowTransferDetail(false);
+                            setSelectedTransfer(null);
+                          } else {
+                            toast.error(res?.message || 'Không thể cập nhật trạng thái');
+                          }
+                        } catch (err: any) {
+                          toast.error(err?.message || 'Update failed');
+                        } finally {
+                          setLoading(false);
+                        }
+                      }}
+                      className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-all flex items-center justify-center gap-2"
+                    >
+                      <Truck className="h-5 w-5" />
+                      Bắt đầu chuyển
+                    </button>
+                  </>
+                )}
+                {selectedTransfer.transfer_status === 'in_transit' && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        setLoading(true);
+                        const res = await batteryTransferService.updateBatteryTransferStatus(
+                          selectedTransfer.transfer_id, 
+                          'completed',
+                          'Hoàn thành chuyển pin từ modal chi tiết'
+                        );
+                        if (res && res.success) {
+                          toast.success('✅ Đã hoàn thành chuyển pin');
+                          fetchTransfers();
+                          setShowTransferDetail(false);
+                          setSelectedTransfer(null);
+                        } else {
+                          toast.error(res?.message || 'Không thể hoàn thành');
+                        }
+                      } catch (err: any) {
+                        toast.error(err?.message || 'Update failed');
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold transition-all flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle className="h-5 w-5" />
+                    Hoàn thành
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
