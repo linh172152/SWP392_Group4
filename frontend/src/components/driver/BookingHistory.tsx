@@ -46,6 +46,17 @@ interface PricingPreview {
   message: string;
 }
 
+interface HoldSummary {
+  battery_code?: string | null;
+  use_subscription: boolean;
+  subscription_unlimited?: boolean;
+  subscription_remaining_after?: number | null;
+  subscription_name?: string | null;
+  wallet_amount_locked?: number;
+  wallet_balance_after?: number | null;
+  hold_expires_at?: string | null;
+}
+
 interface BookingItem {
   booking_id: string;
   booking_code: string;
@@ -58,6 +69,11 @@ interface BookingItem {
     payment_status?: string;
   };
   pricing_preview?: PricingPreview;
+  hold_summary?: HoldSummary;
+  use_subscription?: boolean;
+  locked_subscription_id?: string | null;
+  locked_wallet_amount?: number;
+  hold_expires_at?: string | null;
 }
 
 const BookingHistory: React.FC = () => {
@@ -148,6 +164,12 @@ const BookingHistory: React.FC = () => {
       if (data.data.pagination) {
         setTotalPages(data.data.pagination.pages || 1);
         setTotalBookingsCount(data.data.pagination.total || 0);
+      } else {
+        // Fallback: Nếu BE không trả về pagination, tính từ số lượng bookings
+        const total = items.length;
+        const calculatedPages = Math.ceil(total / limit);
+        setTotalPages(calculatedPages > 0 ? calculatedPages : 1);
+        setTotalBookingsCount(total);
       }
     } catch (e: any) {
       setError(e.message || 'Có lỗi xảy ra');
@@ -607,14 +629,14 @@ const BookingHistory: React.FC = () => {
                 placeholder="Tìm kiếm theo trạm, xe hoặc mã đặt chỗ..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 glass border-slate-200/50 dark:border-slate-700/50"
+                className="pl-10 bg-white dark:bg-slate-800 border-slate-200/50 dark:border-slate-700/50"
               />
             </div>
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
-              <SelectTrigger className="w-full md:w-48 glass border-slate-200/50 dark:border-slate-700/50">
+              <SelectTrigger className="w-full md:w-48 bg-white dark:bg-slate-800 border-slate-200/50 dark:border-slate-700/50">
                 <SelectValue placeholder="Trạng thái" />
               </SelectTrigger>
-              <SelectContent className="glass-card border-0">
+              <SelectContent className="bg-white dark:bg-slate-800 border-0">
                 <SelectItem value="all">Tất cả</SelectItem>
                 <SelectItem value="completed">Hoàn thành</SelectItem>
                 <SelectItem value="in_progress">Đang thực hiện</SelectItem>
@@ -735,18 +757,8 @@ const BookingHistory: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex space-x-2">
-                  {(booking.status === 'confirmed' || booking.status === 'in_progress') && (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="border-blue-500 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                      onClick={() => exportConfirmationVoucher(booking)}
-                    >
-                      <FileText className="mr-2 h-4 w-4" />
-                      Xuất phiếu xác nhận
-                    </Button>
-                  )}
+                {/* Nút hành động - Sắp xếp dọc: Hủy đặt chỗ ở trên, Xuất phiếu xác nhận ở dưới */}
+                <div className="flex flex-col gap-2">
                   {(booking.status === 'pending' || booking.status === 'confirmed') && (() => {
                     const cancelCheck = canCancelBooking(booking);
                     const isDisabled = !cancelCheck.canCancel || loading;
@@ -780,6 +792,17 @@ const BookingHistory: React.FC = () => {
                       </div>
                     );
                   })()}
+                  {(booking.status === 'confirmed' || booking.status === 'in_progress') && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="border-blue-500 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                      onClick={() => exportConfirmationVoucher(booking)}
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      Xuất phiếu xác nhận
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -798,8 +821,8 @@ const BookingHistory: React.FC = () => {
         </Card>
       )}
 
-      {/* Pagination Controls */}
-      {totalPages > 1 && filteredBookings.length > 0 && (
+      {/* Pagination Controls - Hiển thị khi có nhiều hơn 1 trang */}
+      {totalPages > 1 && (
         <Card className="glass-card border-0">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -812,7 +835,7 @@ const BookingHistory: React.FC = () => {
                   size="sm"
                   onClick={handlePreviousPage}
                   disabled={currentPage === 1 || loading}
-                  className="glass border-slate-200/50 dark:border-slate-700/50"
+                  className="glass border-slate-200/50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
                   <ChevronLeft className="h-4 w-4 mr-1" />
                   Trước
@@ -822,7 +845,7 @@ const BookingHistory: React.FC = () => {
                   size="sm"
                   onClick={handleNextPage}
                   disabled={currentPage === totalPages || loading}
-                  className="glass border-slate-200/50 dark:border-slate-700/50"
+                  className="glass border-slate-200/50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
                   Sau
                   <ChevronRight className="h-4 w-4 ml-1" />

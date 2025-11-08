@@ -50,7 +50,15 @@ export interface SubscribeToPackageResponse {
 export interface CancelSubscriptionResponse {
   success: boolean;
   message: string;
-  data: UserSubscription;
+  data: {
+    subscription: UserSubscription;
+    refund?: {
+      payment_id: string;
+      amount: number;
+      payment_type: string;
+    };
+    wallet_balance?: number;
+  };
 }
 
 /**
@@ -83,13 +91,17 @@ export async function subscribeToPackage(
 /**
  * Cancel a subscription
  * @param subscriptionId The subscription ID to cancel
+ * @param reason Optional cancellation reason
  */
 export async function cancelSubscription(
-  subscriptionId: string
+  subscriptionId: string,
+  reason?: string
 ): Promise<CancelSubscriptionResponse> {
   const url = `${API_BASE_URL}/driver/subscriptions/${subscriptionId}/cancel`;
   const res = await authFetch(url, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reason }),
   });
   return res;
 }

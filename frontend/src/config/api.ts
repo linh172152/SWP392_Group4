@@ -61,7 +61,15 @@ export const API_ENDPOINTS = {
   SUPPORT: {
     CREATE: `${API_BASE_URL}/support`,
     LIST: `${API_BASE_URL}/support`,
-    REPLY: (id: string) => `${API_BASE_URL}/support/${id}/reply`,
+    BY_ID: (id: string) => `${API_BASE_URL}/support/${id}`,
+    REPLIES: (id: string) => `${API_BASE_URL}/support/${id}/replies`,
+    REPLY: (id: string) => `${API_BASE_URL}/support/${id}/replies`, // POST để thêm reply
+  },
+  RATINGS: {
+    BASE: `${API_BASE_URL}/ratings`,
+    BY_ID: (id: string) => `${API_BASE_URL}/ratings/${id}`,
+    STATION: (stationId: string) => `${API_BASE_URL}/ratings/stations/${stationId}`,
+    STATION_SUMMARY: (stationId: string) => `${API_BASE_URL}/ratings/stations/${stationId}/summary`,
   },
   // Code của bạn - Driver endpoints (giữ nguyên)
   DRIVER: {

@@ -526,10 +526,10 @@ const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, station, o
                           Chọn xe
                         </Label>
                         <Select value={selectedVehicleId} onValueChange={setSelectedVehicleId}>
-                          <SelectTrigger className="glass border-slate-200/50 dark:border-slate-700/50">
+                          <SelectTrigger className="bg-white dark:bg-slate-800 border-slate-200/50 dark:border-slate-700/50">
                             <SelectValue placeholder="Chọn xe" />
                           </SelectTrigger>
-                          <SelectContent className="glass-card border-0">
+                          <SelectContent className="bg-white dark:bg-slate-800 border-0">
                             {compatibleVehiclesForSelected.map((vehicle) => (
                               <SelectItem key={vehicle.vehicle_id} value={vehicle.vehicle_id}>
                                 {vehicle.license_plate} - {vehicle.make || vehicle.brand} {vehicle.model}

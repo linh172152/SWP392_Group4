@@ -314,27 +314,27 @@ const VehicleManagement: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="make" className="text-slate-700 dark:text-slate-300">Hãng xe</Label>
-                <Input id="make" value={form.make} onChange={(e) => setForm({ ...form, make: e.target.value })} placeholder="Tesla, BYD, VinFast..." className="glass border-slate-200/50 dark:border-slate-700/50" />
+                <Input id="make" value={form.make} onChange={(e) => setForm({ ...form, make: e.target.value })} placeholder="Tesla, BYD, VinFast..." className="bg-white dark:bg-slate-800 border-slate-200/50 dark:border-slate-700/50" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="model" className="text-slate-700 dark:text-slate-300">Mẫu xe</Label>
-                <Input id="model" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} placeholder="Model 3, Tang EV..." className="glass border-slate-200/50 dark:border-slate-700/50" />
+                <Input id="model" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} placeholder="Model 3, Tang EV..." className="bg-white dark:bg-slate-800 border-slate-200/50 dark:border-slate-700/50" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="year" className="text-slate-700 dark:text-slate-300">Năm sản xuất</Label>
-                <Input id="year" type="number" value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} placeholder="2023" className="glass border-slate-200/50 dark:border-slate-700/50" />
+                <Input id="year" type="number" value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} placeholder="2023" className="bg-white dark:bg-slate-800 border-slate-200/50 dark:border-slate-700/50" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="plate" className="text-slate-700 dark:text-slate-300">Biển số xe</Label>
-                <Input id="plate" value={form.license_plate} onChange={(e) => setForm({ ...form, license_plate: e.target.value })} placeholder="30A-12345" className="glass border-slate-200/50 dark:border-slate-700/50" />
+                <Input id="plate" value={form.license_plate} onChange={(e) => setForm({ ...form, license_plate: e.target.value })} placeholder="30A-12345" className="bg-white dark:bg-slate-800 border-slate-200/50 dark:border-slate-700/50" />
               </div>
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="bmodel" className="text-slate-700 dark:text-slate-300">Model Pin</Label>
-                <Input id="bmodel" value={form.battery_model} onChange={(e) => setForm({ ...form, battery_model: e.target.value })} placeholder="VD: Standard-75kWh" className="glass border-slate-200/50 dark:border-slate-700/50" />
+                <Input id="bmodel" value={form.battery_model} onChange={(e) => setForm({ ...form, battery_model: e.target.value })} placeholder="VD: Standard-75kWh" className="bg-white dark:bg-slate-800 border-slate-200/50 dark:border-slate-700/50" />
               </div>
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="vtype" className="text-slate-700 dark:text-slate-300">Loại xe</Label>
-                <Input id="vtype" value={form.vehicle_type} disabled className="glass border-slate-200/50 dark:border-slate-700/50" />
+                <Input id="vtype" value={form.vehicle_type} disabled className="bg-white dark:bg-slate-800 border-slate-200/50 dark:border-slate-700/50" />
               </div>
             </div>
             <div className="flex space-x-4 pt-4">

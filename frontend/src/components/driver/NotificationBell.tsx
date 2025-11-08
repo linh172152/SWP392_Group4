@@ -11,7 +11,7 @@ import { ScrollArea } from '../ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead, Notification } from '../../services/notification.service';
 import { formatDate } from '../../utils/format';
-import { toast as sonnerToast } from 'sonner';
+// Removed toast import - không hiển thị toast notifications, chỉ hiển thị số trên bell
 import { Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -33,29 +33,14 @@ const NotificationBell: React.FC = () => {
       setNotifications(response.data.notifications);
       setUnreadCount(response.data.unread_count);
       
-      // Check for new notifications and show toast
+      // Track latest notification ID (không hiển thị toast - driver sẽ tự vào xem)
       if (response.data.notifications.length > 0) {
         const latestNotification = response.data.notifications[0];
-        if (lastNotificationIdRef.current && latestNotification.notification_id !== lastNotificationIdRef.current) {
-          // New notification received
-          if (latestNotification.type === 'payment_success') {
-            sonnerToast.success(latestNotification.title, {
-              description: latestNotification.message,
-              duration: 5000,
-            });
-          } else if (latestNotification.type === 'payment_failed') {
-            sonnerToast.error(latestNotification.title, {
-              description: latestNotification.message,
-              duration: 5000,
-            });
-          } else {
-            sonnerToast.info(latestNotification.title, {
-              description: latestNotification.message,
-              duration: 5000,
-            });
-          }
-        }
+        // Chỉ update lastNotificationIdRef để track, không hiển thị toast
         if (!lastNotificationIdRef.current) {
+          lastNotificationIdRef.current = latestNotification.notification_id;
+        } else if (latestNotification.notification_id !== lastNotificationIdRef.current) {
+          // Có thông báo mới - chỉ update ref, không hiển thị toast
           lastNotificationIdRef.current = latestNotification.notification_id;
         }
       }
@@ -303,7 +288,13 @@ const NotificationBell: React.FC = () => {
             )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-96 p-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xl rounded-2xl overflow-hidden" align="start" side="top">
+        <PopoverContent 
+          className="w-96 p-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xl rounded-2xl overflow-hidden" 
+          align="end" 
+          side="top"
+          sideOffset={8}
+          alignOffset={-16}
+        >
         <div className="border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20">
           <div className="flex items-center justify-between p-4">
             <h3 className="font-bold text-lg text-slate-900 dark:text-white">

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Input } from '../ui/input';
@@ -30,7 +30,14 @@ interface TicketItem {
   status: 'open' | 'in_progress' | 'resolved' | 'closed' | string;
   created_at: string;
 }
-interface ReplyItem { reply_id: string; message: string; is_staff_reply: boolean; created_at: string; user?: { full_name?: string } }
+interface ReplyItem { 
+  reply_id: string; 
+  message: string; 
+  is_staff?: boolean; // BE dùng is_staff
+  is_staff_reply?: boolean; // Fallback cho compatibility
+  created_at: string; 
+  user?: { full_name?: string; role?: string } 
+}
 
 // Categories match với BE enum TicketCategory trong schema.prisma
 const categories = [
@@ -41,13 +48,6 @@ const categories = [
   { value: 'other', label: 'Khác' }
 ];
 
-// Priorities match với BE enum TicketPriority
-const priorities = [
-  { value: 'low', label: 'Thấp' },
-  { value: 'medium', label: 'Trung bình' },
-  { value: 'high', label: 'Cao' },
-  { value: 'urgent', label: 'Khẩn cấp' }
-];
 
 const SupportTickets: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -99,7 +99,8 @@ const SupportTickets: React.FC = () => {
       const res = await fetchWithAuth(url.toString());
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message || 'Tải ticket thất bại');
-      setTickets(data.data);
+      // API trả về { data: { tickets: [...], pagination: {...} } }
+      setTickets(Array.isArray(data.data) ? data.data : (data.data?.tickets || []));
     } catch (e: any) {
       setError(e.message || 'Có lỗi xảy ra');
     } finally {
@@ -111,10 +112,20 @@ const SupportTickets: React.FC = () => {
     setSelectedTicket(t);
     setReplies([]);
     try {
-      const res = await fetchWithAuth(`${API_ENDPOINTS.SUPPORT}/${t.ticket_id}/replies`);
+      const res = await fetchWithAuth(API_ENDPOINTS.SUPPORT.REPLIES(t.ticket_id));
       const data = await res.json();
-      if (res.ok && data.success) setReplies(data.data);
-    } catch {}
+      if (res.ok && data.success) {
+        // API trả về { data: { replies: [...], pagination: {...} } }
+        const repliesData = Array.isArray(data.data) ? data.data : (data.data?.replies || []);
+        console.log('📨 Loaded replies:', repliesData.length, repliesData);
+        setReplies(repliesData);
+      } else {
+        console.error('❌ Failed to load replies:', data);
+      }
+    } catch (e) {
+      console.error('❌ Error loading replies:', e);
+      setError('Không thể tải tin nhắn. Vui lòng thử lại.');
+    }
   };
 
   const handleSendMessage = async () => {
@@ -122,40 +133,69 @@ const SupportTickets: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const res = await fetchWithAuth(`${API_ENDPOINTS.SUPPORT}/${selectedTicket.ticket_id}/replies`, { method: 'POST', body: JSON.stringify({ message: newMessage }) });
+      const res = await fetchWithAuth(API_ENDPOINTS.SUPPORT.REPLY(selectedTicket.ticket_id), { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: newMessage }) 
+      });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message || 'Gửi tin nhắn thất bại');
+      
+      // Nếu response có reply mới, thêm vào state ngay
+      if (data.data) {
+        const newReply: ReplyItem = {
+          reply_id: data.data.reply_id || data.data.id,
+          message: data.data.message || newMessage,
+          is_staff: data.data.is_staff || false,
+          created_at: data.data.created_at || new Date().toISOString(),
+          user: data.data.user || { full_name: undefined }
+        };
+        setReplies(prev => [...prev, newReply]);
+      }
+      
       setNewMessage('');
+      
+      // Reload lại để đảm bảo có đầy đủ replies từ BE
       await openTicket(selectedTicket);
     } catch (e: any) {
       setError(e.message || 'Có lỗi xảy ra');
+      console.error('Error sending message:', e);
     } finally {
       setLoading(false);
     }
   };
 
   const createTicket = async () => {
-    if (!newSubject || !newDescription || !newCategory) {
+    if (!newDescription || !newCategory) {
       setError('Vui lòng điền đầy đủ thông tin');
       return;
     }
     setLoading(true);
     setError('');
     try {
+      // Tự động tạo subject từ category và phần đầu của description
+      const categoryLabel = categories.find(c => c.value === newCategory)?.label || 'Hỗ trợ';
+      const subjectPreview = newDescription.length > 50 
+        ? newDescription.substring(0, 50) + '...' 
+        : newDescription;
+      const autoSubject = `${categoryLabel}: ${subjectPreview}`;
+      
       const form = {
-        subject: newSubject,
+        subject: autoSubject,
         description: newDescription,
         category: newCategory,
-        priority: newPriority || 'medium'
+        priority: 'medium' // Mặc định medium
       };
-      const res = await fetchWithAuth(API_ENDPOINTS.SUPPORT.CREATE, { method: 'POST', body: JSON.stringify(form) });
+      const res = await fetchWithAuth(API_ENDPOINTS.SUPPORT.CREATE, { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form) 
+      });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message || 'Tạo ticket thất bại');
       setIsCreateDialogOpen(false);
-      setNewSubject('');
       setNewDescription('');
       setNewCategory('');
-      setNewPriority('medium');
       await loadTickets();
     } catch (e: any) {
       setError(e.message || 'Có lỗi xảy ra');
@@ -172,42 +212,36 @@ const SupportTickets: React.FC = () => {
     return matchesSearch;
   });
 
-  const [newSubject, setNewSubject] = useState('');
   const [newCategory, setNewCategory] = useState('');
-  const [newPriority, setNewPriority] = useState('medium');
   const [newDescription, setNewDescription] = useState('');
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Support & Help</h1>
-          <p className="text-gray-600">Get help with your EVSwap experience</p>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Hỗ trợ & phản hồi</h1>
+          <p className="text-slate-600 dark:text-slate-400 mt-1">Nhận hỗ trợ khi gặp sự cố</p>
         </div>
         <div className="flex gap-3">
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="gradient-primary text-white">
                 <Plus className="mr-2 h-4 w-4" />
-                New Ticket
+                Tạo yêu cầu hỗ trợ
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>Create Support Ticket</DialogTitle>
+                <DialogTitle>Tạo yêu cầu hỗ trợ</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="subject">Subject</Label>
-                  <Input id="subject" placeholder="Brief description of your issue" value={newSubject} onChange={(e) => setNewSubject(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="category">Category</Label>
+                  <Label htmlFor="category">Loại hỗ trợ mà bạn cần là *</Label>
                   <Select value={newCategory} onValueChange={setNewCategory}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
+                    <SelectTrigger className="bg-white dark:bg-slate-800">
+                      <SelectValue placeholder="Chọn loại hỗ trợ" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-white dark:bg-slate-800">
                       {categories.map((category) => (
                         <SelectItem key={category.value} value={category.value}>{category.label}</SelectItem>
                       ))}
@@ -215,28 +249,15 @@ const SupportTickets: React.FC = () => {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="priority">Priority</Label>
-                  <Select value={newPriority} onValueChange={setNewPriority}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select priority" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {priorities.map((priority) => (
-                        <SelectItem key={priority.value} value={priority.value}>{priority.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea id="description" placeholder="Please provide detailed information about your issue..." rows={4} value={newDescription} onChange={(e) => setNewDescription(e.target.value)} />
+                  <Label htmlFor="description">Mô tả chi tiết *</Label>
+                  <Textarea id="description" placeholder="Vui lòng cung cấp thông tin chi tiết về vấn đề của bạn..." rows={4} value={newDescription} onChange={(e) => setNewDescription(e.target.value)} />
                 </div>
                 <div className="flex space-x-2 pt-4">
-                  <Button className="flex-1" onClick={() => createTicket({ subject: newSubject, description: newDescription, priority: newPriority })} disabled={loading || !newSubject || !newDescription}>
-                    Create Ticket
+                  <Button className="flex-1 gradient-primary text-white" onClick={createTicket} disabled={loading || !newDescription || !newCategory}>
+                    {loading ? 'Đang tạo...' : 'Tạo yêu cầu'}
                   </Button>
                   <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                    Cancel
+                    Hủy
                   </Button>
                 </div>
               </div>
@@ -262,15 +283,15 @@ const SupportTickets: React.FC = () => {
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filter by status" />
+              <SelectTrigger className="bg-white dark:bg-slate-800">
+                <SelectValue placeholder="Lọc theo trạng thái" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="open">Open</SelectItem>
-                <SelectItem value="in_progress">In Progress</SelectItem>
-                <SelectItem value="resolved">Resolved</SelectItem>
-                <SelectItem value="closed">Closed</SelectItem>
+              <SelectContent className="bg-white dark:bg-slate-800">
+                <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                <SelectItem value="open">Mở</SelectItem>
+                <SelectItem value="in_progress">Đang xử lý</SelectItem>
+                <SelectItem value="resolved">Đã giải quyết</SelectItem>
+                <SelectItem value="closed">Đã đóng</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -362,33 +383,45 @@ const SupportTickets: React.FC = () => {
             </DialogHeader>
 
             <div className="flex-1 overflow-y-auto py-4 space-y-4">
-              {replies.map((message) => (
-                <div key={message.reply_id} className={`flex ${message.is_staff_reply ? 'justify-start' : 'justify-end'}`}>
-                  <div className={`max-w-[70%] ${message.is_staff_reply ? 'bg-gray-100' : 'bg-blue-100'} rounded-lg p-4`}>
-                    <div className="flex items-center space-x-2 mb-2">
-                      <Avatar className="h-6 w-6">
-                        <AvatarFallback className="text-xs">
-                          {(message.user?.full_name || (message.is_staff_reply ? 'Staff' : 'You')).split(' ').map(n => n[0]).join('')}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm font-medium">{message.user?.full_name || (message.is_staff_reply ? 'Staff' : 'You')}</span>
-                      <span className="text-xs text-gray-500">{new Date(message.created_at).toLocaleString()}</span>
-                    </div>
-                    <p className="text-sm">{message.message}</p>
-                  </div>
+              {replies.length === 0 ? (
+                <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                  <MessageCircle className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>Chưa có tin nhắn nào</p>
                 </div>
-              ))}
+              ) : (
+                replies.map((message) => {
+                  const isStaff = message.is_staff || message.is_staff_reply || message.user?.role === 'STAFF';
+                  return (
+                    <div key={message.reply_id} className={`flex ${isStaff ? 'justify-start' : 'justify-end'}`}>
+                      <div className={`max-w-[70%] ${isStaff ? 'bg-gray-100 dark:bg-slate-700' : 'bg-blue-100 dark:bg-blue-900/30'} rounded-lg p-4`}>
+                        <div className="flex items-center space-x-2 mb-2">
+                          <Avatar className="h-6 w-6">
+                            <AvatarFallback className="text-xs">
+                              {(message.user?.full_name || (isStaff ? 'Staff' : 'Bạn')).split(' ').map(n => n[0]).join('')}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-sm font-medium">{message.user?.full_name || (isStaff ? 'Nhân viên hỗ trợ' : 'Bạn')}</span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            {new Date(message.created_at).toLocaleString('vi-VN')}
+                          </span>
+                        </div>
+                        <p className="text-sm text-slate-900 dark:text-slate-100">{message.message}</p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
 
             {selectedTicket.status !== 'closed' && selectedTicket.status !== 'resolved' && (
               <div className="border-t pt-4">
                 <div className="flex space-x-2">
                   <Textarea
-                    placeholder="Type your message..."
+                    placeholder="Nhập tin nhắn của bạn..."
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     rows={3}
-                    className="flex-1"
+                    className="flex-1 bg-white dark:bg-slate-800"
                   />
                   <Button onClick={handleSendMessage} disabled={!newMessage.trim() || loading}>
                     <Send className="h-4 w-4" />

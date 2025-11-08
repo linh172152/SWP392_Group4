@@ -12,6 +12,8 @@ import DriverProfile from './DriverProfile';
 import BookBatteryPage from './BookBatteryPage';
 import Wallet from './Wallet';
 import TransactionHistory from './TransactionHistory';
+import SupportTickets from './SupportTickets';
+import StationRating from './StationRating';
 
 interface DriverDashboardProps {
   user: User;
@@ -32,6 +34,8 @@ const DriverDashboard: React.FC<DriverDashboardProps> = ({ user, onLogout }) => 
         <Route path="/transactions" element={<TransactionHistory />} />
         <Route path="/wallet" element={<Wallet />} />
         <Route path="/subscriptions" element={<ServicePackages />} />
+        <Route path="/support" element={<SupportTickets />} />
+        <Route path="/ratings" element={<StationRating />} />
         <Route path="/profile" element={<DriverProfile />} />
       </Routes>
     </DriverLayout>

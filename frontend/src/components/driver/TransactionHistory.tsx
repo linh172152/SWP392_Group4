@@ -91,7 +91,7 @@ const TransactionHistory: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
             Lịch sử Giao dịch
           </h1>
           <p className="text-slate-600 dark:text-slate-400 mt-1">
@@ -118,10 +118,10 @@ const TransactionHistory: React.FC = () => {
                 Trạng thái:
               </span>
               <Select value={statusFilter} onValueChange={handleFilterChange}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-[180px] bg-white dark:bg-slate-800">
                   <SelectValue placeholder="Tất cả" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white dark:bg-slate-800">
                   <SelectItem value="all">Tất cả</SelectItem>
                   <SelectItem value="completed">Hoàn thành</SelectItem>
                   <SelectItem value="pending">Đang xử lý</SelectItem>

@@ -112,7 +112,7 @@ const Wallet: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
             Ví của tôi
           </h1>
           <p className="text-slate-600 dark:text-slate-400 mt-1">
@@ -144,7 +144,7 @@ const Wallet: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              <div className="text-4xl font-bold text-slate-900 dark:text-white">
                 {formatCurrency(balance)}
               </div>
               <Button
