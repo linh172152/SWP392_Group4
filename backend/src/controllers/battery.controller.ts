@@ -3,6 +3,15 @@ import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
 import { prisma } from "../server";
 
+const batteryStatusLabels: Record<string, string> = {
+  full: "Sẵn sàng",
+  reserved: "Đã giữ chỗ",
+  charging: "Đang sạc",
+  in_use: "Đang gắn trên xe",
+  maintenance: "Đang bảo trì",
+  damaged: "Đã hỏng",
+};
+
 /**
  * Get station batteries
  */
@@ -36,10 +45,15 @@ export const getStationBatteries = asyncHandler(
       orderBy: { created_at: "desc" },
     });
 
+    const batteriesWithLabels = batteries.map((battery) => ({
+      ...battery,
+      status_label: batteryStatusLabels[battery.status] ?? battery.status,
+    }));
+
     res.status(200).json({
       success: true,
       message: "Station batteries retrieved successfully",
-      data: batteries,
+      data: batteriesWithLabels,
     });
   }
 );
@@ -146,6 +160,7 @@ export const addBattery = asyncHandler(async (req: Request, res: Response) => {
     message: warningMessage || "Battery added successfully",
     data: {
       ...battery,
+      status_label: batteryStatusLabels[battery.status] ?? battery.status,
       capacity_info: {
         current_count: currentBatteryCount + 1,
         capacity: Number(station.capacity),
@@ -216,10 +231,15 @@ export const getBatteryDetails = asyncHandler(
       throw new CustomError("Battery not found", 404);
     }
 
+  const batteryWithLabel = {
+    ...battery,
+    status_label: batteryStatusLabels[battery.status] ?? battery.status,
+  };
+
     res.status(200).json({
       success: true,
       message: "Battery details retrieved successfully",
-      data: battery,
+    data: batteryWithLabel,
     });
   }
 );
@@ -314,10 +334,15 @@ export const updateBatteryStatus = asyncHandler(
       },
     });
 
+  const updatedBatteryWithLabel = {
+    ...updatedBattery,
+    status_label: batteryStatusLabels[updatedBattery.status] ?? updatedBattery.status,
+  };
+
     res.status(200).json({
       success: true,
       message: "Battery status updated successfully",
-      data: updatedBattery,
+    data: updatedBatteryWithLabel,
     });
   }
 );

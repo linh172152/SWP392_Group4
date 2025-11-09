@@ -1,4 +1,4 @@
-import { PrismaClient, User } from "@prisma/client";
+import { Prisma, PrismaClient, User } from "@prisma/client";
 import {
   hashPassword,
   comparePassword,
@@ -12,6 +12,56 @@ import {
 import { CustomError } from "../middlewares/error.middleware";
 
 const prisma = new PrismaClient();
+
+type VehicleWithBattery = Prisma.VehicleGetPayload<{
+  include: {
+    current_battery: {
+      select: {
+        battery_id: true;
+        battery_code: true;
+        status: true;
+        current_charge: true;
+        updated_at: true;
+      };
+    };
+  };
+}>;
+
+type UserProfilePayload = Prisma.UserGetPayload<{
+  include: {
+    station: true;
+    vehicles: {
+      include: {
+        current_battery: {
+          select: {
+            battery_id: true;
+            battery_code: true;
+            status: true;
+            current_charge: true;
+            updated_at: true;
+          };
+        };
+      };
+    };
+  };
+}>;
+
+export type UserProfileResponse = Omit<UserProfilePayload, "password_hash"> & {
+  vehicles: VehicleWithBattery[];
+  swap_overview?: {
+    total_swaps: number;
+    subscription_swaps: number;
+    wallet_swaps: number;
+  };
+  active_subscription?: {
+    subscription_id: string;
+    package_name: string | null;
+    remaining_swaps: number | null;
+    swap_limit: number | null;
+    unlimited: boolean;
+    ends_at: Date;
+  };
+};
 
 export interface RegisterData {
   email: string;
@@ -196,13 +246,25 @@ export const refreshAccessToken = async (
  */
 export const getUserProfile = async (
   userId: string
-): Promise<Omit<User, "password_hash">> => {
+): Promise<UserProfileResponse> => {
   try {
     const user = await prisma.user.findUnique({
       where: { user_id: userId },
       include: {
         station: true,
-        vehicles: true,
+        vehicles: {
+          include: {
+            current_battery: {
+              select: {
+                battery_id: true,
+                battery_code: true,
+                status: true,
+                current_charge: true,
+                updated_at: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -210,9 +272,72 @@ export const getUserProfile = async (
       throw new CustomError("User not found", 404);
     }
 
+    let swapOverview: UserProfileResponse["swap_overview"] | undefined;
+    let activeSubscriptionInfo:
+      | UserProfileResponse["active_subscription"]
+      | undefined;
+
+    if (user.role === "DRIVER") {
+      const now = new Date();
+      const [totalSwaps, subscriptionSwaps, activeSubscription] =
+        await Promise.all([
+          prisma.transaction.count({
+            where: {
+              user_id: userId,
+            },
+          }),
+          prisma.transaction.count({
+            where: {
+              user_id: userId,
+              booking: {
+                use_subscription: true,
+              },
+            },
+          }),
+          prisma.userSubscription.findFirst({
+            where: {
+              user_id: userId,
+              status: "active",
+              start_date: { lte: now },
+              end_date: { gte: now },
+            },
+            include: { package: true },
+            orderBy: { created_at: "desc" },
+          }),
+        ]);
+
+      const walletSwaps = Math.max(totalSwaps - subscriptionSwaps, 0);
+      swapOverview = {
+        total_swaps: totalSwaps,
+        subscription_swaps: subscriptionSwaps,
+        wallet_swaps: walletSwaps,
+      };
+
+      if (activeSubscription) {
+        const unlimited = activeSubscription.remaining_swaps === null;
+        activeSubscriptionInfo = {
+          subscription_id: activeSubscription.subscription_id,
+          package_name: activeSubscription.package?.name ?? null,
+          remaining_swaps: activeSubscription.remaining_swaps,
+          swap_limit: activeSubscription.package?.swap_limit ?? null,
+          unlimited,
+          ends_at: activeSubscription.end_date,
+        };
+      }
+    }
+
     const { password_hash, ...userWithoutPassword } = user;
     void password_hash;
-    return userWithoutPassword;
+
+    const profile: UserProfileResponse = {
+      ...userWithoutPassword,
+      ...(swapOverview ? { swap_overview: swapOverview } : {}),
+      ...(activeSubscriptionInfo
+        ? { active_subscription: activeSubscriptionInfo }
+        : {}),
+    };
+
+    return profile;
   } catch (error) {
     if (error instanceof CustomError) {
       throw error;

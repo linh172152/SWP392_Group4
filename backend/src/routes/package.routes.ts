@@ -84,10 +84,3 @@ const router = Router();
 router.get("/", getPublicPackages);
 
 export default router;
-
-
-
-
-
-
-

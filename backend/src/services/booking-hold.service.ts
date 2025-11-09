@@ -32,7 +32,7 @@ type ReleaseParams = {
 
 type ReleaseResult = {
   bookingUpdate: BookingUpdatePatch;
-  walletForfeitedAmount: number;
+  walletRefundAmount: number;
   batteryReleasedId: string | null;
 };
 
@@ -68,7 +68,7 @@ export function buildBookingUncheckedUpdate(
 }
 
 const BATTERY_STATUS_DEFAULT = BatteryStatus.full;
-const PAYMENT_STATUS_FORFEITED = "forfeited" as unknown as PaymentStatus;
+const PAYMENT_STATUS_REFUNDED = "refunded" as unknown as PaymentStatus;
 const PAYMENT_STATUS_COMPLETED = "completed" as unknown as PaymentStatus;
 
 export async function releaseBookingHold({
@@ -77,7 +77,7 @@ export async function releaseBookingHold({
   actorUserId,
   notes,
 }: ReleaseParams): Promise<ReleaseResult> {
-  let walletForfeitedAmount = 0;
+  let walletRefundAmount = 0;
   let batteryReleasedId: string | null = null;
 
   if (booking.locked_battery_id) {
@@ -111,25 +111,58 @@ export async function releaseBookingHold({
   if (booking.locked_wallet_payment_id) {
     const payment = await tx.payment.findUnique({
       where: { payment_id: booking.locked_wallet_payment_id },
-      select: { metadata: true },
     });
 
-    walletForfeitedAmount = booking.locked_wallet_amount
-      ? Number(booking.locked_wallet_amount)
-      : 0;
+    const amountDecimal =
+      booking.locked_wallet_amount ?? new Prisma.Decimal(0);
+    walletRefundAmount = Number(amountDecimal);
+
+    const wallet = await tx.wallet.upsert({
+      where: { user_id: booking.user_id },
+      update: {
+        balance: {
+          increment: amountDecimal,
+        },
+      },
+      create: {
+        user_id: booking.user_id,
+        balance: amountDecimal,
+      },
+    });
 
     await tx.payment.update({
       where: { payment_id: booking.locked_wallet_payment_id },
       data: {
-        payment_status: PAYMENT_STATUS_FORFEITED,
+        payment_status: PAYMENT_STATUS_REFUNDED,
+        paid_at: payment?.paid_at ?? new Date(),
         metadata: {
           ...((payment?.metadata as Record<string, unknown>) ?? {}),
-          forfeited_at: new Date().toISOString(),
-          forfeited_reason: notes ?? "booking_cancelled",
-          forfeited_amount: walletForfeitedAmount,
+          refunded_at: new Date().toISOString(),
+          refunded_reason: notes ?? "booking_cancelled",
+          refunded_amount: walletRefundAmount,
+          wallet_balance_after: Number(wallet.balance),
         },
       },
     });
+  }
+
+  if (
+    booking.locked_subscription_id &&
+    booking.locked_swap_count > 0
+  ) {
+    const subscription = await tx.userSubscription.findUnique({
+      where: { subscription_id: booking.locked_subscription_id },
+      select: { remaining_swaps: true },
+    });
+
+    if (subscription && subscription.remaining_swaps !== null) {
+      await tx.userSubscription.update({
+        where: { subscription_id: booking.locked_subscription_id },
+        data: {
+          remaining_swaps: subscription.remaining_swaps + booking.locked_swap_count,
+        },
+      });
+    }
   }
 
   const bookingUpdate: BookingUpdatePatch = {
@@ -144,7 +177,7 @@ export async function releaseBookingHold({
 
   return {
     bookingUpdate,
-    walletForfeitedAmount,
+    walletRefundAmount,
     batteryReleasedId,
   };
 }

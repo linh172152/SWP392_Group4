@@ -126,12 +126,7 @@ async function main() {
         latitude: 10.7769,
         longitude: 106.7009,
         capacity: 50,
-        supported_models: [
-          "Tesla Model 3",
-          "VinFast VF8",
-          "BYD Atto 3",
-          "BMW iX3",
-        ],
+        supported_models: ["Tesla Model 3", "VinFast VF8"],
         operating_hours: "24/7",
         status: "active",
       },
@@ -143,7 +138,7 @@ async function main() {
         latitude: 10.7374,
         longitude: 106.7223,
         capacity: 40,
-        supported_models: ["VinFast VF8", "BYD Atto 3", "Hyundai IONIQ 5"],
+        supported_models: ["VinFast VF8", "Tesla Model 3"],
         operating_hours: "6:00 - 22:00",
         status: "active",
       },
@@ -155,13 +150,7 @@ async function main() {
         latitude: 10.8603,
         longitude: 106.7599,
         capacity: 60,
-        supported_models: [
-          "Tesla Model 3",
-          "VinFast VF8",
-          "BYD Atto 3",
-          "BMW iX3",
-          "Mercedes EQS",
-        ],
+        supported_models: ["Tesla Model 3", "VinFast VF8"],
         operating_hours: "24/7",
         status: "active",
       },
@@ -173,7 +162,7 @@ async function main() {
         latitude: 10.8106,
         longitude: 106.7091,
         capacity: 35,
-        supported_models: ["VinFast VF8", "BYD Atto 3"],
+        supported_models: ["VinFast VF8", "Tesla Model 3"],
         operating_hours: "7:00 - 21:00",
         status: "maintenance",
       },
@@ -444,74 +433,72 @@ async function main() {
   // ===========================================
   // CREATE VEHICLES
   // ===========================================
-  const vehicles = await Promise.all([
-    prisma.vehicle.create({
-      data: {
-        user_id: drivers[0].user_id,
-        license_plate: "51A-12345",
-        vehicle_type: "car",
-        make: "VinFast",
-        model: "VF8",
-        year: 2023,
-        battery_model: "VinFast VF8 Battery",
-      },
-    }),
-    prisma.vehicle.create({
-      data: {
-        user_id: drivers[1].user_id,
-        license_plate: "51B-67890",
-        vehicle_type: "car",
-        make: "Tesla",
-        model: "Model 3",
-        year: 2022,
-        battery_model: "Tesla Model 3 Battery",
-      },
-    }),
-    prisma.vehicle.create({
-      data: {
-        user_id: drivers[2].user_id,
-        license_plate: "51C-11111",
-        vehicle_type: "car",
-        make: "BYD",
-        model: "Atto 3",
-        year: 2023,
-        battery_model: "BYD Atto 3 Battery",
-      },
-    }),
-    prisma.vehicle.create({
-      data: {
-        user_id: drivers[3].user_id,
-        license_plate: "51D-22222",
-        vehicle_type: "car",
-        make: "BMW",
-        model: "iX3",
-        year: 2022,
-        battery_model: "BMW iX3 Battery",
-      },
-    }),
-    prisma.vehicle.create({
-      data: {
-        user_id: drivers[4].user_id,
-        license_plate: "51E-33333",
-        vehicle_type: "car",
-        make: "Hyundai",
-        model: "IONIQ 5",
-        year: 2023,
-        battery_model: "Hyundai IONIQ 5 Battery",
-      },
-    }),
-    prisma.vehicle.create({
-      data: {
-        user_id: drivers[5].user_id,
-        license_plate: "51F-44444",
-        vehicle_type: "motorbike",
-        make: "VinFast",
-        model: "Theon",
-        year: 2023,
-        battery_model: "VinFast Theon Battery",
-      },
-    }),
-  ]);
+  const vehicleDefinitions = [
+    {
+      user: drivers[0],
+      license_plate: "51A-12345",
+      make: "VinFast",
+      model: "VF8",
+      battery_model: "VinFast VF8 Battery",
+      year: 2023,
+    },
+    {
+      user: drivers[1],
+      license_plate: "51B-67890",
+      make: "Tesla",
+      model: "Model 3",
+      battery_model: "Tesla Model 3 Battery",
+      year: 2022,
+    },
+    {
+      user: drivers[2],
+      license_plate: "51C-11111",
+      make: "VinFast",
+      model: "VF8 Plus",
+      battery_model: "VinFast VF8 Battery",
+      year: 2023,
+    },
+    {
+      user: drivers[3],
+      license_plate: "51D-22222",
+      make: "Tesla",
+      model: "Model 3 Performance",
+      battery_model: "Tesla Model 3 Battery",
+      year: 2023,
+    },
+    {
+      user: drivers[4],
+      license_plate: "51E-33333",
+      make: "VinFast",
+      model: "VF8 Eco",
+      battery_model: "VinFast VF8 Battery",
+      year: 2024,
+    },
+    {
+      user: drivers[5],
+      license_plate: "51F-44444",
+      make: "Tesla",
+      model: "Model 3 Long Range",
+      battery_model: "Tesla Model 3 Battery",
+      year: 2024,
+    },
+  ];
+
+  const vehicles = await Promise.all(
+    vehicleDefinitions.map((definition) =>
+      prisma.vehicle.create({
+        data: {
+          user_id: definition.user.user_id,
+          license_plate: definition.license_plate,
+          vehicle_type: "car",
+          make: definition.make,
+          model: definition.model,
+          year: definition.year,
+          battery_model: definition.battery_model,
+        },
+      })
+    )
+  );
   console.log("✅ Created vehicles:", vehicles.length);
 
   // ===========================================
@@ -522,6 +509,12 @@ async function main() {
   // Station 1 - District 1 (50 capacity)
   for (let i = 1; i <= 15; i++) {
     const status = i <= 8 ? "full" : i <= 12 ? "charging" : "maintenance";
+    const currentCharge =
+      status === "full"
+        ? 100
+        : status === "charging"
+          ? Math.floor(Math.random() * 25) + 60 // 60-84%
+          : Math.floor(Math.random() * 30) + 40; // 40-69%
     const health_percentage =
       status === "full"
         ? Math.random() * 5 + 95
@@ -530,20 +523,19 @@ async function main() {
           : Math.random() * 15 + 70;
     const cycle_count = Math.floor(Math.random() * 120) + 60;
 
+    const model = i % 2 === 1 ? "VinFast VF8 Battery" : "Tesla Model 3 Battery";
+    const capacity_kwh = model === "VinFast VF8 Battery" ? 87.7 : 75;
+    const voltage = model === "VinFast VF8 Battery" ? 400 : 350;
+
     batteryPromises.push(
       prisma.battery.create({
         data: {
           battery_code: `BAT-D1-${i.toString().padStart(3, "0")}`,
           station_id: stations[0].station_id,
-          model:
-            i <= 5
-              ? "VinFast VF8 Battery"
-              : i <= 10
-                ? "Tesla Model 3 Battery"
-                : "BYD Atto 3 Battery",
-          capacity_kwh: i <= 5 ? 87.7 : i <= 10 ? 75 : 60.48,
-          voltage: i <= 5 ? 400 : i <= 10 ? 350 : 400,
-          current_charge: Math.floor(Math.random() * 40) + 60, // 60-100%
+          model,
+          capacity_kwh,
+          voltage,
+          current_charge: currentCharge,
           status,
           last_charged_at: new Date(
             Date.now() - Math.random() * 24 * 60 * 60 * 1000
@@ -558,6 +550,12 @@ async function main() {
   // Station 2 - District 7 (40 capacity)
   for (let i = 1; i <= 12; i++) {
     const status = i <= 6 ? "full" : i <= 10 ? "charging" : "in_use";
+    const currentCharge =
+      status === "full"
+        ? 100
+        : status === "charging"
+          ? Math.floor(Math.random() * 25) + 55 // 55-79%
+          : Math.floor(Math.random() * 25) + 20; // 20-44%
     const health_percentage =
       status === "full"
         ? Math.random() * 5 + 95
@@ -566,20 +564,19 @@ async function main() {
           : Math.random() * 15 + 65;
     const cycle_count = Math.floor(Math.random() * 140) + 80;
 
+    const model = i % 2 === 1 ? "Tesla Model 3 Battery" : "VinFast VF8 Battery";
+    const capacity_kwh = model === "VinFast VF8 Battery" ? 87.7 : 75;
+    const voltage = model === "VinFast VF8 Battery" ? 400 : 350;
+
     batteryPromises.push(
       prisma.battery.create({
         data: {
           battery_code: `BAT-D7-${i.toString().padStart(3, "0")}`,
           station_id: stations[1].station_id,
-          model:
-            i <= 4
-              ? "VinFast VF8 Battery"
-              : i <= 8
-                ? "BYD Atto 3 Battery"
-                : "Hyundai IONIQ 5 Battery",
-          capacity_kwh: i <= 4 ? 87.7 : i <= 8 ? 60.48 : 72.6,
-          voltage: i <= 4 ? 400 : i <= 8 ? 400 : 400,
-          current_charge: Math.floor(Math.random() * 30) + 70, // 70-100%
+          model,
+          capacity_kwh,
+          voltage,
+          current_charge: currentCharge,
           status,
           last_charged_at: new Date(
             Date.now() - Math.random() * 12 * 60 * 60 * 1000
@@ -594,6 +591,12 @@ async function main() {
   // Station 3 - Thu Duc (60 capacity)
   for (let i = 1; i <= 18; i++) {
     const status = i <= 10 ? "full" : i <= 15 ? "charging" : "maintenance";
+    const currentCharge =
+      status === "full"
+        ? 100
+        : status === "charging"
+          ? Math.floor(Math.random() * 25) + 65 // 65-89%
+          : Math.floor(Math.random() * 30) + 35; // 35-64%
     const health_percentage =
       status === "full"
         ? Math.random() * 5 + 96
@@ -602,22 +605,19 @@ async function main() {
           : Math.random() * 20 + 60;
     const cycle_count = Math.floor(Math.random() * 160) + 90;
 
+    const model = i % 2 === 0 ? "Tesla Model 3 Battery" : "VinFast VF8 Battery";
+    const capacity_kwh = model === "VinFast VF8 Battery" ? 87.7 : 75;
+    const voltage = model === "VinFast VF8 Battery" ? 400 : 350;
+
     batteryPromises.push(
       prisma.battery.create({
         data: {
           battery_code: `BAT-TD-${i.toString().padStart(3, "0")}`,
           station_id: stations[2].station_id,
-          model:
-            i <= 6
-              ? "Tesla Model 3 Battery"
-              : i <= 12
-                ? "VinFast VF8 Battery"
-                : i <= 15
-                  ? "BYD Atto 3 Battery"
-                  : "BMW iX3 Battery",
-          capacity_kwh: i <= 6 ? 75 : i <= 12 ? 87.7 : i <= 15 ? 60.48 : 80,
-          voltage: i <= 6 ? 350 : i <= 12 ? 400 : i <= 15 ? 400 : 400,
-          current_charge: Math.floor(Math.random() * 25) + 75, // 75-100%
+          model,
+          capacity_kwh,
+          voltage,
+          current_charge: currentCharge,
           status,
           last_charged_at: new Date(
             Date.now() - Math.random() * 6 * 60 * 60 * 1000
@@ -643,6 +643,7 @@ async function main() {
       duration_days: 30,
       price: 590000,
       billing_cycle: "monthly" as const,
+      swapLimit: 12,
       benefits: [
         "Ưu tiên đặt lịch tại giờ cao điểm",
         "Miễn phí đổi pin tiêu chuẩn 75kWh",
@@ -656,6 +657,7 @@ async function main() {
       duration_days: 365,
       price: 5900000,
       billing_cycle: "yearly" as const,
+      swapLimit: 150,
       benefits: [
         "Bao gồm toàn bộ quyền lợi gói tháng",
         "Tặng kèm 2 lượt vệ sinh pin tại trạm",
@@ -669,6 +671,7 @@ async function main() {
       duration_days: 30,
       price: 830000,
       billing_cycle: "monthly" as const,
+      swapLimit: 16,
       benefits: [
         "Không giới hạn đổi pin 100kWh",
         "Ưu tiên xử lý tại quầy VIP",
@@ -682,6 +685,7 @@ async function main() {
       duration_days: 365,
       price: 8300000,
       billing_cycle: "yearly" as const,
+      swapLimit: 180,
       benefits: [
         "Bao gồm toàn bộ quyền lợi gói tháng",
         "Hỗ trợ kỹ thuật định kỳ 6 tháng/lần",
@@ -701,7 +705,7 @@ async function main() {
           price: pkg.price,
           billing_cycle: pkg.billing_cycle,
           benefits: pkg.benefits,
-          swap_limit: null,
+          swap_limit: pkg.swapLimit,
           battery_models: Prisma.JsonNull,
           metadata: {
             currency: "VND",
@@ -770,7 +774,7 @@ async function main() {
         package_id: servicePackages[0].package_id,
         start_date: new Date(),
         end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        remaining_swaps: null,
+        remaining_swaps: packageDefinitions[0].swapLimit,
         status: "active",
         auto_renew: true,
         metadata: {
@@ -785,7 +789,7 @@ async function main() {
         package_id: servicePackages[1].package_id,
         start_date: new Date(),
         end_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-        remaining_swaps: null,
+        remaining_swaps: packageDefinitions[1].swapLimit,
         status: "active",
         auto_renew: false,
         metadata: {
@@ -800,7 +804,7 @@ async function main() {
         package_id: servicePackages[2].package_id,
         start_date: new Date(),
         end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        remaining_swaps: null,
+        remaining_swaps: packageDefinitions[2].swapLimit,
         status: "active",
         auto_renew: false,
         metadata: {
@@ -998,10 +1002,11 @@ async function main() {
         user_id: drivers[2].user_id,
         vehicle_id: vehicles[2].vehicle_id,
         station_id: stations[1].station_id,
-        battery_model: "Hyundai IONIQ 5 Battery",
+        battery_model: "VinFast VF8 Battery",
         scheduled_at: new Date(nowTime.getTime() - 2 * 60 * 60 * 1000),
         status: "completed",
         notes: "Completed booking for Driver 3",
+        use_subscription: false,
       },
       include: { station: true, vehicle: true },
     }),
@@ -1015,6 +1020,7 @@ async function main() {
         scheduled_at: new Date(nowTime.getTime() - 30 * 60 * 1000),
         status: "cancelled",
         notes: "Cancelled booking for Driver 4",
+        use_subscription: false,
       },
       include: { station: true, vehicle: true },
     }),
@@ -1028,6 +1034,7 @@ async function main() {
         scheduled_at: sixHoursLater,
         status: "pending",
         notes: "Driver 5 scheduling for later",
+        use_subscription: false,
       },
       include: { station: true, vehicle: true },
     }),
@@ -1144,6 +1151,7 @@ async function main() {
         payment_status: "completed",
         payment_gateway_ref: "VNPAY20250120001",
         paid_at: new Date(Date.now() - 1.4 * 60 * 60 * 1000),
+        payment_type: "SWAP",
       },
     }),
     prisma.payment.create({
@@ -1151,10 +1159,11 @@ async function main() {
         subscription_id: userSubscriptions[0].subscription_id,
         user_id: drivers[0].user_id,
         amount: 500000,
-        payment_method: "momo",
+        payment_method: "wallet",
         payment_status: "completed",
-        payment_gateway_ref: "MOMO20250120001",
+        payment_gateway_ref: "WALLET20250120001",
         paid_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+        payment_type: "SUBSCRIPTION",
       },
     }),
     prisma.payment.create({
@@ -1162,10 +1171,11 @@ async function main() {
         subscription_id: userSubscriptions[1].subscription_id,
         user_id: drivers[1].user_id,
         amount: 800000,
-        payment_method: "credit_card",
+        payment_method: "wallet",
         payment_status: "completed",
-        payment_gateway_ref: "CC20250120001",
+        payment_gateway_ref: "WALLET20250120002",
         paid_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+        payment_type: "SUBSCRIPTION",
       },
     }),
   ]);

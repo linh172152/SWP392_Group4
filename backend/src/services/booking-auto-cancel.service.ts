@@ -54,14 +54,14 @@ export async function autoCancelExpiredBookings() {
     const cancelledBookings: {
       original: (typeof expiredBookings)[number];
       updated: Awaited<ReturnType<typeof prisma.booking.update>>;
-      walletForfeitedAmount: number;
+      walletRefundAmount: number;
     }[] = [];
 
     for (const booking of expiredBookings) {
       const autoCancelNote =
         "Auto-cancelled: User did not arrive within 10 minutes of scheduled time.";
 
-      const { updatedBooking, walletForfeitedAmount } =
+      const { updatedBooking, walletRefundAmount } =
         await prisma.$transaction(async (tx) => {
           const release = await releaseBookingHold({
             tx,
@@ -85,20 +85,20 @@ export async function autoCancelExpiredBookings() {
 
           return {
             updatedBooking: updated,
-            walletForfeitedAmount: release.walletForfeitedAmount,
+            walletRefundAmount: release.walletRefundAmount,
           };
         });
 
       cancelledBookings.push({
         original: booking,
         updated: updatedBooking,
-        walletForfeitedAmount,
+        walletRefundAmount,
       });
 
       try {
         const walletMessage =
-          walletForfeitedAmount > 0
-            ? ` Khoản đã thanh toán ${walletForfeitedAmount.toLocaleString("vi-VN")}đ sẽ không được hoàn theo chính sách.`
+          walletRefundAmount > 0
+            ? ` Khoản giữ ${walletRefundAmount.toLocaleString("vi-VN")}đ đã được hoàn lại vào ví.`
             : "";
 
         await notificationService.sendNotification({
@@ -114,7 +114,7 @@ export async function autoCancelExpiredBookings() {
             stationAddress: booking.station.address,
             scheduledTime: booking.scheduled_at.toISOString(),
             cancelledAt: new Date().toISOString(),
-            wallet_forfeited_amount: walletForfeitedAmount,
+            wallet_refund_amount: walletRefundAmount,
           },
         });
       } catch (error) {
@@ -307,14 +307,14 @@ export async function autoCancelInstantBookings() {
     const cancelledBookings: {
       original: (typeof expiredInstantBookings)[number];
       updated: Awaited<ReturnType<typeof prisma.booking.update>>;
-      walletForfeitedAmount: number;
+      walletRefundAmount: number;
     }[] = [];
 
     for (const booking of expiredInstantBookings) {
       const autoCancelNote =
         "Auto-cancelled: Instant booking expired - User did not arrive within 15 minutes.";
 
-      const { updatedBooking, walletForfeitedAmount } =
+      const { updatedBooking, walletRefundAmount } =
         await prisma.$transaction(async (tx) => {
           const release = await releaseBookingHold({
             tx,
@@ -338,20 +338,20 @@ export async function autoCancelInstantBookings() {
 
           return {
             updatedBooking: updated,
-            walletForfeitedAmount: release.walletForfeitedAmount,
+            walletRefundAmount: release.walletRefundAmount,
           };
         });
 
       cancelledBookings.push({
         original: booking,
         updated: updatedBooking,
-        walletForfeitedAmount,
+        walletRefundAmount,
       });
 
       try {
         const walletMessage =
-          walletForfeitedAmount > 0
-            ? ` Khoản đã thanh toán ${walletForfeitedAmount.toLocaleString("vi-VN")}đ sẽ không được hoàn theo chính sách.`
+          walletRefundAmount > 0
+            ? ` Khoản giữ ${walletRefundAmount.toLocaleString("vi-VN")}đ đã được hoàn lại vào ví.`
             : "";
 
         await notificationService.sendNotification({
@@ -367,7 +367,7 @@ export async function autoCancelInstantBookings() {
             stationAddress: booking.station.address,
             scheduledTime: booking.scheduled_at.toISOString(),
             cancelledAt: new Date().toISOString(),
-            wallet_forfeited_amount: walletForfeitedAmount,
+            wallet_refund_amount: walletRefundAmount,
           },
         });
       } catch (error) {
