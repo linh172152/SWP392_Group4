@@ -62,6 +62,7 @@ export interface ConfirmBookingData {
 
 export interface CompleteBookingData {
   old_battery_code: string;
+  new_battery_code: string;
   battery_model: string;
   old_battery_status?: "good" | "damaged" | "maintenance";
   notes?: string;

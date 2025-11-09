@@ -84,6 +84,7 @@ const SwapTransactions: React.FC = () => {
   // Form states
   const [phoneInput, setPhoneInput] = useState('');
   const [oldBatteryCode, setOldBatteryCode] = useState('');
+  const [newBatteryCode, setNewBatteryCode] = useState('');
   const [batteryModel, setBatteryModel] = useState('');
   const [oldBatteryStatus, setOldBatteryStatus] = useState<'good' | 'damaged' | 'maintenance'>('good');
   const [cancelReason, setCancelReason] = useState('');
@@ -297,6 +298,7 @@ const SwapTransactions: React.FC = () => {
   const handleOpenCompleteDialog = (booking: StaffBooking) => {
     setSelectedBooking(booking);
     setOldBatteryCode('');
+    setNewBatteryCode('');
     setBatteryModel(booking.battery_model || '');
     setOldBatteryStatus('good');
     setCompleteError(null); // Reset error
@@ -305,10 +307,10 @@ const SwapTransactions: React.FC = () => {
 
   // Complete booking - Swap battery
   const handleCompleteBooking = async () => {
-    if (!selectedBooking || !oldBatteryCode.trim() || !batteryModel.trim()) {
+    if (!selectedBooking || !oldBatteryCode.trim() || !newBatteryCode.trim() || !batteryModel.trim()) {
       toast({
         title: 'Lỗi',
-        description: 'Vui lòng điền đầy đủ thông tin',
+        description: 'Vui lòng điền đầy đủ thông tin (mã pin cũ, mã pin mới, và model pin)',
         variant: 'destructive',
       });
       return;
@@ -320,6 +322,7 @@ const SwapTransactions: React.FC = () => {
       
       const response = await completeBooking(selectedBooking.booking_id, {
         old_battery_code: oldBatteryCode,
+        new_battery_code: newBatteryCode,
         battery_model: batteryModel,
         old_battery_status: oldBatteryStatus,
       });
@@ -667,8 +670,8 @@ const SwapTransactions: React.FC = () => {
                       <Eye className="mr-1 h-3 w-3" />
                       Chi tiết
                     </Button>
-                    {/* Chỉ hiển thị nút hủy khi booking chưa bị hủy */}
-                    {booking.status !== 'cancelled' && (
+                    {/* Chỉ hiển thị nút hủy khi booking chưa bị hủy và chưa hoàn thành */}
+                    {booking.status !== 'cancelled' && booking.status !== 'completed' && (
                       <Button 
                         variant="outline" 
                         size="sm" 
@@ -1044,7 +1047,8 @@ const SwapTransactions: React.FC = () => {
                   <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
                   <div className="text-xs text-blue-800 dark:text-blue-200">
                     <p className="font-semibold mb-1">Lưu ý quan trọng:</p>
-                    <p>• <strong>Mã pin cũ:</strong> Mã riêng trên từng viên pin (VD: BAT-TD03, BAT-VF001)</p>
+                    <p>• <strong>Mã pin cũ:</strong> Mã riêng trên từng viên pin cũ (VD: BAT-TD03, BAT-VF001)</p>
+                    <p>• <strong>Mã pin mới:</strong> Mã riêng trên từng viên pin mới sẽ thay thế (VD: BAT-TD05, BAT-VF002)</p>
                     <p>• <strong>Model pin:</strong> Loại/dòng pin (VD: Tesla Model 3, VinFast VF8 Battery)</p>
                   </div>
                 </div>
@@ -1069,6 +1073,28 @@ const SwapTransactions: React.FC = () => {
                 />
                 <p className="text-xs text-gray-500">
                   💡 Nhập mã trên nhãn pin cũ của khách hàng (không phải tên model)
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="newBatteryCode" className="flex items-center gap-2">
+                  <Battery className="h-4 w-4 text-green-600" />
+                  Mã pin mới <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="newBatteryCode"
+                  type="text"
+                  placeholder="VD: BAT-TD05, BAT-VF002, BAT-456"
+                  value={newBatteryCode}
+                  onChange={(e) => {
+                    setNewBatteryCode(e.target.value);
+                    if (completeError) setCompleteError(null); // Clear error khi user nhập lại
+                  }}
+                  disabled={actionLoading === selectedBooking.booking_id}
+                  className="font-mono"
+                />
+                <p className="text-xs text-gray-500">
+                  💡 Nhập mã trên nhãn pin mới sẽ thay thế cho pin cũ
                 </p>
               </div>
 
@@ -1118,7 +1144,7 @@ const SwapTransactions: React.FC = () => {
             </Button>
             <Button 
               onClick={handleCompleteBooking}
-              disabled={!oldBatteryCode.trim() || !batteryModel.trim() || actionLoading === selectedBooking?.booking_id}
+              disabled={!oldBatteryCode.trim() || !newBatteryCode.trim() || !batteryModel.trim() || actionLoading === selectedBooking?.booking_id}
             >
               {actionLoading === selectedBooking?.booking_id ? (
                 <>

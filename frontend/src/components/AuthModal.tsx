@@ -10,13 +10,6 @@ import {
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import type { User } from "../App";
 import { 
@@ -48,7 +41,6 @@ const AuthModal: React.FC<AuthModalProps> = ({
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [role, setRole] = useState<"driver" | "staff" | "admin">("driver");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -157,13 +149,13 @@ const AuthModal: React.FC<AuthModalProps> = ({
           return;
         }
 
-        // Real API registration
+        // Real API registration - Mặc định tất cả user đăng ký là DRIVER
         const requestData = {
           email,
           password,
           full_name: name,
           phone: phone,
-          role: role.toUpperCase(),
+          role: "DRIVER", // Luôn mặc định là DRIVER
         };
 
         const response = await fetch(API_ENDPOINTS.AUTH.REGISTER, {
@@ -444,29 +436,6 @@ const AuthModal: React.FC<AuthModalProps> = ({
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   Tối thiểu 6 ký tự
                 </p>
-              </div>
-              <div className="space-y-2">
-                <Label
-                  htmlFor="role"
-                  className="text-slate-700 dark:text-slate-300"
-                >
-                  Loại tài khoản
-                </Label>
-                <Select
-                  value={role}
-                  onValueChange={(value: "driver" | "staff" | "admin") =>
-                    setRole(value)
-                  }
-                >
-                  <SelectTrigger className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                    <SelectItem value="driver">Tài xế</SelectItem>
-                    <SelectItem value="staff">Nhân viên trạm</SelectItem>
-                    <SelectItem value="admin">Quản trị viên</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
               {error && (
                 <div className="text-sm text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-500/10 p-3 rounded-lg border border-red-200/50 dark:border-red-500/20 animate-in fade-in slide-in-from-top-2">
