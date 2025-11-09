@@ -4,6 +4,7 @@
 
 - **Purpose**: Manage EV battery swap stations, bookings, pricing, staff shifts, and support operations for drivers, staff, and admins.
 - **Architecture**: Node.js + Express (TypeScript) REST API, Prisma ORM, PostgreSQL, Socket.IO for real-time events.
+- **Vehicle Scope**: Dataset & flows tập trung vào VinFast VF8 và Tesla Model 3 (cả pin lẫn vehicle); seed mặc định chỉ tạo hai dòng xe này.
 - **Environments**: Local development (`docker-compose` or local Postgres) and Render Cloud (production). `.env` controls database and integration keys.
 - **Key Principles**: Wallet-ledger integrity with subscription-first swap settlement (wallet charges only when swaps are exhausted or not covered), no promotions or cash payments in scope, auditability of every financial event.
 
@@ -22,20 +23,21 @@
 - **Auth & Users**: Registration/login, token refresh, role-based guard (`authenticateToken`, `authorizeRole`).
 - **Driver Experience**:
   - Manage vehicles, search stations, book swaps (scheduled/instant), track wallet balance & history (`/api/driver/...`).
-  - Booking engine immediately **reserves a concrete battery** (`batteries.status = reserved`) and locks the funding source: subscription swap or wallet hold.
-  - Cancellation policy: nếu driver hủy/no-show, pin được trả lại nhưng lượt/tiền đã trừ **không tự hoàn**, chỉ admin mới hoàn lại ví thủ công.
+- Booking engine immediately **reserves a concrete battery** (`batteries.status = reserved`) and locks the funding source: subscription swap hoặc wallet hold.
+- Cancellation policy: nếu driver hủy/no-show, hệ thống tự động hoàn lại khoản giữ ví và trả swap về gói (nếu có); log giữ lại để admin theo dõi.
   - Pricing preview trả về thông tin `hold_summary` (pin, subscription, ví) để frontend thể hiện rõ.
-  - Subscriptions vẫn là ưu tiên số 1: swap trừ `remaining_swaps` (hoặc unlimited). Ví chỉ bị trừ khi không có gói bao phủ.
+  - Subscriptions vẫn là ưu tiên số 1: swap trừ `remaining_swaps` (hoặc unlimited) ngay lúc giữ và lưu `locked_subscription_id`; ví chỉ bị trừ khi không có gói bao phủ.
 - **Staff Console**:
   - Handle on-site bookings: xác minh qua SĐT, hoàn tất swap **tiêu thụ hold** (đổi pin mới sang `in_use`, pin cũ về `charging`/`maintenance`), không nhập PIN.
   - Giao dịch hoàn tất chỉ đánh dấu payment `reserved → completed`; không trừ ví/gói lần nữa.
+  - Staff cancel booking → gọi chung `releaseBookingHold`, hoàn ví/swaps giống driver cancel để giữ ledger nhất quán.
   - Manage personal schedules (`/api/staff/schedules`) và cập nhật ca trực.
   - Inventory oversight cho pin trạm, bao gồm SoH và điều phối transfer.
--- **Admin Console**:
+    -- **Admin Console**:
   - CRUD for stations, staff, users, station batteries, `BatteryPricing`, `TopUpPackage`, and service packages.
   - Staff scheduling management (`/api/admin/staff-schedules`) with overlap detection and station assignment.
   - Demand forecasting, dashboard reports, battery transfer approvals, support ticket workflow.
-- **Wallet & Transactions**: Ledger của các khoản nạp/rút, swap settlement (ví chỉ bị trừ khi gói không cover), VNPay top-up, **wallet hold** khi đặt booking và forfeited nếu hủy muộn. Không xử lý tiền mặt/promotion.
+- **Wallet & Transactions**: Ledger của các khoản nạp/rút, swap settlement (ví chỉ bị trừ khi gói không cover), VNPay top-up, **wallet hold** khi đặt booking (auto hoàn về ví khi hủy). Không xử lý tiền mặt/promotion.
 - **Support & Notifications**: Ticket submission, assignment, replies, status transitions; real-time notification dispatch.
 - **Battery Lifecycle**: SoH metrics (`health_percentage`, `cycle_count`), capacity warnings, transfer logs, demand forecasting feed.
 
@@ -55,7 +57,7 @@
 - `POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/logout`.
 - Driver: `/api/driver/vehicles`, `/api/driver/stations`, `/api/driver/bookings`, `/api/driver/wallet`, `/api/driver/transactions`, `/api/driver/subscriptions`, `/api/driver/notifications`.
 - Staff: `/api/staff/bookings`, `/api/staff/batteries`, `/api/staff/schedules`.
--- Admin:
+  -- Admin:
   - `/api/admin/users`, `/stations`, `/staff`, `/batteries`.
   - `/api/admin/pricing` (`BatteryPricing`), `/topup-packages`, `/staff-schedules`.
   - `/api/admin/dashboard` (reports & metrics including SoH aggregates).
@@ -72,7 +74,7 @@
 - **Wallet Funding**: VNPay transaction → callback updates `Wallet` balance, logs `Payment` record, notifies driver.
 - **Booking Lifecycle**:
   1. Driver đặt (scheduled/instant) → hệ thống chọn pin khả dụng, chuyển `status = reserved`, lock subscription/ ví.
-  2. Cancel/manual hoặc cron auto-cancel (quá hạn) → gọi `releaseBookingHold` để trả pin và chuyển payment hold sang `forfeited`.
+  2. Cancel/manual hoặc cron auto-cancel (quá hạn) → gọi `releaseBookingHold` để trả pin, hoàn tiền giữ ví và khôi phục swap chưa sử dụng.
   3. Staff complete → xác định pin cũ, chuyển pin mới `in_use`, `vehicle.current_battery_id` cập nhật, payment `reserved → completed`, ghi `battery_history`.
 - **Auto-cancel**: Cron 5 phút kiểm tra booking pending/instant quá thời gian, auto release pin và giữ tiền như chính sách.
 - **Battery Transfer**: Admin triggers transfer → validations (station capacity, battery status) → log inserted with `transfer_status` → station inventory updated → SoH recalculated in reports.
@@ -121,4 +123,3 @@
   - `prisma migrate deploy` – apply SQL migrations (production safe).
 - **Post-Migration Manual SQL** (Render): Append missing enum values, add SoH columns, and populate data using provided SQL scripts.
 - **Support Contacts**: Update `.env` email addresses and notification hooks when deploying to production.
-

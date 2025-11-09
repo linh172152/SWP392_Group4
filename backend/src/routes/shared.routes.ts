@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router } from "express";
 
 const router = Router();
 
@@ -24,11 +24,11 @@ const router = Router();
  *                 message:
  *                   type: string
  */
-router.get('/health', (_req, res) => {
-  res.json({ 
-    status: 'OK', 
+router.get("/health", (_req, res) => {
+  res.json({
+    status: "OK",
     timestamp: new Date().toISOString(),
-    message: 'EV Battery Swap API is running'
+    message: "EV Battery Swap API is running",
   });
 });
 
@@ -56,17 +56,17 @@ router.get('/health', (_req, res) => {
  *                   items:
  *                     type: string
  */
-router.get('/', (_req, res) => {
+router.get("/", (_req, res) => {
   res.json({
     success: true,
-    message: 'Shared API modules',
+    message: "Shared API modules",
     endpoints: [
-      '/api/shared/health',
-      '/api/support',
-      '/api/ratings',
-      '/api/maps',
-      '/api/stations/public'
-    ]
+      "/api/shared/health",
+      "/api/support",
+      "/api/ratings",
+      "/api/maps",
+      "/api/stations/public",
+    ],
   });
 });
 

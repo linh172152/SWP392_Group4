@@ -42,13 +42,7 @@ router.get("/", (_req, res) => {
   res.json({
     success: true,
     message: "Staff API modules",
-    modules: [
-      "bookings",
-      "batteries",
-      "schedules",
-      "support",
-      "notifications",
-    ],
+    modules: ["bookings", "batteries", "schedules", "support", "notifications"],
   });
 });
 

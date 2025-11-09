@@ -6,6 +6,7 @@ import { CustomError } from "../middlewares/error.middleware";
 import { notificationService } from "../server";
 import {
   consumeBookingHold,
+  releaseBookingHold,
   type BookingHoldFields,
   buildBookingUncheckedUpdate,
 } from "../services/booking-hold.service";
@@ -95,6 +96,24 @@ const doesSubscriptionCoverModel = async (
   }
 
   return true;
+};
+
+const parseChargePercentage = (value: unknown, fieldLabel: string): number => {
+  if (value === undefined || value === null) {
+    throw new CustomError(`${fieldLabel} is required`, 400);
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    throw new CustomError(`${fieldLabel} must be a number`, 400);
+  }
+
+  const normalized = Math.round(parsed);
+  if (normalized < 0 || normalized > 100) {
+    throw new CustomError(`${fieldLabel} must be between 0 and 100`, 400);
+  }
+
+  return normalized;
 };
 
 /**
@@ -604,8 +623,11 @@ export const completeBooking = asyncHandler(
     const { id } = req.params;
     const {
       old_battery_code,
+      new_battery_code,
       battery_model: batteryModelInput,
       old_battery_status = "good",
+      old_battery_charge,
+      new_battery_charge,
       notes,
     } = req.body;
 
@@ -620,6 +642,35 @@ export const completeBooking = asyncHandler(
         400
       );
     }
+
+    if (
+      typeof old_battery_code !== "string" ||
+      old_battery_code.trim().length === 0
+    ) {
+      throw new CustomError(
+        "Old battery code is required for verification",
+        400
+      );
+    }
+
+    if (
+      typeof new_battery_code !== "string" ||
+      new_battery_code.trim().length === 0
+    ) {
+      throw new CustomError(
+        "New battery code is required for verification",
+        400
+      );
+    }
+
+    const oldBatteryChargeValue = parseChargePercentage(
+      old_battery_charge,
+      "Old battery charge"
+    );
+    const newBatteryChargeValue = parseChargePercentage(
+      new_battery_charge,
+      "New battery charge"
+    );
 
     const booking = await prisma.booking.findUnique({
       where: { booking_id: id },
@@ -743,44 +794,27 @@ export const completeBooking = asyncHandler(
       );
     }
 
-    let oldBattery = null;
+    const trimmedNewBatteryCode = new_battery_code.trim();
     if (
-      typeof old_battery_code === "string" &&
-      old_battery_code.trim().length > 0
+      reservedBattery.battery_code.toLowerCase().trim() !==
+      trimmedNewBatteryCode.toLowerCase()
     ) {
-      oldBattery = await prisma.battery.findUnique({
-        where: { battery_code: old_battery_code.trim() },
-      });
+      throw new CustomError(
+        `Mã pin mới "${new_battery_code}" không khớp với pin đã giữ (${reservedBattery.battery_code}). Vui lòng kiểm tra lại.`,
+        400
+      );
+    }
 
-      if (!oldBattery) {
-        throw new CustomError(
-          `Battery with code "${old_battery_code}" not found`,
-          404
-        );
-      }
-    } else {
-      const lastTransaction = await prisma.transaction.findFirst({
-        where: { user_id: booking.user_id },
-        orderBy: { swap_at: "desc" },
-        include: {
-          new_battery: true,
-        },
-      });
+    const trimmedOldBatteryCode = old_battery_code.trim();
+    const oldBattery = await prisma.battery.findUnique({
+      where: { battery_code: trimmedOldBatteryCode },
+    });
 
-      if (lastTransaction?.new_battery) {
-        oldBattery = lastTransaction.new_battery;
-      } else if (lastTransaction?.new_battery_id) {
-        oldBattery = await prisma.battery.findUnique({
-          where: { battery_id: lastTransaction.new_battery_id },
-        });
-      }
-
-      if (!oldBattery) {
-        throw new CustomError(
-          "Unable to determine the current battery in use. Please provide old_battery_code.",
-          400
-        );
-      }
+    if (!oldBattery) {
+      throw new CustomError(
+        `Battery with code "${old_battery_code}" not found`,
+        404
+      );
     }
 
     if (oldBattery.status !== "in_use") {
@@ -845,7 +879,7 @@ export const completeBooking = asyncHandler(
     const subscriptionRemainingAfter =
       subscriptionRecord?.remaining_swaps ?? null;
 
-    let transactionAmountDecimal = holdInfo.use_subscription
+    const transactionAmountDecimal = holdInfo.use_subscription
       ? new Prisma.Decimal(0)
       : (holdInfo.locked_wallet_amount ?? new Prisma.Decimal(0));
 
@@ -893,11 +927,14 @@ export const completeBooking = asyncHandler(
             ? "maintenance"
             : "charging";
 
+      const nowTimestamp = new Date();
+
       await tx.battery.update({
         where: { battery_id: oldBattery.battery_id },
         data: {
           status: oldBatteryStatusUpdate,
           station_id: booking.station_id,
+          current_charge: oldBatteryChargeValue,
           last_charged_at:
             oldBatteryStatusUpdate === "charging"
               ? null
@@ -905,10 +942,29 @@ export const completeBooking = asyncHandler(
         },
       });
 
+      if (old_battery_status === "maintenance") {
+        await tx.batteryTransferLog.create({
+          data: {
+            battery_id: oldBattery.battery_id,
+            from_station_id: booking.station_id,
+            to_station_id: booking.station_id,
+            transfer_reason: "manufacturer_service",
+            transferred_by: staffId,
+            transfer_status: "in_transit",
+            notes: `Pin ${oldBattery.battery_code} gửi về hãng bảo trì sau booking ${booking.booking_code}.`,
+          },
+        });
+      }
+
       await tx.battery.update({
         where: { battery_id: reservedBattery.battery_id },
         data: {
           status: "in_use",
+          current_charge: newBatteryChargeValue,
+          last_charged_at:
+            newBatteryChargeValue === 100
+              ? nowTimestamp
+              : reservedBattery.last_charged_at,
         },
       });
 
@@ -929,8 +985,8 @@ export const completeBooking = asyncHandler(
           action: oldBatteryHistoryAction,
           notes:
             old_battery_status === "good"
-              ? "Staff xác nhận pin cũ trả về trạng thái tốt."
-              : `Staff đánh dấu pin cũ ở trạng thái ${old_battery_status}.`,
+              ? `Staff xác nhận pin cũ trả về trạng thái tốt ở mức sạc ${oldBatteryChargeValue}%.`
+              : `Staff đánh dấu pin cũ ở trạng thái ${old_battery_status} với mức sạc ${oldBatteryChargeValue}%.`,
         },
       });
 
@@ -941,9 +997,9 @@ export const completeBooking = asyncHandler(
           station_id: booking.station_id,
           actor_user_id: staffId,
           action: "issued",
-          notes: `Giao pin model ${reservedBattery.model} cho xe ${
+          notes: `Giao pin model ${reservedBattery.model} (mã ${reservedBattery.battery_code}) cho xe ${
             vehicle.license_plate ?? ""
-          }.`,
+          } với mức sạc ${newBatteryChargeValue}%.`,
         },
       });
 
@@ -980,6 +1036,9 @@ export const completeBooking = asyncHandler(
         walletBalanceAfter: walletAfterRow
           ? Number(walletAfterRow.balance)
           : null,
+        newBatteryCharge: newBatteryChargeValue,
+        oldBatteryCharge: oldBatteryChargeValue,
+        newBatteryCode: reservedBattery.battery_code,
       };
     });
 
@@ -1003,6 +1062,8 @@ export const completeBooking = asyncHandler(
             booking_id: booking.booking_id,
             payment_method: "subscription",
             amount: 0,
+            battery_code: result.newBatteryCode,
+            battery_charge: result.newBatteryCharge,
           },
         });
       } else if (result.transactionAmount > 0) {
@@ -1023,6 +1084,8 @@ export const completeBooking = asyncHandler(
             transaction_id: result.transaction.transaction_id,
             amount: result.transactionAmount,
             payment_method: "wallet",
+            battery_code: result.newBatteryCode,
+            battery_charge: result.newBatteryCharge,
           },
         });
       }
@@ -1077,6 +1140,12 @@ export const completeBooking = asyncHandler(
                 unlimited: subscriptionUnlimited,
               }
             : null,
+        battery_handover: {
+          new_battery_code: result.newBatteryCode,
+          new_battery_charge: result.newBatteryCharge,
+          old_battery_code: trimmedOldBatteryCode,
+          old_battery_charge: result.oldBatteryCharge,
+        },
         response_message: responseMessage,
       },
     });
@@ -1111,31 +1180,6 @@ export const cancelBooking = asyncHandler(
         booking_id: id,
         station_id: staff.station_id,
       },
-    });
-
-    if (!booking) {
-      throw new CustomError(
-        "Booking not found or does not belong to your station",
-        404
-      );
-    }
-
-    if (booking.status === "completed") {
-      throw new CustomError("Cannot cancel completed booking", 400);
-    }
-
-    if (booking.status === "cancelled") {
-      throw new CustomError("Booking is already cancelled", 400);
-    }
-
-    const updatedBooking = await prisma.booking.update({
-      where: { booking_id: id },
-      data: {
-        status: "cancelled",
-        notes: reason
-          ? `${booking.notes || ""}\nCancelled by staff: ${reason}`.trim()
-          : booking.notes,
-      },
       include: {
         user: {
           select: {
@@ -1162,10 +1206,90 @@ export const cancelBooking = asyncHandler(
       },
     });
 
+    if (!booking) {
+      throw new CustomError(
+        "Booking not found or does not belong to your station",
+        404
+      );
+    }
+
+    if (booking.status === "completed") {
+      throw new CustomError("Cannot cancel completed booking", 400);
+    }
+
+    if (booking.status === "cancelled") {
+      throw new CustomError("Booking is already cancelled", 400);
+    }
+
+    const holdInfo = booking as unknown as BookingHoldFields;
+    const reasonNote =
+      typeof reason === "string" && reason.trim().length > 0
+        ? reason.trim()
+        : undefined;
+    const releaseNote = reasonNote
+      ? `Staff cancelled booking: ${reasonNote}`
+      : "Staff cancelled booking";
+
+    const result = await prisma.$transaction(async (tx) => {
+      const release = await releaseBookingHold({
+        tx,
+        booking: holdInfo,
+        actorUserId: staffId,
+        notes: releaseNote,
+      });
+
+      const bookingUpdateData: Prisma.BookingUncheckedUpdateInput = {
+        ...buildBookingUncheckedUpdate(release.bookingUpdate),
+        status: "cancelled",
+        notes: reasonNote
+          ? `${booking.notes || ""}\nCancelled by staff: ${reasonNote}`.trim()
+          : booking.notes,
+      };
+
+      const updatedBooking = await tx.booking.update({
+        where: { booking_id: id },
+        data: bookingUpdateData,
+        include: {
+          user: {
+            select: {
+              user_id: true,
+              full_name: true,
+              email: true,
+            },
+          },
+          vehicle: {
+            select: {
+              vehicle_id: true,
+              license_plate: true,
+              vehicle_type: true,
+              model: true,
+            },
+          },
+          station: {
+            select: {
+              station_id: true,
+              name: true,
+              address: true,
+            },
+          },
+        },
+      });
+
+      return { updatedBooking, release };
+    });
+
+    const responseMessage = reasonNote
+      ? `Booking cancelled by staff. Reason: ${reasonNote}`
+      : "Booking cancelled by staff.";
+
     res.status(200).json({
       success: true,
-      message: "Booking cancelled successfully",
-      data: updatedBooking,
+      message: responseMessage,
+      data: {
+        booking: result.updatedBooking,
+        wallet_refund_amount: result.release.walletRefundAmount,
+        battery_released_id: result.release.batteryReleasedId,
+      },
     });
   }
 );

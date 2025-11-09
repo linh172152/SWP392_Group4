@@ -1337,7 +1337,7 @@ export const cancelBooking = asyncHandler(
       return {
         updatedBooking,
         cancellationFee,
-        walletForfeitedAmount: release.walletForfeitedAmount,
+        walletRefundAmount: release.walletRefundAmount,
         batteryReleasedId: release.batteryReleasedId,
       };
     });
@@ -1348,8 +1348,8 @@ export const cancelBooking = asyncHandler(
       const notificationMessage =
         cancellationFee > 0
           ? `Đã hủy đặt chỗ. Phí hủy muộn: ${cancellationFee.toLocaleString("vi-VN")}đ`
-          : result.walletForfeitedAmount > 0
-            ? `Đã hủy đặt chỗ. Khoản đã thanh toán ${result.walletForfeitedAmount.toLocaleString("vi-VN")}đ sẽ không được hoàn.`
+          : result.walletRefundAmount > 0
+            ? `Đã hủy đặt chỗ. Đã hoàn ${result.walletRefundAmount.toLocaleString("vi-VN")}đ về ví.`
             : "Đã hủy đặt chỗ thành công";
       await notificationService.sendNotification({
         type: "booking_cancelled",
@@ -1360,7 +1360,7 @@ export const cancelBooking = asyncHandler(
           booking_id: booking.booking_id,
           booking_code: booking.booking_code,
           cancellation_fee: cancellationFee,
-          wallet_forfeited_amount: result.walletForfeitedAmount,
+          wallet_refund_amount: result.walletRefundAmount,
         },
       });
     } catch (error) {
@@ -1370,8 +1370,8 @@ export const cancelBooking = asyncHandler(
     const responseMessage =
       cancellationFee > 0
         ? `Đã hủy đặt chỗ. Phí hủy muộn: ${cancellationFee.toLocaleString("vi-VN")}đ`
-        : result.walletForfeitedAmount > 0
-          ? `Đã hủy đặt chỗ. Khoản đã thanh toán ${result.walletForfeitedAmount.toLocaleString("vi-VN")}đ sẽ không được hoàn.`
+        : result.walletRefundAmount > 0
+          ? `Đã hủy đặt chỗ. Đã hoàn ${result.walletRefundAmount.toLocaleString("vi-VN")}đ về ví.`
           : baseCancelMessage;
 
     res.status(200).json({
@@ -1380,9 +1380,9 @@ export const cancelBooking = asyncHandler(
       data: {
         booking: result.updatedBooking,
         cancellation_fee: result.cancellationFee,
-        wallet_forfeited_amount: result.walletForfeitedAmount,
+        wallet_refund_amount: result.walletRefundAmount,
         wallet_balance:
-          cancellationFee > 0 || result.walletForfeitedAmount > 0
+          cancellationFee > 0 || result.walletRefundAmount > 0
             ? await prisma.wallet
                 .findUnique({
                   where: { user_id: userId },
