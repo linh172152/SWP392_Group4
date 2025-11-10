@@ -16,7 +16,8 @@ import {
   X,
   Zap,
   Wallet,
-  MessageSquare
+  MessageSquare,
+  Package
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -30,6 +31,7 @@ const navigation = [
   { name: 'Bảng điều khiển', href: '/admin/home', icon: Home },
   { name: 'Quản lý trạm', href: '/admin/stations', icon: Building },
   { name: 'Quản lý giá pin', href: '/admin/battery-pricing', icon: Shuffle },
+  { name: 'Quản lý gói dịch vụ', href: '/admin/service-packages', icon: Package },
   { name: 'Quản lý gói nạp tiền', href: '/admin/topup-packages', icon: Wallet },
   { name: 'Quản lý người dùng', href: '/admin/users', icon: Users },
   { name: 'Quản lý nhân viên', href: '/admin/employees', icon: Users },
