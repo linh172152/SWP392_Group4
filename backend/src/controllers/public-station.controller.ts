@@ -208,16 +208,19 @@ export const findNearbyPublicStations = asyncHandler(
     const lng = parseFloat(longitude as string);
     const searchRadius = parseFloat(radius as string);
 
-    // Simple bounding box search (for production, use PostGIS or similar)
+    // Improved bounding box search with buffer (1.5x radius for safety)
+    // Then filter by actual Haversine distance to ensure accuracy
+    // Buffer accounts for the fact that bounding box is square, not circular
+    const buffer = (searchRadius * 1.5) / 111; // Add 50% buffer to bounding box
     const whereClause: any = {
       status: "active",
       latitude: {
-        gte: lat - searchRadius / 111, // Rough conversion: 1 degree ≈ 111 km
-        lte: lat + searchRadius / 111,
+        gte: lat - buffer,
+        lte: lat + buffer,
       },
       longitude: {
-        gte: lng - searchRadius / 111,
-        lte: lng + searchRadius / 111,
+        gte: lng - buffer,
+        lte: lng + buffer,
       },
     };
 
@@ -283,14 +286,17 @@ export const findNearbyPublicStations = asyncHandler(
       })
     );
 
-    // Sort by distance
-    stationsWithDistance.sort((a, b) => a.distance_km - b.distance_km);
+    // Filter by actual distance (within radius) and sort by distance
+    // This ensures we only return stations actually within the requested radius
+    const filteredStations = stationsWithDistance
+      .filter((station) => station.distance_km <= searchRadius)
+      .sort((a, b) => a.distance_km - b.distance_km);
 
     res.status(200).json({
       success: true,
       message: "Nearby stations retrieved successfully",
       data: {
-        stations: stationsWithDistance,
+        stations: filteredStations,
         search_params: {
           latitude: lat,
           longitude: lng,

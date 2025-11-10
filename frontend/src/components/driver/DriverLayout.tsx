@@ -37,7 +37,7 @@ const navigation = [
   { name: 'Giao dịch', href: '/driver/transactions', icon: Receipt },
   { name: 'Ví của tôi', href: '/driver/wallet', icon: Wallet },
   { name: 'Gói dịch vụ', href: '/driver/subscriptions', icon: Package },
-  { name: 'Hỗ trợ & phản hồi', href: '/driver/support', icon: HelpCircle },
+  { name: 'Hỗ trợ', href: '/driver/support', icon: HelpCircle },
   { name: 'Đánh giá dịch vụ', href: '/driver/ratings', icon: Star },
   { name: 'Hồ sơ', href: '/driver/profile', icon: Settings },
 ];
