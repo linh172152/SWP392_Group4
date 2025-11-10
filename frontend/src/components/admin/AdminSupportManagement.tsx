@@ -820,7 +820,7 @@ const AdminSupportManagement: React.FC = () => {
                   </label>
                   <select
                     value={assignFormData.staff_id}
-                    onChange={(e) => setAssignFormData({ staff_id: e.target.value })}
+                    onChange={(e) => setAssignFormData(prev => ({ ...prev, staff_id: e.target.value }))}
                     className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none"
                     required
                   >
