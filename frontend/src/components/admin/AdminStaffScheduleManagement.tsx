@@ -670,18 +670,14 @@ const AdminStaffScheduleManagement: React.FC = () => {
             onClick={() => setViewMode('list')}
             size="sm"
           >
-            List View
+            Xem danh sách
           </Button>
           <Button 
             variant={viewMode === 'calendar' ? 'default' : 'outline'}
             onClick={() => setViewMode('calendar')}
             size="sm"
           >
-            Calendar View
-          </Button>
-          <Button onClick={resetFilters} variant="outline" className="gap-2">
-            <Filter className="h-4 w-4" />
-            Reset Filters
+            Xem lịch
           </Button>
           <Button onClick={() => setShowCreateModal(true)} className="gap-2">
             <Plus className="h-4 w-4" />
@@ -799,14 +795,20 @@ const AdminStaffScheduleManagement: React.FC = () => {
               className="text-sm"
             />
           </div>
-          <Button 
-            variant="outline" 
-            onClick={fetchSchedules}
-            className="gap-2"
-          >
-            <Filter className="h-4 w-4" />
-            Áp dụng bộ lọc
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={fetchSchedules}
+              className="gap-2"
+            >
+              <Filter className="h-4 w-4" />
+              Áp dụng bộ lọc
+            </Button>
+            <Button onClick={resetFilters} variant="outline" className="gap-2">
+              <Filter className="h-4 w-4" />
+              Đặt lại bộ lọc
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

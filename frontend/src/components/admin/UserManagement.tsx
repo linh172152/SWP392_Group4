@@ -328,7 +328,7 @@ const UserManagement: React.FC = () => {
                           <SelectTrigger className="w-[120px]">
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
                             <SelectItem value="ACTIVE">Active</SelectItem>
                             <SelectItem value="INACTIVE">Inactive</SelectItem>
                           </SelectContent>
