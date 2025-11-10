@@ -9,9 +9,37 @@ import { calculateStationStats } from "../utils/station.util";
  */
 export const getPublicStations = asyncHandler(
   async (req: Request, res: Response) => {
-    const { status = "active", page = 1, limit = 10 } = req.query;
+    const { status, page = 1, limit = 10, search } = req.query;
 
-    const whereClause: any = { status };
+    const allowedStatuses = ["active", "maintenance", "closed"];
+    const normalizedStatus = status
+      ? String(status).toLowerCase().trim()
+      : "active";
+
+    if (
+      normalizedStatus !== "all" &&
+      !allowedStatuses.includes(normalizedStatus)
+    ) {
+      throw new CustomError(
+        `Invalid status value. Allowed values: ${allowedStatuses.join(", ")} or "all"`,
+        400
+      );
+    }
+
+    const whereClause: any = {};
+
+    if (normalizedStatus !== "all") {
+      whereClause.status = normalizedStatus;
+    }
+
+    const searchTerm = typeof search === "string" ? search.trim() : undefined;
+
+    if (searchTerm) {
+      whereClause.OR = [
+        { name: { contains: searchTerm, mode: "insensitive" } },
+        { address: { contains: searchTerm, mode: "insensitive" } },
+      ];
+    }
 
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
 
