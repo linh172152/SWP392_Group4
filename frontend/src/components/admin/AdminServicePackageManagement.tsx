@@ -192,9 +192,9 @@ const AdminServicePackageManagement: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Service Package Management</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Quản lý gói dịch vụ</h1>
           <p className="text-muted-foreground">
-            Manage and configure service packages for the platform
+            Quản lý và cấu hình các gói dịch vụ cho nền tảng
           </p>
         </div>
         <Button onClick={() => setShowCreateModal(true)} className="gap-2">

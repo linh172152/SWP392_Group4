@@ -17,7 +17,8 @@ import {
   Zap,
   Wallet,
   MessageSquare,
-  Package
+  Package,
+  Calendar
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -35,6 +36,7 @@ const navigation = [
   { name: 'Quản lý gói nạp tiền', href: '/admin/topup-packages', icon: Wallet },
   { name: 'Quản lý người dùng', href: '/admin/users', icon: Users },
   { name: 'Quản lý nhân viên', href: '/admin/employees', icon: Users },
+  { name: 'Lịch làm việc', href: '/admin/schedules', icon: Calendar },
   { name: 'Quản lý hỗ trợ', href: '/admin/support', icon: MessageSquare },
   { name: 'Báo cáo & Phân tích', href: '/admin/reports', icon: BarChart3 },
   { name: 'Gợi ý AI', href: '/admin/ai-suggestions', icon: Brain },
