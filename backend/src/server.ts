@@ -251,56 +251,63 @@ server.listen(PORT, () => {
   console.log(`🔗 Health check: http://localhost:${PORT}/health`);
   console.log(`🔌 WebSocket enabled for real-time notifications`);
 
-  // Start cron jobs for booking management
-  // Run every 5 minutes to check and auto-cancel expired bookings
-  cron.schedule("*/5 * * * *", async () => {
-    try {
-      console.log("🔄 Running auto-cancel expired bookings check...");
-      const result = await autoCancelExpiredBookings();
-      if (result.cancelled > 0) {
-        console.log(`✅ Auto-cancelled ${result.cancelled} expired booking(s)`);
+  // ✅ Start cron jobs ONLY if DATABASE_URL is available
+  if (process.env.DATABASE_URL) {
+    console.log(`✅ DATABASE_URL found, starting cron jobs...`);
+    
+    // Run every 5 minutes to check and auto-cancel expired bookings
+    cron.schedule("*/5 * * * *", async () => {
+      try {
+        console.log("🔄 Running auto-cancel expired bookings check...");
+        const result = await autoCancelExpiredBookings();
+        if (result.cancelled > 0) {
+          console.log(`✅ Auto-cancelled ${result.cancelled} expired booking(s)`);
+        }
+      } catch (error) {
+        console.error("❌ Error in auto-cancel cron job:", error);
       }
-    } catch (error) {
-      console.error("❌ Error in auto-cancel cron job:", error);
-    }
-  });
+    });
 
-  // Run every 5 minutes to auto-cancel expired instant bookings
-  cron.schedule("*/5 * * * *", async () => {
-    try {
-      console.log("🔄 Running auto-cancel instant bookings check...");
-      const result = await autoCancelInstantBookings();
-      if (result.cancelled > 0) {
-        console.log(
-          `✅ Auto-cancelled ${result.cancelled} expired instant booking(s)`
+    // Run every 5 minutes to auto-cancel expired instant bookings
+    cron.schedule("*/5 * * * *", async () => {
+      try {
+        console.log("🔄 Running auto-cancel instant bookings check...");
+        const result = await autoCancelInstantBookings();
+        if (result.cancelled > 0) {
+          console.log(
+            `✅ Auto-cancelled ${result.cancelled} expired instant booking(s)`
+          );
+        }
+      } catch (error) {
+        console.error(
+          "❌ Error in auto-cancel instant bookings cron job:",
+          error
         );
       }
-    } catch (error) {
-      console.error(
-        "❌ Error in auto-cancel instant bookings cron job:",
-        error
-      );
-    }
-  });
+    });
 
-  // Run every 5 minutes to send booking reminders
-  cron.schedule("*/5 * * * *", async () => {
-    try {
-      console.log("🔄 Running booking reminders check...");
-      const result = await sendBookingReminders();
-      if (result.remindersSent > 0 || result.finalRemindersSent > 0) {
-        console.log(
-          `✅ Sent ${result.remindersSent} reminders and ${result.finalRemindersSent} final reminders`
-        );
+    // Run every 5 minutes to send booking reminders
+    cron.schedule("*/5 * * * *", async () => {
+      try {
+        console.log("🔄 Running booking reminders check...");
+        const result = await sendBookingReminders();
+        if (result.remindersSent > 0 || result.finalRemindersSent > 0) {
+          console.log(
+            `✅ Sent ${result.remindersSent} reminders and ${result.finalRemindersSent} final reminders`
+          );
+        }
+      } catch (error) {
+        console.error("❌ Error in booking reminders cron job:", error);
       }
-    } catch (error) {
-      console.error("❌ Error in booking reminders cron job:", error);
-    }
-  });
+    });
 
-  console.log(
-    `⏰ Cron jobs started: auto-cancel (every 5 min), auto-cancel-instant (every 5 min), reminders (every 5 min)`
-  );
+    console.log(
+      `⏰ Cron jobs started: auto-cancel (every 5 min), auto-cancel-instant (every 5 min), reminders (every 5 min)`
+    );
+  } else {
+    console.warn(`⚠️ DATABASE_URL not found. Cron jobs will NOT be started.`);
+    console.warn(`⚠️ Please ensure DATABASE_URL is set in your .env file.`);
+  }
 });
 
 export default app;
