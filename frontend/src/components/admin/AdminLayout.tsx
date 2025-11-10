@@ -12,11 +12,11 @@ import {
   BarChart3, 
   Brain,
   LogOut,
-  Settings,
   Menu,
   X,
   Zap,
-  Wallet
+  Wallet,
+  MessageSquare
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -33,6 +33,7 @@ const navigation = [
   { name: 'Quản lý gói nạp tiền', href: '/admin/topup-packages', icon: Wallet },
   { name: 'Quản lý người dùng', href: '/admin/users', icon: Users },
   { name: 'Quản lý nhân viên', href: '/admin/employees', icon: Users },
+  { name: 'Quản lý hỗ trợ', href: '/admin/support', icon: MessageSquare },
   { name: 'Báo cáo & Phân tích', href: '/admin/reports', icon: BarChart3 },
   { name: 'Gợi ý AI', href: '/admin/ai-suggestions', icon: Brain },
 ];

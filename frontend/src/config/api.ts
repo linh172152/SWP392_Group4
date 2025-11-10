@@ -27,6 +27,7 @@ export const API_ENDPOINTS = {
     REPORTS: `${API_BASE_URL}/admin/dashboard`,
     DASHBOARD: `${API_BASE_URL}/admin/dashboard`,
     BATTERIES: `${API_BASE_URL}/admin/batteries`,
+    SUPPORT: `${API_BASE_URL}/admin/support`,
   },
   STATION: {
     LIST: `${API_BASE_URL}/stations`,
