@@ -1,4 +1,4 @@
-import api from '../config/api';
+import { API_ENDPOINTS, fetchWithAuth } from '../config/api';
 
 export interface ServicePackage {
   package_id: string;
@@ -34,55 +34,95 @@ export interface UpdateServicePackageDto {
 }
 
 class ServicePackageService {
-  private readonly BASE_URL = '/admin/service-packages';
+  private readonly BASE_URL = `${API_ENDPOINTS.ADMIN.STATIONS.replace('/admin/stations', '/admin/service-packages')}`;
 
   async getServicePackages(params?: { limit?: number; offset?: number; is_active?: boolean }) {
     try {
-      const response = await api.get(this.BASE_URL, { params });
-      return response.data;
+      let url = this.BASE_URL;
+      if (params) {
+        const searchParams = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined) {
+            searchParams.append(key, value.toString());
+          }
+        });
+        if (searchParams.toString()) {
+          url += `?${searchParams.toString()}`;
+        }
+      }
+      const response = await fetchWithAuth(url);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw errorData;
+      }
+      return await response.json();
     } catch (error: any) {
       console.error('Get service packages error:', error);
-      throw error.response?.data || error;
+      throw error;
     }
   }
 
   async getServicePackageById(packageId: string) {
     try {
-      const response = await api.get(`${this.BASE_URL}/${packageId}`);
-      return response.data;
+      const response = await fetchWithAuth(`${this.BASE_URL}/${packageId}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw errorData;
+      }
+      return await response.json();
     } catch (error: any) {
       console.error('Get service package error:', error);
-      throw error.response?.data || error;
+      throw error;
     }
   }
 
   async createServicePackage(data: CreateServicePackageDto) {
     try {
-      const response = await api.post(this.BASE_URL, data);
-      return response.data;
+      const response = await fetchWithAuth(this.BASE_URL, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw errorData;
+      }
+      return await response.json();
     } catch (error: any) {
       console.error('Create service package error:', error);
-      throw error.response?.data || error;
+      throw error;
     }
   }
 
   async updateServicePackage(packageId: string, data: UpdateServicePackageDto) {
     try {
-      const response = await api.put(`${this.BASE_URL}/${packageId}`, data);
-      return response.data;
+      const response = await fetchWithAuth(`${this.BASE_URL}/${packageId}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw errorData;
+      }
+      return await response.json();
     } catch (error: any) {
       console.error('Update service package error:', error);
-      throw error.response?.data || error;
+      throw error;
     }
   }
 
   async deleteServicePackage(packageId: string) {
     try {
-      const response = await api.delete(`${this.BASE_URL}/${packageId}`);
-      return response.data;
+      const response = await fetchWithAuth(`${this.BASE_URL}/${packageId}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw errorData;
+      }
+      return await response.json();
     } catch (error: any) {
       console.error('Delete service package error:', error);
-      throw error.response?.data || error;
+      throw error;
     }
   }
 }
