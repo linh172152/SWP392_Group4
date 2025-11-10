@@ -37,7 +37,76 @@ export async function getPublicPackages(capacity?: number): Promise<GetPackagesR
   return res;
 }
 
+/**
+ * Get all service packages (Admin only)
+ */
+export async function adminGetPackages(): Promise<GetPackagesResponse> {
+  const res = await authFetch(`${API_BASE_URL}/admin/packages`);
+  return res;
+}
+
+export interface CreatePackageRequest {
+  name: string;
+  description?: string;
+  battery_capacity_kwh: number;
+  duration_days: number;
+  price: number;
+  billing_cycle: "monthly" | "yearly" | "custom";
+  benefits?: string[];
+  is_active?: boolean;
+  metadata?: any;
+}
+
+export interface UpdatePackageRequest {
+  name?: string;
+  description?: string;
+  battery_capacity_kwh?: number;
+  duration_days?: number;
+  price?: number;
+  billing_cycle?: "monthly" | "yearly" | "custom";
+  benefits?: string[];
+  is_active?: boolean;
+  metadata?: any;
+}
+
+export interface CreatePackageResponse {
+  success: boolean;
+  message: string;
+  data: ServicePackage;
+}
+
+export interface UpdatePackageResponse {
+  success: boolean;
+  message: string;
+  data: ServicePackage;
+}
+
+/**
+ * Create a new service package (Admin only)
+ */
+export async function adminCreatePackage(packageData: CreatePackageRequest): Promise<CreatePackageResponse> {
+  const res = await authFetch(`${API_BASE_URL}/admin/packages`, {
+    method: 'POST',
+    body: JSON.stringify(packageData),
+  });
+  return res;
+}
+
+/**
+ * Update an existing service package (Admin only)
+ */
+export async function adminUpdatePackage(packageId: string, packageData: UpdatePackageRequest): Promise<UpdatePackageResponse> {
+  const res = await authFetch(`${API_BASE_URL}/admin/packages/${packageId}`, {
+    method: 'PUT',
+    body: JSON.stringify(packageData),
+  });
+  return res;
+}
+
 export default {
   getPublicPackages,
+  adminGetPackages,
+  adminCreatePackage,
+  adminUpdatePackage,
 };
 

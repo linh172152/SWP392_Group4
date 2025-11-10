@@ -5,6 +5,7 @@ import AdminLayout from './AdminLayout';
 import AdminHome from './AdminHome';
 import StationManagement from './StationManagement';
 import BatteryPricingManagement from './BatteryPricingManagement';
+import AdminServicePackageManagement from './AdminServicePackageManagement';
 import TopUpPackageManagement from './TopUpPackageManagement';
 import UserManagement from './UserManagement';
 import StaffManagement from './StaffManagement';
@@ -25,6 +26,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
         <Route path="/home" element={<AdminHome />} />
         <Route path="/stations" element={<StationManagement />} />
         <Route path="/battery-pricing" element={<BatteryPricingManagement />} />
+        <Route path="/service-packages" element={<AdminServicePackageManagement />} />
         <Route path="/topup-packages" element={<TopUpPackageManagement />} />
         <Route path="/users" element={<UserManagement />} />
         <Route path="/employees" element={<StaffManagement />} />
