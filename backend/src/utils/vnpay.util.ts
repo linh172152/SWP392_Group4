@@ -93,12 +93,14 @@ export const generateVNPayUrl = (paymentData: VNPayPaymentData): string => {
 
   // Build string for secure hash without URL encoding
   const signData = sortedKeys.map((key) => `${key}=${params[key]}`).join("&");
+  console.log("[VNPay] signData:", signData);
 
   // Create secure hash
   const secureHash = crypto
     .HmacSHA512(signData, vnpayConfig.hashSecret)
     .toString(crypto.enc.Hex)
     .toUpperCase();
+  console.log("[VNPay] secureHash:", secureHash);
 
   // Add secure hash info to parameters
   const finalParams: Record<string, string> = {
