@@ -132,6 +132,7 @@ app.use(
       "http://localhost:5173",
       "https://ev-battery-frontend.onrender.com",
       "https://swp392-git-main-leducthanhhs-projects.vercel.app",
+      "https://swp392.vercel.app",
     ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -256,14 +257,16 @@ server.listen(PORT, () => {
   // ✅ Start cron jobs ONLY if DATABASE_URL is available
   if (process.env.DATABASE_URL) {
     console.log(`✅ DATABASE_URL found, starting cron jobs...`);
-    
+
     // Run every 5 minutes to check and auto-cancel expired bookings
     cron.schedule("*/5 * * * *", async () => {
       try {
         console.log("🔄 Running auto-cancel expired bookings check...");
         const result = await autoCancelExpiredBookings();
         if (result.cancelled > 0) {
-          console.log(`✅ Auto-cancelled ${result.cancelled} expired booking(s)`);
+          console.log(
+            `✅ Auto-cancelled ${result.cancelled} expired booking(s)`
+          );
         }
       } catch (error) {
         console.error("❌ Error in auto-cancel cron job:", error);
