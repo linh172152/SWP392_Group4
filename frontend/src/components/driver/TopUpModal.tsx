@@ -29,9 +29,6 @@ const TopUpModal: React.FC<TopUpModalProps> = ({
   const [selectedPackage, setSelectedPackage] = useState<TopUpPackage | null>(
     null
   );
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "vnpay" | "momo">(
-    "vnpay"
-  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
 
@@ -47,17 +44,11 @@ const TopUpModal: React.FC<TopUpModalProps> = ({
     try {
       const response = await walletService.topUpWallet({
         package_id: selectedPackage.package_id,
-        payment_method: paymentMethod,
+        payment_method: "vnpay",
       });
 
       if (!response.success) {
         throw new Error(response.message || "Không thể tạo giao dịch nạp tiền");
-      }
-
-      // Cash: cập nhật ngay lập tức
-      if (paymentMethod === "cash") {
-        onSuccess();
-        return;
       }
 
       const paymentUrl = response.data?.payment_url;
@@ -176,41 +167,6 @@ const TopUpModal: React.FC<TopUpModalProps> = ({
             )}
           </div>
 
-          {/* Payment Method Selection */}
-          {selectedPackage && (
-            <div>
-              <h3 className="text-lg font-semibold mb-3 text-slate-900 dark:text-white">
-                Phương thức thanh toán
-              </h3>
-              <div className="grid grid-cols-3 gap-3">
-                {(["vnpay", "momo", "cash"] as const).map((method) => {
-                  const labels = {
-                    vnpay: "VNPay",
-                    momo: "MoMo",
-                    cash: "Tiền mặt",
-                  };
-
-                  return (
-                    <button
-                      key={method}
-                      onClick={() => setPaymentMethod(method)}
-                      className={`p-3 rounded-lg border-2 transition-all ${
-                        paymentMethod === method
-                          ? "border-blue-600 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20"
-                          : "border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500"
-                      }`}
-                    >
-                      <div className="font-medium text-slate-900 dark:text-white">
-                        {labels[method]}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Summary */}
           {selectedPackage && (
             <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
               <div className="flex items-center justify-between mb-2">
@@ -239,6 +195,10 @@ const TopUpModal: React.FC<TopUpModalProps> = ({
                 <span className="text-xl font-bold text-blue-600 dark:text-blue-400">
                   {formatCurrency(Number(selectedPackage.actual_amount))}
                 </span>
+              </div>
+              <div className="mt-4 flex items-center justify-between rounded-lg border border-blue-500/40 bg-blue-50/60 p-3 text-sm text-blue-700 dark:border-blue-400/40 dark:bg-blue-900/20 dark:text-blue-300">
+                <span>Phương thức thanh toán</span>
+                <Badge className="bg-blue-600 text-white dark:bg-blue-500">VNPay</Badge>
               </div>
             </div>
           )}

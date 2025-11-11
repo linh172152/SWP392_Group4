@@ -43,6 +43,7 @@ export interface Station {
   available_batteries?: number;
   distance_km?: number;
   battery_stats?: Record<string, number>;
+  battery_inventory?: Record<string, unknown>;
 }
 
 export interface NearbyStationsParams {

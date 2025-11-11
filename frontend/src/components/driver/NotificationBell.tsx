@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, X, CheckCheck, MapPin, FileText, Calendar, Battery } from 'lucide-react';
+import { Bell, X, CheckCheck, Calendar, Battery } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import {
@@ -9,7 +9,7 @@ import {
 } from '../ui/popover';
 import { ScrollArea } from '../ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead, Notification } from '../../services/notification.service';
+import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead, type Notification } from '../../services/notification.service';
 import { formatDate } from '../../utils/format';
 // Removed toast import - không hiển thị toast notifications, chỉ hiển thị số trên bell
 import { Loader2 } from 'lucide-react';
@@ -24,7 +24,7 @@ const NotificationBell: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState<NotificationFilter>('all');
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastNotificationIdRef = useRef<string | null>(null);
 
   const loadNotifications = async () => {

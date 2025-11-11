@@ -85,12 +85,15 @@ const StationDetail: React.FC = () => {
     try {
       // Lấy list tất cả xe của user
       const vs = await fetchWithAuth(API_ENDPOINTS.DRIVER.VEHICLES);
-      const vsData = await vs.json();
-      const vehicles = vs.ok && vsData.success && Array.isArray(vsData.data) ? vsData.data : [];
+      const vsData: any = await vs.json();
+      const vehicles: Array<{ vehicle_id: string; battery_model: string }> =
+        vs.ok && vsData.success && Array.isArray(vsData.data) ? vsData.data : [];
       // Lọc pin khả dụng ở trạm (full)
       const availableBatteries = batteries.filter(b => b.status === 'full');
       // Tìm xe có battery_model khớp với bất cứ battery model tại trạm
-      const matching = vehicles.find(v => availableBatteries.some(b => b.model === v.battery_model));
+      const matching = vehicles.find((v) =>
+        availableBatteries.some((b) => b.model === v.battery_model)
+      );
       if (!matching) {
         setError('Bạn không có xe nào tương thích pin tại trạm này.');
         return;
@@ -103,9 +106,11 @@ const StationDetail: React.FC = () => {
         battery_model: matchedBatteryModel,
         scheduled_at: scheduledAt
       };
-      const res = await fetchWithAuth(API_ENDPOINTS.DRIVER.BOOKINGS, { method: 'POST', body: JSON.stringify(body) });
-      let data = {};
-      try { data = await res.json(); } catch { data = {}; }
+      const res = await fetchWithAuth(API_ENDPOINTS.DRIVER.BOOKINGS, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      const data: any = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) throw new Error(data.message || 'Đặt pin thất bại');
       setBookingMsg('Đặt Pin thành công!');
     } catch (e: any) {
