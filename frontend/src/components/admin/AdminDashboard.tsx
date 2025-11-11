@@ -10,7 +10,6 @@ import TopUpPackageManagement from './TopUpPackageManagement';
 import UserManagement from './UserManagement';
 import StaffManagement from './StaffManagement';
 import ReportsAnalytics from './ReportsAnalytics';
-import AISuggestions from './AISuggestions';
 import AdminSupportManagement from './AdminSupportManagement';
 import AdminStaffScheduleManagement from './AdminStaffScheduleManagement';
 
@@ -34,7 +33,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
         <Route path="/schedules" element={<AdminStaffScheduleManagement />} />
         <Route path="/support" element={<AdminSupportManagement />} />
         <Route path="/reports" element={<ReportsAnalytics />} />
-        <Route path="/ai-suggestions" element={<AISuggestions />} />
       </Routes>
     </AdminLayout>
   );

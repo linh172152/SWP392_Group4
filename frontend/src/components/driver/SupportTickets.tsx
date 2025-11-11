@@ -110,6 +110,40 @@ const SupportTickets: React.FC = () => {
   const [newCategory, setNewCategory] = useState('');
   const [newDescription, setNewDescription] = useState('');
 
+  // Function để lấy màu background cho status
+  const getStatusStyle = (status: string) => {
+    const normalizedStatus = status.toLowerCase();
+    switch (normalizedStatus) {
+      case 'open':
+        return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800';
+      case 'in_progress':
+        return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800';
+      case 'resolved':
+        return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800';
+      case 'closed':
+        return 'bg-slate-100 dark:bg-slate-700/50 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-600';
+      default:
+        return 'bg-slate-100 dark:bg-slate-700/50 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-600';
+    }
+  };
+
+  // Function để lấy label tiếng Việt cho status
+  const getStatusLabel = (status: string) => {
+    const normalizedStatus = status.toLowerCase();
+    switch (normalizedStatus) {
+      case 'open':
+        return 'Mở';
+      case 'in_progress':
+        return 'Đang xử lý';
+      case 'resolved':
+        return 'Đã giải quyết';
+      case 'closed':
+        return 'Đã đóng';
+      default:
+        return status.replace('_', ' ');
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -215,12 +249,14 @@ const SupportTickets: React.FC = () => {
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                     <div>
-                      <p className="text-gray-500">Ngày tạo</p>
-                      <p className="font-medium">{new Date(ticket.created_at).toLocaleDateString('vi-VN')}</p>
+                      <p className="text-gray-500 dark:text-gray-400">Ngày tạo</p>
+                      <p className="font-medium text-slate-900 dark:text-white">{new Date(ticket.created_at).toLocaleDateString('vi-VN')}</p>
                     </div>
                     <div>
-                      <p className="text-gray-500">Trạng thái</p>
-                      <p className="font-medium capitalize">{ticket.status.replace('_', ' ')}</p>
+                      <p className="text-gray-500 dark:text-gray-400 mb-1">Trạng thái</p>
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getStatusStyle(ticket.status)}`}>
+                        {getStatusLabel(ticket.status)}
+                      </span>
                     </div>
                   </div>
                 </div>

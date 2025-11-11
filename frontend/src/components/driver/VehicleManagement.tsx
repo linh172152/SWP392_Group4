@@ -214,6 +214,15 @@ const VehicleManagement: React.FC = () => {
     loadVehicles();
   }, []);
 
+  // Auto-refresh khi user quay lại trang (focus vào window)
+  useEffect(() => {
+    const handleFocus = () => {
+      loadVehicles();
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -339,9 +348,12 @@ const VehicleManagement: React.FC = () => {
                       {vehicle.year ? (<><span>•</span><span>{vehicle.year}</span></>) : null}
                     </div>
                     <div className="text-sm">Model pin: {vehicle.battery_model}</div>
-                    {(vehicle.current_battery?.battery_code || vehicle.current_battery_code) && (
-                      <div className="text-sm">Mã Pin hiện tại: <span className="font-medium">{vehicle.current_battery?.battery_code || vehicle.current_battery_code}</span></div>
-                    )}
+                    {(() => {
+                      const batteryCode = vehicle.current_battery?.battery_code || vehicle.current_battery_code;
+                      return batteryCode ? (
+                        <div className="text-sm">Mã Pin hiện tại: <span className="font-medium">{batteryCode}</span></div>
+                      ) : null;
+                    })()}
                     <div className="text-sm">Loại xe: car</div>
                     <div className="flex space-x-2 pt-2">
                       <Button variant="outline" size="sm" className="glass border-blue-200/50 dark:border-purple-400/30 hover:bg-blue-50/50 dark:hover:bg-purple-500/10" onClick={() => startEdit(vehicle)} disabled={loading}>

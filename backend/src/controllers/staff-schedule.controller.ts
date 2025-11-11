@@ -173,7 +173,7 @@ export const updateMyScheduleStatus = asyncHandler(
 
 export const adminListStaffSchedules = asyncHandler(
   async (req: Request, res: Response) => {
-    const { staff_id, station_id, from, to, status, page = "1", limit = "20" } = req.query;
+    const { staff_id, station_id, shift_date, from, to, status, page = "1", limit = "20" } = req.query;
 
     const where: Prisma.StaffScheduleWhereInput = {};
 
@@ -185,15 +185,39 @@ export const adminListStaffSchedules = asyncHandler(
       where.station_id = station_id as string;
     }
 
-    const fromDate = parseDate(from as string | undefined);
-    const toDate = parseDate(to as string | undefined);
-    if (fromDate || toDate) {
-      where.shift_start = {};
-      if (fromDate) {
-        where.shift_start.gte = fromDate;
+    // Handle specific date filter
+    if (shift_date) {
+      const targetDate = parseDate(shift_date as string);
+      if (targetDate) {
+        // Filter by shift_date field (which stores the date part)
+        const startOfDay = new Date(Date.UTC(
+          targetDate.getUTCFullYear(),
+          targetDate.getUTCMonth(),
+          targetDate.getUTCDate()
+        ));
+        const endOfDay = new Date(Date.UTC(
+          targetDate.getUTCFullYear(),
+          targetDate.getUTCMonth(),
+          targetDate.getUTCDate() + 1
+        ));
+        
+        where.shift_date = {
+          gte: startOfDay,
+          lt: endOfDay
+        };
       }
-      if (toDate) {
-        where.shift_start.lte = toDate;
+    } else {
+      // Handle date range filter (from/to)
+      const fromDate = parseDate(from as string | undefined);
+      const toDate = parseDate(to as string | undefined);
+      if (fromDate || toDate) {
+        where.shift_start = {};
+        if (fromDate) {
+          where.shift_start.gte = fromDate;
+        }
+        if (toDate) {
+          where.shift_start.lte = toDate;
+        }
       }
     }
 

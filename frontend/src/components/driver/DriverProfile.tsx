@@ -9,39 +9,89 @@ import {
   CreditCard,
   Edit,
   Save,
-  Camera
+  Camera,
+  Loader2
 } from 'lucide-react';
 import API_ENDPOINTS, { fetchWithAuth } from '../../config/api';
+import authService from '../../services/auth.service';
 
 const DriverProfile: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [profile, setProfile] = useState({
     name: '',
     email: '',
     phone: '',
+    avatar: '',
     totalSwaps: 0,
     monthlySwaps: 0,
     monthlyCost: 0
   });
 
   const loadProfile = async () => {
+    setLoading(true);
     setError('');
     setMessage('');
     try {
-      const res = await fetchWithAuth(API_ENDPOINTS.AUTH.PROFILE);
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || 'Tải hồ sơ thất bại');
-      const u = data.data?.user || data.data;
+      // Load user profile
+      const profileData = await authService.getProfile();
+      const u = profileData.data?.user || profileData.data;
       setProfile(p => ({
         ...p,
         name: u.full_name || '',
         email: u.email || '',
         phone: u.phone || '',
+        avatar: u.avatar || '',
       }));
+
+      // Load statistics
+      try {
+        const statsRes = await fetchWithAuth(`${API_ENDPOINTS.DRIVER.TRANSACTIONS}/stats?period=30`);
+        const statsData = await statsRes.json();
+        if (statsRes.ok && statsData.success) {
+          // Get current month stats
+          const now = new Date();
+          const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+          
+          // Load all transactions to calculate monthly stats
+          const transactionsRes = await fetchWithAuth(`${API_ENDPOINTS.DRIVER.TRANSACTIONS}?limit=1000`);
+          const transactionsData = await transactionsRes.json();
+          
+          if (transactionsRes.ok && transactionsData.success) {
+            const transactions = transactionsData.data?.transactions || transactionsData.data || [];
+            
+            // Calculate total swaps (all time)
+            const totalSwaps = transactions.length;
+            
+            // Calculate monthly swaps and cost
+            const monthlyTransactions = transactions.filter((t: any) => {
+              const swapDate = new Date(t.swap_at || t.created_at);
+              return swapDate >= currentMonthStart;
+            });
+            
+            const monthlySwaps = monthlyTransactions.length;
+            const monthlyCost = monthlyTransactions.reduce((sum: number, t: any) => {
+              return sum + (t.payment?.amount || 0);
+            }, 0);
+            
+            setProfile(p => ({
+              ...p,
+              totalSwaps,
+              monthlySwaps,
+              monthlyCost,
+            }));
+          }
+        }
+      } catch (statsError) {
+        console.error('Error loading statistics:', statsError);
+        // Don't show error for stats, just use defaults
+      }
     } catch (e: any) {
       setError(e.message || 'Có lỗi xảy ra');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -49,18 +99,28 @@ const DriverProfile: React.FC = () => {
     setError('');
     setMessage('');
     try {
-      const body = { full_name: profile.name, phone: profile.phone };
-      const res = await fetchWithAuth(API_ENDPOINTS.AUTH.UPDATE_PROFILE, { method: 'PUT', body: JSON.stringify(body) });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || 'Cập nhật thất bại');
+      await authService.updateProfile({
+        full_name: profile.name,
+        phone: profile.phone,
+      });
       setIsEditing(false);
       setMessage('Cập nhật hồ sơ thành công');
+      // Reload profile to get updated data
+      await loadProfile();
     } catch (e: any) {
       setError(e.message || 'Có lỗi xảy ra');
     }
   };
 
   useEffect(() => { loadProfile(); }, []);
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -72,6 +132,7 @@ const DriverProfile: React.FC = () => {
         <Button 
           onClick={() => isEditing ? handleSave() : setIsEditing(true)}
           className="gradient-primary text-white shadow-lg hover:shadow-xl transition-all duration-300"
+          disabled={loading}
         >
           {isEditing ? (
             <>
@@ -99,8 +160,8 @@ const DriverProfile: React.FC = () => {
           <CardContent className="p-6 text-center">
             <div className="relative inline-block mb-4">
               <Avatar className="w-24 h-24">
-                <AvatarImage src="/placeholder-avatar.jpg" />
-                <AvatarFallback className="text-2xl gradient-primary text-white">{profile.name ? profile.name.charAt(0) : 'U'}</AvatarFallback>
+                <AvatarImage src={profile.avatar || "/placeholder-avatar.jpg"} />
+                <AvatarFallback className="text-2xl gradient-primary text-white">{profile.name ? profile.name.charAt(0).toUpperCase() : 'U'}</AvatarFallback>
               </Avatar>
               {isEditing && (
                 <Button size="sm" className="absolute bottom-0 right-0 rounded-full w-8 h-8 p-0">
@@ -213,12 +274,20 @@ const DriverProfile: React.FC = () => {
               onClick={async () => {
                 const cur = (document.getElementById('curPwd') as HTMLInputElement)?.value;
                 const nw = (document.getElementById('newPwd') as HTMLInputElement)?.value;
+                if (!cur || !nw) {
+                  setError('Vui lòng điền đầy đủ mật khẩu');
+                  return;
+                }
                 setError(''); setMessage('');
                 try {
-                  const res = await fetchWithAuth(API_ENDPOINTS.AUTH.CHANGE_PASSWORD, { method: 'PUT', body: JSON.stringify({ currentPassword: cur, newPassword: nw }) });
-                  const data = await res.json();
-                  if (!res.ok || !data.success) throw new Error(data.message || 'Đổi mật khẩu thất bại');
+                  await authService.changePassword({
+                    current_password: cur,
+                    new_password: nw,
+                  });
                   setMessage('Đổi mật khẩu thành công');
+                  // Clear password fields
+                  (document.getElementById('curPwd') as HTMLInputElement).value = '';
+                  (document.getElementById('newPwd') as HTMLInputElement).value = '';
                 } catch (e: any) {
                   setError(e.message || 'Có lỗi xảy ra');
                 }

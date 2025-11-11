@@ -29,6 +29,13 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/select';
+import {
   adminGetPackages,
   adminCreatePackage,
   adminUpdatePackage,
@@ -258,38 +265,75 @@ const AdminServicePackageManagement: React.FC = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
+          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
+            <div className="flex-1 min-w-0">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Tìm kiếm..."
+                  placeholder="Tìm kiếm gói dịch vụ..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 h-10"
                 />
               </div>
             </div>
-            <div className="flex gap-2">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-                className="px-3 py-2 border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring min-w-0"
-              >
-                <option value="all">Tất cả</option>
-                <option value="active">Hoạt động</option>
-                <option value="inactive">Tạm dừng</option>
-              </select>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as SortBy)}
-                className="px-3 py-2 border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring min-w-0"
-              >
-                <option value="name">Tên</option>
-                <option value="price">Giá</option>
-                <option value="capacity">Dung lượng</option>
-                <option value="created">Ngày tạo</option>
-              </select>
+            <div className="flex gap-3">
+              <div className="min-w-[140px]">
+                <Select value={statusFilter} onValueChange={(value: StatusFilter) => setStatusFilter(value)}>
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="Trạng thái" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
+                    <SelectItem value="all" className="hover:bg-gray-50 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                        Tất cả
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="active" className="hover:bg-green-50 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                        Hoạt động
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="inactive" className="hover:bg-red-50 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                        Tạm dừng
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="min-w-[140px]">
+                <Select value={sortBy} onValueChange={(value: SortBy) => setSortBy(value)}>
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="Sắp xếp" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
+                    <SelectItem value="name" className="hover:bg-blue-50 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        📝 Theo tên
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="price" className="hover:bg-green-50 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        💰 Theo giá
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="capacity" className="hover:bg-orange-50 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        🔋 Theo dung lượng
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="created" className="hover:bg-purple-50 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        📅 Ngày tạo
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
         </CardContent>

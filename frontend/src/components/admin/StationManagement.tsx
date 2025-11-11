@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from '../ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import StationForm from './StationForm';
 import StationDetails from './StationDetails';
@@ -39,73 +39,6 @@ const StationManagement: React.FC = () => {
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [editingStation, setEditingStation] = useState<Station | null>(null);
-
-  // Mock data for development
-  const mockStations: Station[] = [
-    {
-      id: 'ST001',
-      station_id: 'ST001',
-      name: 'Trạm Thành phố',
-      address: '123 Đường Chính, Quận 1, TP.HCM',
-      coordinates: { lat: 10.762622, lng: 106.660172 },
-      status: 'active',
-      capacity: 12,
-      available_batteries: 8,
-      charging_batteries: 3,
-      maintenance_batteries: 1,
-      daily_swaps: 47,
-      daily_revenue: 1247.50,
-      uptime: 99.2,
-      operating_hours: '24/7',
-      manager: {
-        user_id: 'USER001',
-        full_name: 'Nguyễn Văn Quản lý',
-        phone: '+84 901 234 567'
-      }
-    },
-    {
-      id: 'ST002',
-      station_id: 'ST002',
-      name: 'Trạm Trung tâm Thương mại',
-      address: '456 Đại lộ Mua sắm, Quận 3, TP.HCM',
-      coordinates: { lat: 10.786785, lng: 106.700471 },
-      status: 'active',
-      capacity: 20,
-      available_batteries: 15,
-      charging_batteries: 4,
-      maintenance_batteries: 1,
-      daily_swaps: 68,
-      daily_revenue: 1876.25,
-      uptime: 97.8,
-      operating_hours: '6 AM - 11 PM',
-      manager: {
-        user_id: 'USER002',
-        full_name: 'Trần Thị Quản lý',
-        phone: '+84 902 345 678'
-      }
-    },
-    {
-      id: 'ST003',
-      station_id: 'ST003',
-      name: 'Trạm Nghỉ Cao tốc A1',
-      address: 'Cao tốc A1 hướng Bắc Km 42',
-      coordinates: { lat: 10.950000, lng: 106.800000 },
-      status: 'maintenance',
-      capacity: 16,
-      available_batteries: 6,
-      charging_batteries: 8,
-      maintenance_batteries: 2,
-      daily_swaps: 34,
-      daily_revenue: 892.75,
-      uptime: 89.5,
-      operating_hours: '24/7',
-      manager: {
-        user_id: 'USER003',
-        full_name: 'Lê Hoàng Quản lý',
-        phone: '+84 903 456 789'
-      }
-    }
-  ];
 
   // Fetch stations from API
   const fetchStations = async () => {
@@ -152,21 +85,21 @@ const StationManagement: React.FC = () => {
           });
           
           console.log('Transformed stations:', transformedStations);
-          setStations(transformedStations.length > 0 ? transformedStations : mockStations);
+          setStations(transformedStations);
         } else {
           console.error('Invalid API response format:', res);
-          setStations(mockStations);
-          toast.error('Định dạng dữ liệu không hợp lệ - Đang hiển thị dữ liệu mẫu');
+          setStations([]);
+          toast.error('Định dạng dữ liệu không hợp lệ');
         }
       } else {
         console.error('API Error:', res.message);
-        setStations(mockStations);
-        toast.error(res.message || 'Lỗi khi tải danh sách trạm - Đang hiển thị dữ liệu mẫu');
+        setStations([]);
+        toast.error(res.message || 'Lỗi khi tải danh sách trạm');
       }
     } catch (err: any) {
       console.error('Load stations error:', err);
-      setStations(mockStations);
-      toast.error('Lỗi kết nối API - Đang hiển thị dữ liệu mẫu');
+      setStations([]);
+      toast.error('Lỗi kết nối API');
     }
   };
 
@@ -350,10 +283,10 @@ const StationManagement: React.FC = () => {
   const getStatusColor = (status: Station['status']) => {
     console.log('Status for color:', status); // Debug log
     switch (status) {
-      case 'active': return 'bg-green-50/80 dark:bg-green-500/10 text-green-800 dark:text-green-400 border-green-200/50 dark:border-green-500/20';
-      case 'closed': return 'bg-red-50/80 dark:bg-red-500/10 text-red-800 dark:text-red-400 border-red-200/50 dark:border-red-500/20';
-      case 'maintenance': return 'bg-yellow-50/80 dark:bg-yellow-500/10 text-yellow-800 dark:text-yellow-400 border-yellow-200/50 dark:border-yellow-500/20';
-      default: return 'bg-slate-50/80 dark:bg-slate-500/10 text-slate-800 dark:text-slate-400 border-slate-200/50 dark:border-slate-500/20';
+      case 'active': return 'bg-green-100 text-green-800 border-green-200';
+      case 'closed': return 'bg-red-100 text-red-800 border-red-200';
+      case 'maintenance': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
@@ -441,108 +374,112 @@ const StationManagement: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="container mx-auto max-w-7xl px-4 space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="float">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-purple-900 dark:from-white dark:to-purple-100 bg-clip-text text-transparent">Quản lý Trạm</h1>
-          <p className="text-slate-600 dark:text-slate-300">Giám sát và quản lý mạng lưới trạm thay pin</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Quản lý Trạm</h1>
+          <p className="text-muted-foreground">
+            Giám sát và quản lý mạng lưới trạm thay pin.
+          </p>
         </div>
-        <Button 
-          className="bg-gradient-to-r from-purple-500 to-violet-500 text-white shadow-lg hover:shadow-xl transition-all duration-300"
-          onClick={() => {
-            setEditingStation(null);
-            setIsFormOpen(true);
-          }}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Thêm Trạm mới
+        <Button onClick={() => {
+          setEditingStation(null);
+          setIsFormOpen(true);
+        }} className="gap-2">
+          <Plus className="h-4 w-4" />
+          Thêm trạm mới
         </Button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-purple-500 to-violet-500 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <Building className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Tổng trạm</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.total}</p>
-              </div>
-            </div>
+      {/* Statistics Cards */}
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-blue-700">Tổng trạm</CardTitle>
+            <Building className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-800">{stats.total}</div>
           </CardContent>
         </Card>
-
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <CheckCircle className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Trực tuyến</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.online}</p>
-              </div>
-            </div>
+        <Card className="bg-gradient-to-r from-green-50 to-emerald-100 border-green-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-green-700">Trực tuyến</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-700">{stats.online}</div>
           </CardContent>
         </Card>
-
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <Activity className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Lần thay hôm nay</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.swaps}</p>
-              </div>
-            </div>
+        <Card className="bg-gradient-to-r from-amber-50 to-yellow-100 border-amber-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-amber-700">Lần thay hôm nay</CardTitle>
+            <Activity className="h-4 w-4 text-amber-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-amber-800">{stats.swaps}</div>
           </CardContent>
         </Card>
-
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-orange-500 to-yellow-500 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <DollarSign className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Doanh thu hôm nay</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">${stats.revenue.toLocaleString()}</p>
-              </div>
-            </div>
+        <Card className="bg-gradient-to-r from-red-50 to-rose-100 border-red-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-red-700">Doanh thu hôm nay</CardTitle>
+            <DollarSign className="h-4 w-4 text-red-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-700">${stats.revenue.toLocaleString()}</div>
           </CardContent>
         </Card>
-
-
       </div>
 
       {/* Filters */}
-      <Card className="glass-card border-0 glow">
-        <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400 dark:text-slate-500" />
+      <Card className="bg-gradient-to-r from-slate-50 to-gray-100 border-slate-200">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-lg flex items-center gap-2 text-slate-700">
+            <Search className="h-5 w-5 text-slate-600" />
+            Bộ lọc và tìm kiếm
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Tìm kiếm theo tên trạm, địa chỉ hoặc ID..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 glass border-slate-200/50 dark:border-slate-700/50"
+                className="pl-10"
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-48 glass border-slate-200/50 dark:border-slate-700/50">
+              <SelectTrigger className="h-10 bg-white border border-gray-300 shadow-sm">
                 <SelectValue placeholder="Trạng thái" />
               </SelectTrigger>
-              <SelectContent className="glass-card border-0">
-                <SelectItem value="all">Tất cả trạng thái</SelectItem>
-                <SelectItem value="active">Trực tuyến</SelectItem>
-                <SelectItem value="closed">Ngoại tuyến</SelectItem>
-                <SelectItem value="maintenance">Bảo trì</SelectItem>
+              <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
+                <SelectItem value="all" className="hover:bg-gray-50 cursor-pointer">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                    Tất cả trạng thái
+                  </div>
+                </SelectItem>
+                <SelectItem value="active" className="hover:bg-green-50 cursor-pointer">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    Trực tuyến
+                  </div>
+                </SelectItem>
+                <SelectItem value="closed" className="hover:bg-red-50 cursor-pointer">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-red-600" />
+                    Ngoại tuyến
+                  </div>
+                </SelectItem>
+                <SelectItem value="maintenance" className="hover:bg-yellow-50 cursor-pointer">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-yellow-600" />
+                    Bảo trì
+                  </div>
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>

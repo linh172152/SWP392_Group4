@@ -10,7 +10,6 @@ import {
   Shuffle, 
   Users, 
   BarChart3, 
-  Brain,
   LogOut,
   Menu,
   X,
@@ -39,7 +38,6 @@ const navigation = [
   { name: 'Lịch làm việc', href: '/admin/schedules', icon: Calendar },
   { name: 'Quản lý hỗ trợ', href: '/admin/support', icon: MessageSquare },
   { name: 'Báo cáo & Phân tích', href: '/admin/reports', icon: BarChart3 },
-  { name: 'Gợi ý AI', href: '/admin/ai-suggestions', icon: Brain },
 ];
 
 const AdminLayout: React.FC<AdminLayoutProps> = ({ user, onLogout, children }) => {
