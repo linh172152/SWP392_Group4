@@ -13,6 +13,18 @@ import {
 
 const prisma = new PrismaClient();
 
+type VehicleWithCurrentBattery = Prisma.VehicleGetPayload<{
+  include: {
+    current_battery: {
+      select: {
+        battery_id: true;
+        battery_code: true;
+        status: true;
+      };
+    };
+  };
+}>;
+
 const normalizeBatteryModel = (value: string): string =>
   value.trim().toLowerCase();
 
@@ -719,14 +731,18 @@ export const completeBooking = asyncHandler(
       throw new CustomError("Battery model is required", 400);
     }
 
-    const vehicle = await prisma.vehicle.findUnique({
+    const vehicle = (await prisma.vehicle.findUnique({
       where: { vehicle_id: booking.vehicle_id },
-      select: {
-        vehicle_id: true,
-        license_plate: true,
-        battery_model: true,
+      include: {
+        current_battery: {
+          select: {
+            battery_id: true,
+            battery_code: true,
+            status: true,
+          },
+        },
       },
-    });
+    })) as VehicleWithCurrentBattery | null;
 
     if (!vehicle) {
       throw new CustomError("Vehicle not found", 404);
@@ -806,14 +822,34 @@ export const completeBooking = asyncHandler(
     }
 
     const trimmedOldBatteryCode = old_battery_code.trim();
+
     const oldBattery = await prisma.battery.findUnique({
       where: { battery_code: trimmedOldBatteryCode },
     });
 
     if (!oldBattery) {
       throw new CustomError(
-        `Battery with code "${old_battery_code}" not found`,
+        `Pin "${trimmedOldBatteryCode}" chưa được đăng ký trong hệ thống. Vui lòng xác nhận lại với driver hoặc nhân viên quản lý.`,
         404
+      );
+    }
+
+    const vehicleCurrentBatteryId =
+      vehicle.current_battery?.battery_id ?? vehicle.current_battery_id;
+
+    if (!vehicleCurrentBatteryId) {
+      throw new CustomError(
+        "Xe hiện không ghi nhận mã pin đang sử dụng. Vui lòng kiểm tra lại thông tin xe trước khi hoàn tất.",
+        400
+      );
+    }
+
+    if (vehicleCurrentBatteryId !== oldBattery.battery_id) {
+      const vehicleCurrentBatteryCode =
+        vehicle.current_battery?.battery_code || "chưa có";
+      throw new CustomError(
+        `Mã pin cũ "${old_battery_code}" không khớp với pin hiện tại của xe. Pin hiện tại của xe là: ${vehicleCurrentBatteryCode}.`,
+        400
       );
     }
 
