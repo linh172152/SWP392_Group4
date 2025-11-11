@@ -122,7 +122,7 @@ export const createVNPayPayment = async (
         }
       });
       const signFromUrl = Object.keys(paramsForHash)
-        .sort()
+        .sort((a, b) => a.localeCompare(b))
         .map((key) => `${key}=${paramsForHash[key]}`)
         .join("&");
       const hashFromUrl = crypto
