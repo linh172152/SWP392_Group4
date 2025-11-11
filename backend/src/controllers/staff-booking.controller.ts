@@ -894,28 +894,18 @@ export const completeBooking = asyncHandler(
     }
 
     // ✅ Validate: Old battery code must match vehicle's current battery
-    const vehicleCurrentBatteryId = (vehicle as any).current_battery_id;
-    if (vehicleCurrentBatteryId !== oldBattery.battery_id) {
-      const vehicleCurrentBatteryCode = (vehicle as any).current_battery?.battery_code || 'chưa có';
-      throw new CustomError(
-        `Mã pin cũ "${old_battery_code}" không khớp với pin hiện tại của xe. Pin hiện tại của xe là: ${vehicleCurrentBatteryCode}.`,
-        400
-      );
-    }
-
     const vehicleCurrentBatteryId =
       vehicle.current_battery?.battery_id ?? vehicle.current_battery_id;
-
+    
     if (!vehicleCurrentBatteryId) {
       throw new CustomError(
         "Xe hiện không ghi nhận mã pin đang sử dụng. Vui lòng kiểm tra lại thông tin xe trước khi hoàn tất.",
         400
       );
     }
-
+    
     if (vehicleCurrentBatteryId !== oldBattery.battery_id) {
-      const vehicleCurrentBatteryCode =
-        vehicle.current_battery?.battery_code || "chưa có";
+      const vehicleCurrentBatteryCode = (vehicle as any).current_battery?.battery_code || 'chưa có';
       throw new CustomError(
         `Mã pin cũ "${old_battery_code}" không khớp với pin hiện tại của xe. Pin hiện tại của xe là: ${vehicleCurrentBatteryCode}.`,
         400

@@ -96,11 +96,16 @@ const VehicleManagement: React.FC = () => {
     setLoading(true);
     setError('');
     try {
+      if (!form.current_battery_code?.trim()) {
+        setError('Vui lòng nhập mã pin hiện tại (bắt buộc)');
+        setLoading(false);
+        return;
+      }
       const body = {
         license_plate: form.license_plate,
         vehicle_type: form.vehicle_type,
         battery_model: form.battery_model,
-        current_battery_code: form.current_battery_code.trim() || undefined,
+        current_battery_code: form.current_battery_code.trim(),
         make: form.make || undefined,
         model: form.model || undefined,
         year: form.year ? Number(form.year) : undefined,
@@ -153,14 +158,23 @@ const VehicleManagement: React.FC = () => {
   };
 
   const startEdit = (vehicle: VehicleItem) => {
+    console.log('[VehicleManagement] startEdit - vehicle data:', {
+      vehicle_id: vehicle.vehicle_id,
+      license_plate: vehicle.license_plate,
+      current_battery: vehicle.current_battery,
+      current_battery_id: (vehicle as any).current_battery_id,
+      current_battery_code: vehicle.current_battery_code,
+    });
     setEditingId(vehicle.vehicle_id);
+    const batteryCode = vehicle.current_battery?.battery_code || vehicle.current_battery_code || '';
+    console.log('[VehicleManagement] startEdit - extracted battery_code:', batteryCode);
     setEditForm({
       make: vehicle.make || '',
       model: vehicle.model || '',
       year: vehicle.year ? String(vehicle.year) : '',
       license_plate: vehicle.license_plate,
       battery_model: vehicle.battery_model,
-      current_battery_code: vehicle.current_battery?.battery_code || vehicle.current_battery_code || '',
+      current_battery_code: batteryCode,
       vehicle_type: 'car'
     });
   };
