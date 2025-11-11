@@ -185,6 +185,8 @@ const AdminServicePackageManagement: React.FC = () => {
     }).format(price);
   };
 
+
+
   const getBillingCycleLabel = (cycle: string) => {
     switch (cycle) {
       case 'monthly': return 'Hàng tháng';
@@ -250,7 +252,7 @@ const AdminServicePackageManagement: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-lg font-bold text-amber-800 truncate">
-              {packages.length > 0 ? formatPrice(packages.reduce((sum, p) => sum + p.price, 0) / packages.length) : '0 ₫'}
+              {packages.length > 0 ? formatPrice(packages.reduce((sum, p) => sum + Number(p.price), 0) / packages.length) : '0 ₫'}
             </div>
           </CardContent>
         </Card>
