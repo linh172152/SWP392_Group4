@@ -26,7 +26,7 @@ export const vnpayConfig = {
   orderType: 'other',
   
   // VNPay create date format
-  createDate: 'yyyyMMddHHmmss',
+  createDate: 'YYYYMMDDHHmmss',
   
   // VNPay expire time (minutes)
   expireTime: 15
