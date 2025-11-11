@@ -84,8 +84,9 @@ export const generateVNPayUrl = (paymentData: VNPayPaymentData): string => {
   };
 
   // Add bank code if provided
-  if (bankCode) {
-    params.vnp_BankCode = bankCode;
+  const trimmedBankCode = bankCode?.trim();
+  if (trimmedBankCode) {
+    params.vnp_BankCode = trimmedBankCode;
   }
 
   // Sort parameter keys

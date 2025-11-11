@@ -1,24 +1,20 @@
-const sanitize = (value?: string, fallback?: string): string => {
-  if (!value) return fallback ?? "";
-  return value.trim();
+const requireEnv = (key: string): string => {
+  const raw = process.env[key];
+  const value = raw?.trim();
+  if (!value) {
+    throw new Error(`[VNPay] Missing required environment variable ${key}`);
+  }
+  return value;
 };
 
 export const vnpayConfig = {
-  // VNPay Sandbox Configuration
-  tmnCode: sanitize(process.env.VNPAY_TMN_CODE, "LEAFSTIT"),
-  hashSecret: sanitize(
-    process.env.VNPAY_HASH_SECRET,
-    "3WKXHH4OIVQP7PU36Y6VEIO11LVS2BJV"
-  ),
-  url: sanitize(
-    process.env.VNPAY_URL,
-    "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
-  ),
-  returnUrl: sanitize(
-    process.env.VNPAY_RETURN_URL,
-    "http://localhost:3000/api/payments/vnpay/return"
-  ),
-  ipnUrl: sanitize(process.env.VNPAY_IPN_URL, ""),
+  tmnCode: requireEnv("VNPAY_TMN_CODE"),
+  hashSecret: requireEnv("VNPAY_HASH_SECRET"),
+  url:
+    process.env.VNPAY_URL?.trim() ||
+    "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html",
+  returnUrl: requireEnv("VNPAY_RETURN_URL"),
+  ipnUrl: process.env.VNPAY_IPN_URL?.trim() || "",
 
   // VNPay API endpoints
   queryUrl: "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction",
@@ -46,3 +42,10 @@ export const vnpayConfig = {
   // VNPay expire time (minutes)
   expireTime: 15,
 };
+
+console.log(
+  "[VNPay] TMN:",
+  vnpayConfig.tmnCode,
+  "SECRET_LEN:",
+  vnpayConfig.hashSecret.length
+);
