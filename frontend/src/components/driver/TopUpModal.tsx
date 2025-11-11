@@ -1,17 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '../ui/dialog';
-import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
-import { Loader2, Wallet, Gift, Check } from 'lucide-react';
-import { type TopUpPackage } from '../../services/topup-package.service';
-import walletService from '../../services/wallet.service';
-import { formatCurrency } from '../../utils/format';
+} from "../ui/dialog";
+import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
+import { Loader2, Wallet, Gift, Check } from "lucide-react";
+import { type TopUpPackage } from "../../services/topup-package.service";
+import walletService from "../../services/wallet.service";
+import { formatCurrency } from "../../utils/format";
 
 interface TopUpModalProps {
   packages: TopUpPackage[];
@@ -26,19 +26,23 @@ const TopUpModal: React.FC<TopUpModalProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const [selectedPackage, setSelectedPackage] = useState<TopUpPackage | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'vnpay' | 'momo'>('vnpay');
+  const [selectedPackage, setSelectedPackage] = useState<TopUpPackage | null>(
+    null
+  );
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "vnpay" | "momo">(
+    "vnpay"
+  );
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState<string>("");
 
   const handleTopUp = async () => {
     if (!selectedPackage) {
-      setError('Vui lòng chọn gói nạp tiền');
+      setError("Vui lòng chọn gói nạp tiền");
       return;
     }
 
     setLoading(true);
-    setError('');
+    setError("");
 
     try {
       const response = await walletService.topUpWallet({
@@ -46,23 +50,29 @@ const TopUpModal: React.FC<TopUpModalProps> = ({
         payment_method: paymentMethod,
       });
 
-      if (response.success) {
-        // If cash payment, success immediately
-        if (paymentMethod === 'cash') {
-          onSuccess();
-        } else {
-          // For online payments, redirect to payment gateway
-          if (response.data?.payment_url) {
-            // Redirect to VNPay/MoMo payment gateway
-            window.location.href = response.data.payment_url;
-          } else {
-            setError('Không thể tạo liên kết thanh toán. Vui lòng thử lại.');
-            setLoading(false);
-          }
-        }
+      if (!response.success) {
+        throw new Error(response.message || "Không thể tạo giao dịch nạp tiền");
       }
+
+      // Cash: cập nhật ngay lập tức
+      if (paymentMethod === "cash") {
+        onSuccess();
+        return;
+      }
+
+      const paymentUrl = response.data?.payment_url;
+
+      if (!paymentUrl) {
+        setError("Không thể tạo liên kết thanh toán. Vui lòng thử lại.");
+        return;
+      }
+
+      // Đóng modal trước khi chuyển hướng
+      onClose();
+      // Chuyển hướng tới cổng thanh toán
+      window.location.href = paymentUrl;
     } catch (err: any) {
-      setError(err.message || 'Có lỗi xảy ra khi nạp tiền');
+      setError(err.message || "Có lỗi xảy ra khi nạp tiền");
     } finally {
       setLoading(false);
     }
@@ -95,7 +105,8 @@ const TopUpModal: React.FC<TopUpModalProps> = ({
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {packages.map((pkg) => {
-                const isSelected = selectedPackage?.package_id === pkg.package_id;
+                const isSelected =
+                  selectedPackage?.package_id === pkg.package_id;
                 const hasBonus = Number(pkg.bonus_amount) > 0;
 
                 return (
@@ -104,8 +115,8 @@ const TopUpModal: React.FC<TopUpModalProps> = ({
                     onClick={() => setSelectedPackage(pkg)}
                     className={`p-4 rounded-lg border-2 transition-all ${
                       isSelected
-                        ? 'border-blue-600 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20 shadow-lg'
-                        : 'border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 bg-white dark:bg-slate-800'
+                        ? "border-blue-600 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20 shadow-lg"
+                        : "border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 bg-white dark:bg-slate-800"
                     }`}
                   >
                     <div className="flex items-start justify-between mb-2">
@@ -137,7 +148,10 @@ const TopUpModal: React.FC<TopUpModalProps> = ({
                           <span className="text-sm text-slate-600 dark:text-slate-400">
                             Khuyến mãi:
                           </span>
-                          <Badge variant="secondary" className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                          <Badge
+                            variant="secondary"
+                            className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
+                          >
                             +{formatCurrency(Number(pkg.bonus_amount))}
                           </Badge>
                         </div>
@@ -169,11 +183,11 @@ const TopUpModal: React.FC<TopUpModalProps> = ({
                 Phương thức thanh toán
               </h3>
               <div className="grid grid-cols-3 gap-3">
-                {(['vnpay', 'momo', 'cash'] as const).map((method) => {
+                {(["vnpay", "momo", "cash"] as const).map((method) => {
                   const labels = {
-                    vnpay: 'VNPay',
-                    momo: 'MoMo',
-                    cash: 'Tiền mặt',
+                    vnpay: "VNPay",
+                    momo: "MoMo",
+                    cash: "Tiền mặt",
                   };
 
                   return (
@@ -182,8 +196,8 @@ const TopUpModal: React.FC<TopUpModalProps> = ({
                       onClick={() => setPaymentMethod(method)}
                       className={`p-3 rounded-lg border-2 transition-all ${
                         paymentMethod === method
-                          ? 'border-blue-600 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20'
-                          : 'border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500'
+                          ? "border-blue-600 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20"
+                          : "border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500"
                       }`}
                     >
                       <div className="font-medium text-slate-900 dark:text-white">
@@ -200,7 +214,9 @@ const TopUpModal: React.FC<TopUpModalProps> = ({
           {selectedPackage && (
             <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-slate-600 dark:text-slate-400">Số tiền nạp:</span>
+                <span className="text-slate-600 dark:text-slate-400">
+                  Số tiền nạp:
+                </span>
                 <span className="font-semibold text-slate-900 dark:text-white">
                   {formatCurrency(Number(selectedPackage.topup_amount))}
                 </span>
@@ -264,4 +280,3 @@ const TopUpModal: React.FC<TopUpModalProps> = ({
 };
 
 export default TopUpModal;
-

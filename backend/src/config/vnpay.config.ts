@@ -1,37 +1,40 @@
 export const vnpayConfig = {
   // VNPay Sandbox Configuration
-  tmnCode: process.env.VNPAY_TMN_CODE || '2QXUI4J4',
-  hashSecret: process.env.VNPAY_HASH_SECRET || 'RAOEXHYVHDDIIENYWSLDIIENYWSLEXY',
-  url: process.env.VNPAY_URL || 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html',
-  returnUrl: process.env.VNPAY_RETURN_URL || 'http://localhost:3000/api/payments/vnpay/return',
-  ipnUrl: process.env.VNPAY_IPN_URL || 'http://localhost:3000/api/payments/vnpay/ipn',
-  
+  tmnCode: process.env.VNPAY_TMN_CODE || "2QXUI4J4",
+  hashSecret:
+    process.env.VNPAY_HASH_SECRET || "RAOEXHYVHDDIIENYWSLDIIENYWSLEXY",
+  url:
+    process.env.VNPAY_URL ||
+    "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html",
+  returnUrl:
+    process.env.VNPAY_RETURN_URL ||
+    "http://localhost:3000/api/payments/vnpay/return",
+  ipnUrl:
+    process.env.VNPAY_IPN_URL || "http://localhost:3000/api/payments/vnpay/ipn",
+
   // VNPay API endpoints
-  queryUrl: 'https://sandbox.vnpayment.vn/merchant_webapi/api/transaction',
-  refundUrl: 'https://sandbox.vnpayment.vn/merchant_webapi/api/transaction',
-  
+  queryUrl: "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction",
+  refundUrl: "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction",
+
   // VNPay version
-  version: '2.1.0',
-  
+  version: "2.1.0",
+
   // VNPay command
-  command: 'pay',
-  
+  command: "pay",
+
   // VNPay currency
-  currency: 'VND',
-  
+  currency: "VND",
+
   // VNPay locale
-  locale: 'vn',
-  
+  locale: "vn",
+
   // VNPay order type
-  orderType: 'other',
-  
+  orderType: "other",
+
   // VNPay create date format
-  createDate: 'YYYYMMDDHHmmss',
-  
+  createDate: "YYYYMMDDHHmmss",
+  secureHashType: "HmacSHA512",
+
   // VNPay expire time (minutes)
-  expireTime: 15
+  expireTime: 15,
 };
-
-
-
-
