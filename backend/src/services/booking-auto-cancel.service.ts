@@ -1,12 +1,10 @@
-import { PrismaClient, Prisma } from "@prisma/client";
-import { notificationService } from "../server";
+import { Prisma } from "@prisma/client";
+import { notificationService, prisma } from "../server";
 import {
   releaseBookingHold,
   type BookingHoldFields,
   buildBookingUncheckedUpdate,
 } from "./booking-hold.service";
-
-const prisma = new PrismaClient();
 
 /**
  * Auto-cancel bookings that are not checked in within 10 minutes after scheduled time
@@ -14,6 +12,12 @@ const prisma = new PrismaClient();
  */
 export async function autoCancelExpiredBookings() {
   try {
+    // Check if DATABASE_URL is available
+    if (!process.env.DATABASE_URL) {
+      console.warn("⚠️ DATABASE_URL not found, skipping auto-cancel expired bookings");
+      return { cancelled: 0, errors: [] };
+    }
+
     const now = new Date();
     const tenMinutesAgo = new Date(now.getTime() - 10 * 60 * 1000); // 10 minutes ago
 
@@ -142,6 +146,12 @@ export async function autoCancelExpiredBookings() {
  */
 export async function sendBookingReminders() {
   try {
+    // Check if DATABASE_URL is available
+    if (!process.env.DATABASE_URL) {
+      console.warn("⚠️ DATABASE_URL not found, skipping booking reminders");
+      return { remindersSent: 0, finalRemindersSent: 0, errors: [] };
+    }
+
     const now = new Date();
     const thirtyMinutesLater = new Date(now.getTime() + 30 * 60 * 1000); // 30 minutes from now
     const tenMinutesLater = new Date(now.getTime() + 10 * 60 * 1000); // 10 minutes from now
@@ -266,6 +276,11 @@ export async function sendBookingReminders() {
  */
 export async function autoCancelInstantBookings() {
   try {
+    // Check if DATABASE_URL is available
+    if (!process.env.DATABASE_URL) {
+      console.warn("⚠️ DATABASE_URL not found, skipping auto-cancel instant bookings");
+      return { cancelled: 0, errors: [] };
+    }
     const now = new Date();
     const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000); // 15 minutes ago
 

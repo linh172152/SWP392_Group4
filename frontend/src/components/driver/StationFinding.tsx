@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
@@ -27,6 +27,8 @@ const StationFinding: React.FC = () => {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
+  const hasSearchedRef = useRef(false); // Tránh gọi API nhiều lần
+  const locationSetRef = useRef(false); // Tránh set location nhiều lần
   
   const { 
     stations, 
@@ -39,9 +41,13 @@ const StationFinding: React.FC = () => {
 
   // Lấy vị trí người dùng khi component mount
   useEffect(() => {
+    if (locationSetRef.current) return; // Đã set rồi thì không set lại
+    
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
+          if (locationSetRef.current) return; // Double check
+          locationSetRef.current = true;
           setUserLocation({
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
@@ -49,6 +55,9 @@ const StationFinding: React.FC = () => {
           setLocationError(null);
         },
         (error) => {
+          if (locationSetRef.current) return; // Double check
+          locationSetRef.current = true;
+          
           // Xử lý lỗi geolocation một cách thân thiện
           let errorMessage = "Không thể lấy vị trí của bạn. ";
           switch (error.code) {
@@ -79,6 +88,8 @@ const StationFinding: React.FC = () => {
         }
       );
     } else {
+      if (locationSetRef.current) return;
+      locationSetRef.current = true;
       setLocationError("Trình duyệt không hỗ trợ định vị. Sử dụng vị trí mặc định.");
       // Sử dụng vị trí mặc định nếu trình duyệt không hỗ trợ geolocation
       setUserLocation({
@@ -88,40 +99,52 @@ const StationFinding: React.FC = () => {
     }
   }, []);
 
-  // Tự động tìm trạm gần đây khi có vị trí
-  useEffect(() => {
-    if (userLocation) {
-      handleFindNearby();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userLocation]);
-
   // Tìm trạm gần đây
-  const handleFindNearby = async () => {
-    if (!userLocation) return;
+  const handleFindNearby = React.useCallback(async () => {
+    if (!userLocation) {
+      console.warn('[StationFinding] No user location available');
+      return;
+    }
     
     try {
+      console.log('[StationFinding] Finding nearby stations:', userLocation);
       await findNearbyPublicStations({
         latitude: userLocation.latitude,
         longitude: userLocation.longitude,
         radius: 10,
       });
+      console.log('[StationFinding] Successfully found stations');
     } catch (err) {
-      console.error("Error finding nearby stations:", err);
+      console.error("[StationFinding] Error finding nearby stations:", err);
+      // Error đã được set trong hook, không cần set lại
     }
-  };
+  }, [userLocation, findNearbyPublicStations]);
+
+  // Tự động tìm trạm gần đây khi có vị trí (chỉ gọi 1 lần)
+  useEffect(() => {
+    if (userLocation && !hasSearchedRef.current) {
+      hasSearchedRef.current = true;
+      handleFindNearby();
+    }
+    // Chỉ chạy khi userLocation thay đổi từ null sang có giá trị
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userLocation?.latitude, userLocation?.longitude]);
 
   // Tìm kiếm trạm
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
+      hasSearchedRef.current = false; // Reset để có thể tìm lại
       handleFindNearby();
       return;
     }
 
     try {
+      console.log('[StationFinding] Searching stations:', searchQuery);
       await searchStations(searchQuery);
+      console.log('[StationFinding] Search completed');
     } catch (err) {
-      console.error("Error searching stations:", err);
+      console.error("[StationFinding] Error searching stations:", err);
+      // Error đã được set trong hook
     }
   };
 

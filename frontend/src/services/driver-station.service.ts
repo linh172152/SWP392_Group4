@@ -78,44 +78,86 @@ export const driverStationService = {
       radius: radius.toString(),
     });
 
-    const response = await fetch(
-      `${API_ENDPOINTS.STATION.PUBLIC}/nearby?${queryParams.toString()}`,
-      {
-        method: "GET",
-      }
-    );
+    const url = `${API_ENDPOINTS.STATION.PUBLIC}/nearby?${queryParams.toString()}`;
+    console.log('[driver-station.service] Fetching nearby stations:', url);
+
+    const response = await fetch(url, {
+      method: "GET",
+    });
 
     if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.message || "Không thể tìm trạm gần đây");
+      const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+      console.error('[driver-station.service] API error:', response.status, errorData);
+      throw new Error(errorData.message || `Không thể tìm trạm gần đây (${response.status})`);
     }
 
     const data = await response.json();
-    return data.data?.stations || data.data || [];
+    console.log('[driver-station.service] Response:', data);
+    
+    // BE trả về: { success: true, data: { stations: [...], search_params: {...} } }
+    // Hoặc: { success: true, data: [...] }
+    if (data.success && data.data) {
+      if (Array.isArray(data.data)) {
+        return data.data;
+      } else if (data.data.stations && Array.isArray(data.data.stations)) {
+        return data.data.stations;
+      }
+    }
+    
+    console.warn('[driver-station.service] Unexpected response format:', data);
+    return [];
   },
 
   // GET /api/public/stations - Tìm kiếm trạm công khai (không cần auth)
   async searchPublicStations(query: string): Promise<Station[]> {
     const queryParams = new URLSearchParams();
     
+    // BE mới: search parameter để tìm theo name hoặc address
     if (query.trim()) {
-      queryParams.append("search", query);
+      queryParams.append("search", query.trim());
     }
+    
+    // BE mới: status="all" để lấy tất cả stations (không chỉ active)
+    // Hoặc không gửi status để mặc định lấy active
+    queryParams.append("status", "all"); // Lấy tất cả để search được nhiều hơn
+    
+    // Tăng limit để lấy nhiều kết quả hơn
+    queryParams.append("limit", "50");
 
-    const response = await fetch(
-      `${API_ENDPOINTS.STATION.PUBLIC}?${queryParams.toString()}`,
-      {
-        method: "GET",
-      }
-    );
+    const url = `${API_ENDPOINTS.STATION.PUBLIC}?${queryParams.toString()}`;
+    console.log('[driver-station.service] Searching stations:', url);
+
+    const response = await fetch(url, {
+      method: "GET",
+    });
 
     if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.message || "Không thể tìm kiếm trạm");
+      const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+      console.error('[driver-station.service] Search API error:', response.status, errorData);
+      throw new Error(errorData.message || `Không thể tìm kiếm trạm (${response.status})`);
     }
 
     const data = await response.json();
-    return data.data?.stations || data.data || [];
+    console.log('[driver-station.service] Search response:', data);
+    console.log('[driver-station.service] Search response data.data:', data.data);
+    
+    // BE trả về: { success: true, data: { stations: [...], pagination: {...} } }
+    if (data.success && data.data) {
+      if (Array.isArray(data.data)) {
+        // Trường hợp BE trả về array trực tiếp (backward compatibility)
+        console.log('[driver-station.service] Returning array directly, count:', data.data.length);
+        return data.data;
+      } else if (data.data.stations && Array.isArray(data.data.stations)) {
+        // Trường hợp BE trả về object với stations array
+        console.log('[driver-station.service] Returning stations array, count:', data.data.stations.length);
+        return data.data.stations;
+      } else {
+        console.warn('[driver-station.service] data.data is not array and has no stations property:', data.data);
+      }
+    }
+    
+    console.warn('[driver-station.service] Unexpected search response format:', data);
+    return [];
   },
 
   // GET /api/public/stations/:id - Chi tiết trạm công khai (không cần auth)

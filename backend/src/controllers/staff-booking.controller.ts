@@ -822,31 +822,90 @@ export const completeBooking = asyncHandler(
     }
 
     const trimmedOldBatteryCode = old_battery_code.trim();
-
-    const oldBattery = await prisma.battery.findUnique({
+    
+    // ✅ Tìm hoặc tạo pin cũ (nếu không tồn tại - trường hợp pin mới từ hãng chưa được tạo trong DB)
+    let oldBattery = await prisma.battery.findUnique({
       where: { battery_code: trimmedOldBatteryCode },
     });
 
     if (!oldBattery) {
-      throw new CustomError(
-        `Pin "${trimmedOldBatteryCode}" chưa được đăng ký trong hệ thống. Vui lòng xác nhận lại với driver hoặc nhân viên quản lý.`,
-        404
-      );
+      // Pin cũ không tồn tại → Có thể là pin mới từ hãng chưa được tạo trong DB
+      // Kiểm tra xem pin này có phải là pin hiện tại của xe không
+      const vehicleCurrentBattery = (vehicle as any).current_battery;
+      if (vehicleCurrentBattery?.battery_code === trimmedOldBatteryCode) {
+        // Pin này đã được link với xe nhưng không tìm thấy trong DB → Lỗi dữ liệu
+        throw new CustomError(
+          `Pin "${trimmedOldBatteryCode}" đã được link với xe nhưng không tìm thấy trong database. Vui lòng liên hệ quản trị viên.`,
+          500
+        );
+      }
+      
+      // Pin không tồn tại và không match với vehicle.current_battery → Tạo pin mới
+      // (Trường hợp hiếm: pin từ hãng chưa được tạo khi đăng ký xe)
+      console.log(`[completeBooking] ⚠️ Old battery "${trimmedOldBatteryCode}" not found. Creating new battery...`);
+      
+      const defaultStation = await prisma.station.findFirst({ 
+        where: { status: "active" }, 
+        select: { station_id: true } 
+      });
+      
+      if (!defaultStation) {
+        throw new CustomError(
+          "Không tìm thấy trạm nào để tạo pin. Vui lòng liên hệ quản trị viên.",
+          500
+        );
+      }
+      
+      oldBattery = await prisma.battery.create({
+        data: {
+          battery_code: trimmedOldBatteryCode,
+          model: vehicle.battery_model,
+          status: "in_use", // Pin đang gắn trên xe
+          current_charge: oldBatteryChargeValue || 100,
+          station_id: defaultStation.station_id, // Sẽ được update về trạm hiện tại sau khi swap
+        },
+      });
+      
+      console.log(`[completeBooking] ✅ Created old battery: ${oldBattery.battery_code} (ID: ${oldBattery.battery_id})`);
+      
+      // Update vehicle với pin mới được tạo
+      await prisma.vehicle.update({
+        where: { vehicle_id: vehicle.vehicle_id },
+        data: { current_battery_id: oldBattery.battery_id } as any,
+      });
+      
+      // Reload vehicle để có current_battery mới
+      const updatedVehicle = await prisma.vehicle.findUnique({
+        where: { vehicle_id: vehicle.vehicle_id },
+        include: {
+          current_battery: {
+            select: {
+              battery_id: true,
+              battery_code: true,
+              status: true,
+            },
+          } as any,
+        } as any,
+      });
+      
+      if (updatedVehicle) {
+        Object.assign(vehicle, updatedVehicle);
+      }
     }
 
+    // ✅ Validate: Old battery code must match vehicle's current battery
     const vehicleCurrentBatteryId =
       vehicle.current_battery?.battery_id ?? vehicle.current_battery_id;
-
+    
     if (!vehicleCurrentBatteryId) {
       throw new CustomError(
         "Xe hiện không ghi nhận mã pin đang sử dụng. Vui lòng kiểm tra lại thông tin xe trước khi hoàn tất.",
         400
       );
     }
-
+    
     if (vehicleCurrentBatteryId !== oldBattery.battery_id) {
-      const vehicleCurrentBatteryCode =
-        vehicle.current_battery?.battery_code || "chưa có";
+      const vehicleCurrentBatteryCode = (vehicle as any).current_battery?.battery_code || 'chưa có';
       throw new CustomError(
         `Mã pin cũ "${old_battery_code}" không khớp với pin hiện tại của xe. Pin hiện tại của xe là: ${vehicleCurrentBatteryCode}.`,
         400
@@ -986,7 +1045,7 @@ export const completeBooking = asyncHandler(
             to_station_id: booking.station_id,
             transfer_reason: "manufacturer_service",
             transferred_by: staffId,
-            transfer_status: "in_transit",
+            transfer_status: "in_transit" as any,
             notes: `Pin ${oldBattery.battery_code} gửi về hãng bảo trì sau booking ${booking.booking_code}.`,
           },
         });

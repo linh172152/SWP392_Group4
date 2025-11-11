@@ -21,6 +21,13 @@ interface VehicleItem {
   model?: string;
   year?: number;
   battery_model: string;
+  current_battery_code?: string;
+  current_battery?: {
+    battery_id: string;
+    battery_code: string;
+    status: string;
+    current_charge?: number;
+  };
   image?: string;
   totalSwaps?: number;
 }
@@ -38,6 +45,7 @@ const VehicleManagement: React.FC = () => {
     year: '',
     license_plate: '',
     battery_model: '',
+    current_battery_code: '',
     vehicle_type: 'car'
   });
   // Thêm mới: dùng biến form
@@ -48,6 +56,7 @@ const VehicleManagement: React.FC = () => {
     license_plate: '',
     vehicle_type: 'car',
     battery_model: '',
+    current_battery_code: '',
   });
 
   const getDaysSinceLastSwap = (lastSwapDate?: string) => {
@@ -66,6 +75,15 @@ const VehicleManagement: React.FC = () => {
       const res = await fetchWithAuth(API_ENDPOINTS.DRIVER.VEHICLES);
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message || 'Tải danh sách xe thất bại');
+      console.log('[VehicleManagement] Loaded vehicles:', data.data);
+      // Log current_battery info for each vehicle
+      data.data.forEach((v: VehicleItem) => {
+        console.log(`[VehicleManagement] Vehicle ${v.license_plate}:`, {
+          current_battery_id: (v as any).current_battery_id,
+          current_battery: v.current_battery,
+          current_battery_code: v.current_battery_code,
+        });
+      });
       setVehicles(data.data);
     } catch (e: any) {
       setError(e.message || 'Có lỗi xảy ra');
@@ -78,24 +96,44 @@ const VehicleManagement: React.FC = () => {
     setLoading(true);
     setError('');
     try {
+      if (!form.current_battery_code?.trim()) {
+        setError('Vui lòng nhập mã pin hiện tại (bắt buộc)');
+        setLoading(false);
+        return;
+      }
       const body = {
         license_plate: form.license_plate,
         vehicle_type: form.vehicle_type,
         battery_model: form.battery_model,
+        current_battery_code: form.current_battery_code.trim(),
         make: form.make || undefined,
         model: form.model || undefined,
         year: form.year ? Number(form.year) : undefined,
       };
+      console.log('[VehicleManagement] Adding vehicle with body:', body);
       const res = await fetchWithAuth(API_ENDPOINTS.DRIVER.VEHICLES, {
         method: 'POST',
         body: JSON.stringify(body),
       });
       const data = await res.json();
+      console.log('[VehicleManagement] Add vehicle response:', data);
       if (!res.ok || !data.success) throw new Error(data.message || 'Thêm xe thất bại');
+      
+      // Log the created vehicle data
+      if (data.data) {
+        console.log('[VehicleManagement] Created vehicle:', {
+          vehicle_id: data.data.vehicle_id,
+          license_plate: data.data.license_plate,
+          current_battery_id: data.data.current_battery_id,
+          current_battery: data.data.current_battery,
+        });
+      }
+      
       setShowAddForm(false);
-      setForm({ make: '', model: '', year: '', license_plate: '', vehicle_type: 'car', battery_model: '' });
+      setForm({ make: '', model: '', year: '', license_plate: '', vehicle_type: 'car', battery_model: '', current_battery_code: '' });
       await loadVehicles();
     } catch (e: any) {
+      console.error('[VehicleManagement] Error adding vehicle:', e);
       setError(e.message || 'Có lỗi xảy ra');
     } finally {
       setLoading(false);
@@ -120,20 +158,30 @@ const VehicleManagement: React.FC = () => {
   };
 
   const startEdit = (vehicle: VehicleItem) => {
+    console.log('[VehicleManagement] startEdit - vehicle data:', {
+      vehicle_id: vehicle.vehicle_id,
+      license_plate: vehicle.license_plate,
+      current_battery: vehicle.current_battery,
+      current_battery_id: (vehicle as any).current_battery_id,
+      current_battery_code: vehicle.current_battery_code,
+    });
     setEditingId(vehicle.vehicle_id);
+    const batteryCode = vehicle.current_battery?.battery_code || vehicle.current_battery_code || '';
+    console.log('[VehicleManagement] startEdit - extracted battery_code:', batteryCode);
     setEditForm({
       make: vehicle.make || '',
       model: vehicle.model || '',
       year: vehicle.year ? String(vehicle.year) : '',
       license_plate: vehicle.license_plate,
       battery_model: vehicle.battery_model,
+      current_battery_code: batteryCode,
       vehicle_type: 'car'
     });
   };
 
   const cancelEdit = () => {
     setEditingId(null);
-    setEditForm({ make: '', model: '', year: '', license_plate: '', battery_model: '', vehicle_type: 'car' });
+    setEditForm({ make: '', model: '', year: '', license_plate: '', battery_model: '', current_battery_code: '', vehicle_type: 'car' });
   };
 
   const updateVehicle = async (vehicleId: string) => {
@@ -146,13 +194,14 @@ const VehicleManagement: React.FC = () => {
         model: editForm.model || undefined,
         year: editForm.year ? Number(editForm.year) : undefined,
         battery_model: editForm.battery_model,
+        current_battery_code: editForm.current_battery_code.trim() || undefined,
         vehicle_type: 'car'
       };
       const res = await fetchWithAuth(`${API_ENDPOINTS.DRIVER.VEHICLES}/${vehicleId}`, { method: 'PUT', body: JSON.stringify(body) });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message || 'Cập nhật xe thất bại');
       setEditingId(null);
-      setEditForm({make: '', model: '', year: '', license_plate: '', battery_model: '', vehicle_type: 'car'});
+      setEditForm({make: '', model: '', year: '', license_plate: '', battery_model: '', current_battery_code: '', vehicle_type: 'car'});
       await loadVehicles();
     } catch (e: any) {
       setError(e.message || 'Có lỗi xảy ra');
@@ -250,6 +299,15 @@ const VehicleManagement: React.FC = () => {
                         <Input value={editForm.battery_model} onChange={e => setEditForm(f=>({...f,battery_model:e.target.value}))} />
                       </div>
                       <div className="space-y-2 md:col-span-2">
+                        <Label>Mã Pin hiện tại</Label>
+                        <Input 
+                          value={editForm.current_battery_code} 
+                          onChange={e => setEditForm(f=>({...f,current_battery_code:e.target.value}))} 
+                          placeholder="VD: BAT-TD-007"
+                          className="bg-white dark:bg-slate-800"
+                        />
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
                         <Label>Loại xe</Label>
                         <Input value="car" disabled />
                       </div>
@@ -281,6 +339,9 @@ const VehicleManagement: React.FC = () => {
                       {vehicle.year ? (<><span>•</span><span>{vehicle.year}</span></>) : null}
                     </div>
                     <div className="text-sm">Model pin: {vehicle.battery_model}</div>
+                    {(vehicle.current_battery?.battery_code || vehicle.current_battery_code) && (
+                      <div className="text-sm">Mã Pin hiện tại: <span className="font-medium">{vehicle.current_battery?.battery_code || vehicle.current_battery_code}</span></div>
+                    )}
                     <div className="text-sm">Loại xe: car</div>
                     <div className="flex space-x-2 pt-2">
                       <Button variant="outline" size="sm" className="glass border-blue-200/50 dark:border-purple-400/30 hover:bg-blue-50/50 dark:hover:bg-purple-500/10" onClick={() => startEdit(vehicle)} disabled={loading}>
@@ -331,6 +392,17 @@ const VehicleManagement: React.FC = () => {
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="bmodel" className="text-slate-700 dark:text-slate-300">Model Pin</Label>
                 <Input id="bmodel" value={form.battery_model} onChange={(e) => setForm({ ...form, battery_model: e.target.value })} placeholder="VD: Standard-75kWh" className="bg-white dark:bg-slate-800 border-slate-200/50 dark:border-slate-700/50" />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="battery_code" className="text-slate-700 dark:text-slate-300">Mã Pin hiện tại <span className="text-red-500">*</span></Label>
+                <Input 
+                  id="battery_code" 
+                  value={form.current_battery_code} 
+                  onChange={(e) => setForm({ ...form, current_battery_code: e.target.value })} 
+                  placeholder="VD: BAT-TD-007" 
+                  className="bg-white dark:bg-slate-800 border-slate-200/50 dark:border-slate-700/50" 
+                  required
+                />
               </div>
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="vtype" className="text-slate-700 dark:text-slate-300">Loại xe</Label>

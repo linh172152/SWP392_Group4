@@ -26,6 +26,14 @@ export const getUserVehicles = asyncHandler(
             email: true,
           },
         },
+        current_battery: {
+          select: {
+            battery_id: true,
+            battery_code: true,
+            status: true,
+            current_charge: true,
+          },
+        },
       },
       orderBy: { created_at: "desc" },
     });
@@ -372,6 +380,14 @@ export const updateVehicle = asyncHandler(
             user_id: true,
             full_name: true,
             email: true,
+          },
+        },
+        current_battery: {
+          select: {
+            battery_id: true,
+            battery_code: true,
+            status: true,
+            current_charge: true,
           },
         },
       },
