@@ -9,6 +9,8 @@ import {
   VNPayPaymentData,
   VNPayResponse,
 } from "../utils/vnpay.util";
+import { vnpayConfig } from "../config/vnpay.config";
+import crypto from "crypto-js";
 import { CustomError } from "../middlewares/error.middleware";
 import { prisma } from "../server";
 
@@ -110,6 +112,30 @@ export const createVNPayPayment = async (
 
     // Generate VNPay URL
     const paymentUrl = generateVNPayUrl(vnpayData);
+
+    try {
+      const url = new URL(paymentUrl);
+      const paramsForHash: Record<string, string> = {};
+      url.searchParams.forEach((value, key) => {
+        if (key !== "vnp_SecureHash" && key !== "vnp_SecureHashType") {
+          paramsForHash[key] = value;
+        }
+      });
+      const signFromUrl = Object.keys(paramsForHash)
+        .sort()
+        .map((key) => `${key}=${paramsForHash[key]}`)
+        .join("&");
+      const hashFromUrl = crypto
+        .HmacSHA512(signFromUrl, vnpayConfig.hashSecret)
+        .toString(crypto.enc.Hex)
+        .toUpperCase();
+      const sentHash = url.searchParams.get("vnp_SecureHash");
+      console.log("[VNPay] TMN:", paramsForHash["vnp_TmnCode"]);
+      console.log("[VNPay] sentHash:", sentHash);
+      console.log("[VNPay] hashFromUrl:", hashFromUrl);
+    } catch (error) {
+      console.warn("[VNPay] Failed to verify generated payment URL:", error);
+    }
 
     console.log(
       "[VNPay] Generated payment URL",
