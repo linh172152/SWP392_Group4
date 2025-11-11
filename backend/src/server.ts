@@ -127,12 +127,10 @@ app.use(helmet());
 app.use(
   cors({
     origin: [
-      process.env.FRONTEND_URL || "http://localhost:5173",
+      process.env.FRONTEND_URL || "https://swp392-ev.vercel.app",
       "http://localhost:3000",
       "http://localhost:5173",
-      "https://ev-battery-frontend.onrender.com",
-      "https://swp392-git-main-leducthanhhs-projects.vercel.app",
-      "https://swp392.vercel.app",
+      "https://swp392-ev.vercel.app",
     ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
