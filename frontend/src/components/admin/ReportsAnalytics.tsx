@@ -84,10 +84,10 @@ const ReportsAnalytics: React.FC = () => {
                 </div>
                 <div>
                   <h1 className="text-4xl font-black text-white tracking-tight">
-                    Reports & Analytics
+                    Báo Cáo & Phân Tích
                   </h1>
                   <p className="text-indigo-100 text-lg mt-1">
-                    Real-time system performance metrics
+                    Thống kê hiệu suất hệ thống theo thời gian thực
                   </p>
                 </div>
               </div>
@@ -104,7 +104,7 @@ const ReportsAnalytics: React.FC = () => {
                         : 'text-white hover:bg-white/10'
                     }`}
                   >
-                    {p === 'day' ? 'Today' : p === 'week' ? 'This Week' : 'This Month'}
+                    {p === 'day' ? 'Hôm nay' : p === 'week' ? 'Tuần này' : 'Tháng này'}
                   </button>
                 ))}
               </div>
@@ -114,7 +114,7 @@ const ReportsAnalytics: React.FC = () => {
               <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20">
                 <div className="flex items-center gap-2 text-white">
                   <Calendar className="h-5 w-5" />
-                  <span className="font-semibold">Period: {stats.period}</span>
+                  <span className="font-semibold">Kỳ báo cáo: {stats.period}</span>
                 </div>
               </div>
             )}
@@ -157,8 +157,8 @@ const ReportsAnalytics: React.FC = () => {
                     <DollarSign className="h-8 w-8 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-white">Revenue Analytics</h2>
-                    <p className="text-green-100">Financial performance overview</p>
+                    <h2 className="text-2xl font-bold text-white">Phân Tích Doanh Thu</h2>
+                    <p className="text-green-100">Tổng quan hiệu suất tài chính</p>
                   </div>
                 </div>
               </div>
@@ -169,7 +169,7 @@ const ReportsAnalytics: React.FC = () => {
                   <Card className="border-2 border-green-100 bg-gradient-to-br from-green-50 to-emerald-50">
                     <CardHeader>
                       <CardTitle className="flex items-center justify-between">
-                        <span className="text-slate-700">Total Revenue</span>
+                        <span className="text-slate-700">Tổng Doanh Thu</span>
                         {getTrendIcon(stats.revenue.trend)}
                       </CardTitle>
                     </CardHeader>
@@ -178,7 +178,7 @@ const ReportsAnalytics: React.FC = () => {
                         {formatCurrency(stats.revenue.total)}
                       </p>
                       <p className={`text-sm font-semibold ${getTrendColor(stats.revenue.trend)}`}>
-                        {stats.revenue.trend} trend
+                        Xu hướng {stats.revenue.trend}
                       </p>
                     </CardContent>
                   </Card>
@@ -186,13 +186,13 @@ const ReportsAnalytics: React.FC = () => {
                   {/* Daily Average */}
                   <Card className="border-2 border-blue-100 bg-gradient-to-br from-blue-50 to-indigo-50">
                     <CardHeader>
-                      <CardTitle className="text-slate-700">Daily Average</CardTitle>
+                      <CardTitle className="text-slate-700">Trung Bình Ngày</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <p className="text-3xl font-black text-blue-600">
                         {formatCurrency(stats.revenue.daily_average)}
                       </p>
-                      <p className="text-sm text-slate-600 mt-2">per day</p>
+                      <p className="text-sm text-slate-600 mt-2">mỗi ngày</p>
                     </CardContent>
                   </Card>
 
@@ -201,7 +201,7 @@ const ReportsAnalytics: React.FC = () => {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-slate-700">
                         <CreditCard className="h-5 w-5" />
-                        Payment Methods
+                        Phương Thức Thanh Toán
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -231,8 +231,8 @@ const ReportsAnalytics: React.FC = () => {
                     <Calendar className="h-8 w-8 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-white">Booking Statistics</h2>
-                    <p className="text-blue-100">Service usage metrics</p>
+                    <h2 className="text-2xl font-bold text-white">Thống Kê Đặt Chỗ</h2>
+                    <p className="text-blue-100">Chỉ số sử dụng dịch vụ</p>
                   </div>
                 </div>
               </div>
@@ -242,7 +242,7 @@ const ReportsAnalytics: React.FC = () => {
                   {/* Total Bookings */}
                   <Card className="border-2 border-blue-100 bg-gradient-to-br from-blue-50 to-indigo-50">
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm text-slate-600">Total Bookings</CardTitle>
+                      <CardTitle className="text-sm text-slate-600">Tổng Đặt Chỗ</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="flex items-center justify-between">
@@ -260,7 +260,7 @@ const ReportsAnalytics: React.FC = () => {
                     <CardHeader className="pb-3">
                       <CardTitle className="flex items-center gap-2 text-sm text-slate-600">
                         <CheckCircle className="h-4 w-4 text-green-500" />
-                        Completed
+                        Hoàn Thành
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -273,7 +273,7 @@ const ReportsAnalytics: React.FC = () => {
                     <CardHeader className="pb-3">
                       <CardTitle className="flex items-center gap-2 text-sm text-slate-600">
                         <Clock className="h-4 w-4 text-yellow-500" />
-                        Pending
+                        Chờ Xử Lý
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -286,7 +286,7 @@ const ReportsAnalytics: React.FC = () => {
                     <CardHeader className="pb-3">
                       <CardTitle className="flex items-center gap-2 text-sm text-slate-600">
                         <XCircle className="h-4 w-4 text-red-500" />
-                        Cancelled
+                        Đã Hủy
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -297,7 +297,7 @@ const ReportsAnalytics: React.FC = () => {
                   {/* Cancellation Rate */}
                   <Card className="border-2 border-orange-100 bg-gradient-to-br from-orange-50 to-red-50">
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm text-slate-600">Cancel Rate</CardTitle>
+                      <CardTitle className="text-sm text-slate-600">Tỷ Lệ Hủy</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <p className="text-2xl font-black text-orange-600">
@@ -319,8 +319,8 @@ const ReportsAnalytics: React.FC = () => {
                       <Activity className="h-6 w-6 text-white" />
                     </div>
                     <div>
-                      <h2 className="text-xl font-bold text-white">Transactions</h2>
-                      <p className="text-purple-100 text-sm">Payment overview</p>
+                      <h2 className="text-xl font-bold text-white">Giao Dịch</h2>
+                      <p className="text-purple-100 text-sm">Tổng quan thanh toán</p>
                     </div>
                   </div>
                 </div>
@@ -328,7 +328,7 @@ const ReportsAnalytics: React.FC = () => {
                 <div className="p-6 space-y-4">
                   <Card className="border-2 border-purple-100 bg-gradient-to-br from-purple-50 to-pink-50">
                     <CardHeader>
-                      <CardTitle className="text-slate-700">Total Transactions</CardTitle>
+                      <CardTitle className="text-slate-700">Tổng Giao Dịch</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <p className="text-3xl font-black text-purple-600">{stats.transactions.total}</p>
@@ -337,7 +337,7 @@ const ReportsAnalytics: React.FC = () => {
 
                   <Card className="border-2 border-pink-100 bg-gradient-to-br from-pink-50 to-rose-50">
                     <CardHeader>
-                      <CardTitle className="text-slate-700">Average Amount</CardTitle>
+                      <CardTitle className="text-slate-700">Số Tiền Trung Bình</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <p className="text-2xl font-black text-pink-600">
@@ -350,7 +350,7 @@ const ReportsAnalytics: React.FC = () => {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-slate-700">
                         <Zap className="h-5 w-5" />
-                        By Battery Model
+                        Theo Mẫu Pin
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -358,7 +358,7 @@ const ReportsAnalytics: React.FC = () => {
                         {Object.entries(stats.transactions.by_battery_model).map(([model, count]) => (
                           <div key={model} className="flex justify-between items-center p-2 bg-white rounded-lg">
                             <span className="text-sm font-medium text-slate-700">{model}</span>
-                            <span className="text-sm font-bold text-indigo-600">{count} txns</span>
+                            <span className="text-sm font-bold text-indigo-600">{count} giao dịch</span>
                           </div>
                         ))}
                       </div>
@@ -377,8 +377,8 @@ const ReportsAnalytics: React.FC = () => {
                         <Building className="h-6 w-6 text-white" />
                       </div>
                       <div>
-                        <h2 className="text-xl font-bold text-white">Stations</h2>
-                        <p className="text-cyan-100 text-sm">Network status</p>
+                        <h2 className="text-xl font-bold text-white">Trạm</h2>
+                        <p className="text-cyan-100 text-sm">Trạng thái mạng lưới</p>
                       </div>
                     </div>
                   </div>
@@ -387,7 +387,7 @@ const ReportsAnalytics: React.FC = () => {
                     <div className="grid grid-cols-2 gap-4">
                       <Card className="border-2 border-cyan-100 bg-gradient-to-br from-cyan-50 to-blue-50">
                         <CardHeader className="pb-3">
-                          <CardTitle className="text-sm text-slate-600">Active Stations</CardTitle>
+                          <CardTitle className="text-sm text-slate-600">Trạm Hoạt Động</CardTitle>
                         </CardHeader>
                         <CardContent>
                           <p className="text-2xl font-black text-cyan-600">{stats.stations.active}</p>
@@ -396,7 +396,7 @@ const ReportsAnalytics: React.FC = () => {
 
                       <Card className="border-2 border-blue-100 bg-gradient-to-br from-blue-50 to-indigo-50">
                         <CardHeader className="pb-3">
-                          <CardTitle className="text-sm text-slate-600">Total Bookings</CardTitle>
+                          <CardTitle className="text-sm text-slate-600">Tổng Đặt Chỗ</CardTitle>
                         </CardHeader>
                         <CardContent>
                           <p className="text-2xl font-black text-blue-600">{stats.stations.total_bookings}</p>
@@ -409,7 +409,7 @@ const ReportsAnalytics: React.FC = () => {
                         <CardHeader>
                           <CardTitle className="flex items-center gap-2 text-slate-700">
                             <Award className="h-5 w-5 text-yellow-500" />
-                            Most Popular
+                            Phổ Biến Nhất
                           </CardTitle>
                         </CardHeader>
                         <CardContent>
@@ -417,7 +417,7 @@ const ReportsAnalytics: React.FC = () => {
                             {stats.stations.most_popular.name}
                           </p>
                           <p className="text-sm text-slate-600 mt-1">
-                            {stats.stations.most_popular.bookings_count} bookings
+                            {stats.stations.most_popular.bookings_count} đặt chỗ
                           </p>
                         </CardContent>
                       </Card>
@@ -433,8 +433,8 @@ const ReportsAnalytics: React.FC = () => {
                         <Users className="h-6 w-6 text-white" />
                       </div>
                       <div>
-                        <h2 className="text-xl font-bold text-white">Users</h2>
-                        <p className="text-teal-100 text-sm">Community growth</p>
+                        <h2 className="text-xl font-bold text-white">Người Dùng</h2>
+                        <p className="text-teal-100 text-sm">Tăng trưởng cộng đồng</p>
                       </div>
                     </div>
                   </div>
@@ -443,7 +443,7 @@ const ReportsAnalytics: React.FC = () => {
                     <div className="grid grid-cols-3 gap-4">
                       <Card className="border-2 border-teal-100 bg-gradient-to-br from-teal-50 to-cyan-50">
                         <CardHeader className="pb-3">
-                          <CardTitle className="text-xs text-slate-600">Total</CardTitle>
+                          <CardTitle className="text-xs text-slate-600">Tổng</CardTitle>
                         </CardHeader>
                         <CardContent>
                           <p className="text-xl font-black text-teal-600">{stats.users.total}</p>
@@ -452,7 +452,7 @@ const ReportsAnalytics: React.FC = () => {
 
                       <Card className="border-2 border-green-100 bg-gradient-to-br from-green-50 to-emerald-50">
                         <CardHeader className="pb-3">
-                          <CardTitle className="text-xs text-slate-600">Active</CardTitle>
+                          <CardTitle className="text-xs text-slate-600">Hoạt Động</CardTitle>
                         </CardHeader>
                         <CardContent>
                           <p className="text-xl font-black text-green-600">{stats.users.active_this_month}</p>
@@ -461,7 +461,7 @@ const ReportsAnalytics: React.FC = () => {
 
                       <Card className="border-2 border-blue-100 bg-gradient-to-br from-blue-50 to-indigo-50">
                         <CardHeader className="pb-3">
-                          <CardTitle className="text-xs text-slate-600">New</CardTitle>
+                          <CardTitle className="text-xs text-slate-600">Mới</CardTitle>
                         </CardHeader>
                         <CardContent>
                           <p className="text-xl font-black text-blue-600">{stats.users.new_this_month}</p>
@@ -480,8 +480,8 @@ const ReportsAnalytics: React.FC = () => {
           <Card className="text-center py-12">
             <CardContent>
               <BarChart3 className="h-16 w-16 text-slate-300 mx-auto mb-4" />
-              <p className="text-slate-500 text-lg font-medium">No analytics data available</p>
-              <p className="text-slate-400 text-sm mt-2">Try selecting a different time period</p>
+              <p className="text-slate-500 text-lg font-medium">Không có dữ liệu phân tích</p>
+              <p className="text-slate-400 text-sm mt-2">Thử chọn khoảng thời gian khác</p>
             </CardContent>
           </Card>
         )}

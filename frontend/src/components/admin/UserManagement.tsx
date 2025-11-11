@@ -250,38 +250,78 @@ const UserManagement: React.FC = () => {
   };
 
   return (
-    <div className="p-8 bg-gray-50 min-h-screen">
-      <div className="flex justify-between items-center mb-6">
+    <div className="container mx-auto max-w-7xl px-4 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            👥 Quản lý người dùng
-          </h1>
-          <p className="text-gray-600 mt-1">
-            Quản lý danh sách và quyền của người dùng trong hệ thống
+          <h1 className="text-3xl font-bold tracking-tight">Quản lý người dùng</h1>
+          <p className="text-muted-foreground">
+            Quản lý danh sách và quyền của người dùng trong hệ thống.
           </p>
         </div>
-        <Button
-          onClick={() => setIsCreateModalOpen(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white"
-        >
-          <UserPlusIcon className="mr-2 h-4 w-4" />
+        <Button onClick={() => setIsCreateModalOpen(true)} className="gap-2">
+          <UserPlusIcon className="h-4 w-4" />
           Thêm người dùng
         </Button>
       </div>
 
-      <Card className="shadow-md border border-gray-200">
+      {/* Statistics Cards */}
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-4">
+        <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-blue-700">Tổng người dùng</CardTitle>
+            <UserPlusIcon className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-800">{users.length}</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-r from-green-50 to-emerald-100 border-green-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-green-700">Đang hoạt động</CardTitle>
+            <UserPlusIcon className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-700">
+              {users.filter(u => u.status === 'ACTIVE').length}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-r from-amber-50 to-yellow-100 border-amber-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-amber-700">Admin</CardTitle>
+            <UserPlusIcon className="h-4 w-4 text-amber-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-amber-800">
+              {users.filter(u => u.role === 'ADMIN').length}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-r from-red-50 to-rose-100 border-red-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-red-700">Không hoạt động</CardTitle>
+            <UserPlusIcon className="h-4 w-4 text-red-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-700">
+              {users.filter(u => u.status === 'INACTIVE').length}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* User List */}
+      <Card>
         <CardHeader>
-          <CardTitle className="text-xl font-semibold text-gray-800">
-            Danh sách người dùng
-          </CardTitle>
+          <CardTitle>Danh sách người dùng</CardTitle>
           <CardDescription>Toàn bộ người dùng trong hệ thống</CardDescription>
         </CardHeader>
-
         <CardContent>
           {loading ? (
-            <div className="flex justify-center py-10">
-              <div className="animate-spin h-8 w-8 border-4 border-blue-400 border-t-transparent rounded-full"></div>
-              <p className="ml-3 text-blue-600 font-medium">Đang tải...</p>
+            <div className="flex flex-col justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600 mb-4"></div>
+              <p className="text-gray-600 animate-pulse">Đang tải danh sách người dùng...</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
