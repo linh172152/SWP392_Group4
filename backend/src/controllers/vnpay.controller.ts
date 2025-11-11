@@ -139,7 +139,8 @@ export const handleReturn = asyncHandler(
         }
 
         // Redirect to success page
-        const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+        const frontendUrl =
+          process.env.FRONTEND_URL || "https://swp392-ev.vercel.app";
         const successUrl = `${frontendUrl}/payment/success?paymentId=${result.paymentId}&amount=${result.amount}`;
         return res.redirect(successUrl);
       } else {
@@ -167,7 +168,8 @@ export const handleReturn = asyncHandler(
         }
 
         // Redirect to error page
-        const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+        const frontendUrl =
+          process.env.FRONTEND_URL || "https://swp392-ev.vercel.app";
         const errorUrl = `${frontendUrl}/payment/error?message=${encodeURIComponent(result.message)}`;
         return res.redirect(errorUrl);
       }
