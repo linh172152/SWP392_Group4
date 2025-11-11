@@ -434,18 +434,20 @@ const StaffManagement: React.FC = () => {
 
       {/* Add Staff Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="max-w-7xl w-[98vw] max-h-[95vh] overflow-hidden">
+          <DialogHeader className="pb-4">
             <DialogTitle>Thêm Nhân viên mới</DialogTitle>
             <DialogDescription>
               Điền thông tin để thêm nhân viên mới vào hệ thống
             </DialogDescription>
           </DialogHeader>
-          <StaffForm 
-            onSubmit={handleAddStaff as any} 
-            isSubmitting={loading}
-            stations={stationList}
-          />
+          <div className="overflow-y-auto max-h-[calc(95vh-120px)] px-2">
+            <StaffForm 
+              onSubmit={handleAddStaff as any} 
+              isSubmitting={loading}
+              stations={stationList}
+            />
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -456,34 +458,36 @@ const StaffManagement: React.FC = () => {
           if (!open) setSelectedStaff(null);
         }}
       >
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
+        <DialogContent className="max-w-7xl w-[98vw] max-h-[95vh] overflow-hidden">
+          <DialogHeader className="pb-4">
             <DialogTitle>Chỉnh sửa Thông tin Nhân viên</DialogTitle>
             <DialogDescription>
               Cập nhật thông tin nhân viên {selectedStaff?.full_name || selectedStaff?.email}
             </DialogDescription>
           </DialogHeader>
-          {selectedStaff && (
-            <StaffForm 
-              initialData={selectedStaff}
-              onSubmit={async (data) => {
-                if (!selectedStaff.user_id) {
-                  setError('ID nhân viên không hợp lệ');
-                  return;
-                }
-                await handleUpdateStaff(selectedStaff.user_id, {
-                  full_name: data.name,
-                  email: data.email,
-                  phone: data.phone,
-                  role: data.position,
-                  status: data.status,
-                  station_id: data.station_id || null,
-                });
-              }}
-              isSubmitting={loading}
-              stations={stationList}
-            />
-          )}
+          <div className="overflow-y-auto max-h-[calc(95vh-120px)] px-2">
+            {selectedStaff && (
+              <StaffForm 
+                initialData={selectedStaff}
+                onSubmit={async (data) => {
+                  if (!selectedStaff.user_id) {
+                    setError('ID nhân viên không hợp lệ');
+                    return;
+                  }
+                  await handleUpdateStaff(selectedStaff.user_id, {
+                    full_name: data.name,
+                    email: data.email,
+                    phone: data.phone,
+                    role: data.position,
+                    status: data.status,
+                    station_id: data.station_id || null,
+                  });
+                }}
+                isSubmitting={loading}
+                stations={stationList}
+              />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

@@ -380,13 +380,14 @@ const VehicleManagement: React.FC = () => {
                 <Input id="bmodel" value={form.battery_model} onChange={(e) => setForm({ ...form, battery_model: e.target.value })} placeholder="VD: Standard-75kWh" className="bg-white dark:bg-slate-800 border-slate-200/50 dark:border-slate-700/50" />
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="battery_code" className="text-slate-700 dark:text-slate-300">Mã Pin hiện tại</Label>
+                <Label htmlFor="battery_code" className="text-slate-700 dark:text-slate-300">Mã Pin hiện tại <span className="text-red-500">*</span></Label>
                 <Input 
                   id="battery_code" 
                   value={form.current_battery_code} 
                   onChange={(e) => setForm({ ...form, current_battery_code: e.target.value })} 
                   placeholder="VD: BAT-TD-007" 
                   className="bg-white dark:bg-slate-800 border-slate-200/50 dark:border-slate-700/50" 
+                  required
                 />
               </div>
               <div className="space-y-2 md:col-span-2">
