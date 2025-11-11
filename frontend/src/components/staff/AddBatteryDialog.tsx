@@ -89,13 +89,14 @@ const AddBatteryDialog: React.FC<AddBatteryDialogProps> = ({
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.battery_code.trim()) {
+    const batteryCode = formData.battery_code?.trim() || '';
+    if (!batteryCode) {
       newErrors.battery_code = 'Mã pin là bắt buộc';
-    } else if (formData.battery_code.length < 3) {
+    } else if (batteryCode.length < 3) {
       newErrors.battery_code = 'Mã pin phải có ít nhất 3 ký tự';
     }
 
-    if (!formData.model.trim()) {
+    if (!(formData.model?.trim())) {
       newErrors.model = 'Model pin là bắt buộc';
     }
 
@@ -107,7 +108,8 @@ const AddBatteryDialog: React.FC<AddBatteryDialogProps> = ({
       newErrors.voltage = 'Điện áp phải lớn hơn 0';
     }
 
-    if (formData.current_charge < 0 || formData.current_charge > 100) {
+    const currentCharge = formData.current_charge ?? 100;
+    if (currentCharge < 0 || currentCharge > 100) {
       newErrors.current_charge = 'Mức sạc phải từ 0-100%';
     }
 

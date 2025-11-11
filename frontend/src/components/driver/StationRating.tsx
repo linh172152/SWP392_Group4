@@ -86,7 +86,7 @@ const StationRating: React.FC = () => {
         </Button>
       </div>
 
-      {error && <ErrorDisplay message={error} variant="card" />}
+      {error && <ErrorDisplay error={error} variant="card" />}
 
       {/* Danh sách đánh giá đã tạo */}
       <Card className="glass-card border-0 shadow-xl">

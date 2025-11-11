@@ -44,7 +44,7 @@ const StaffHome: React.FC = () => {
   
   // Auto-refresh state
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
-  const [autoRefreshInterval, setAutoRefreshInterval] = useState<NodeJS.Timeout | null>(null);
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState<ReturnType<typeof setInterval> | null>(null);
   const [lastRefreshTime, setLastRefreshTime] = useState<Date>(new Date());
   
   const { toast } = useToast();
@@ -132,7 +132,7 @@ const StaffHome: React.FC = () => {
 
   // Auto-refresh setup
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
+    let interval: ReturnType<typeof setInterval> | null = null;
     
     if (autoRefreshEnabled) {
       interval = setInterval(() => {

@@ -43,7 +43,6 @@ const AuthModal: React.FC<AuthModalProps> = ({
   const [phone, setPhone] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   // Simple password validation function

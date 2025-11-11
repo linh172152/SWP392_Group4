@@ -46,7 +46,6 @@ const ServicePackages: React.FC = () => {
   const [currentSubscription, setCurrentSubscription] = useState<UserSubscription | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [loadingSub, setLoadingSub] = useState(false);
 
   // Load danh sách gói dịch vụ
   const loadPackages = async () => {
@@ -66,7 +65,6 @@ const ServicePackages: React.FC = () => {
 
   // Load subscription hiện tại của user
   const loadCurrentSubscription = async () => {
-    setLoadingSub(true);
     try {
       const url = new URL(API_ENDPOINTS.SUBSCRIPTIONS.BASE);
       url.searchParams.set('status', 'active');
@@ -88,8 +86,6 @@ const ServicePackages: React.FC = () => {
       }
     } catch (e: any) {
       console.error('Load subscription error:', e);
-    } finally {
-      setLoadingSub(false);
     }
   };
 

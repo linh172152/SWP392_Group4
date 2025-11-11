@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Alert, AlertDescription } from '../ui/alert';
@@ -301,7 +300,6 @@ const BookingForm: React.FC = () => {
 
   const compatibleBatteryTypes = getCompatibleBatteryTypes();
   const selectedBatteryInfo = compatibleBatteryTypes.find(b => b.model === selectedBatteryType);
-  const compatibleVehiclesForSelected = selectedBatteryInfo?.compatibleVehicles || [];
 
   // Tính giá
   const batteryPrice = selectedBatteryInfo?.price || 0;
@@ -418,7 +416,6 @@ const BookingForm: React.FC = () => {
         throw new Error('Vui lòng chọn xe');
       }
 
-      let booking;
       const bookingData = {
         vehicle_id: selectedVehicleId,
         station_id: stationId,
@@ -429,7 +426,7 @@ const BookingForm: React.FC = () => {
       // Sử dụng state useSubscription mà driver đã chọn
       if (selectedTimeSlot === 'instant') {
         // Đặt chỗ đổi pin ngay
-        booking = await bookingService.createInstantBooking(bookingData);
+        await bookingService.createInstantBooking(bookingData);
         setSuccess('Đã đặt chỗ đổi pin ngay thành công! Pin đã được tạm giữ trong 15 phút.');
       } else if (selectedTimeSlot && selectedTimeSlot !== 'instant') {
         // Đặt lịch hẹn với time slot
@@ -442,7 +439,6 @@ const BookingForm: React.FC = () => {
           scheduled_at: scheduledDate.toISOString(),
           use_subscription: useSubscription, // Driver đã chọn có dùng subscription hay không
         });
-        booking = result.booking || result;
         
         // Hiển thị thông tin hold_summary
         if (result.hold_summary) {
@@ -466,7 +462,6 @@ const BookingForm: React.FC = () => {
           scheduled_at: scheduledDate.toISOString(),
           use_subscription: useSubscription, // Driver đã chọn có dùng subscription hay không
         });
-        booking = result.booking || result;
         
         // Hiển thị thông tin hold_summary
         if (result.hold_summary) {

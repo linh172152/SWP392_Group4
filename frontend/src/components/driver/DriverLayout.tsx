@@ -1,15 +1,13 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { User } from '../../App';
+import type { User } from '../../App';
 import { Button } from '../ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { ThemeToggle } from '../ThemeToggle';
 import { 
-  Home, 
   Car, 
   MapPin, 
   Calendar, 
-  CreditCard, 
   HelpCircle, 
   Settings, 
   LogOut,
