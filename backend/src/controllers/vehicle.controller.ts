@@ -38,10 +38,15 @@ export const getUserVehicles = asyncHandler(
       orderBy: { created_at: "desc" },
     });
 
+    const vehiclesWithBattery = vehicles.map((vehicle) => ({
+      ...vehicle,
+      current_battery: vehicle.current_battery ?? null,
+    }));
+
     res.status(200).json({
       success: true,
       message: "Vehicles retrieved successfully",
-      data: vehicles,
+      data: vehiclesWithBattery,
     });
   }
 );
