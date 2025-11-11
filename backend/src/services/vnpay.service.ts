@@ -111,6 +111,11 @@ export const createVNPayPayment = async (
     // Generate VNPay URL
     const paymentUrl = generateVNPayUrl(vnpayData);
 
+    console.log(
+      "[VNPay] Generated payment URL",
+      JSON.stringify({ orderId, userId, paymentUrl }, null, 2)
+    );
+
     return {
       paymentUrl,
       orderId,
