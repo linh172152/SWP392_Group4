@@ -57,8 +57,8 @@ export const generateVNPayUrl = (paymentData: VNPayPaymentData): string => {
   // Convert amount to VNPay format (multiply by 100)
   const vnpAmount = (amount * 100).toString();
 
-  // Create order info
-  const orderInfo = orderDescription;
+  // Create order info (remove whitespace characters as per VNPay spec)
+  const orderInfo = orderDescription.replace(/\s+/g, "");
 
   // Create return URL
   const returnUrl = vnpayConfig.returnUrl;
@@ -90,7 +90,7 @@ export const generateVNPayUrl = (paymentData: VNPayPaymentData): string => {
   }
 
   // Sort parameter keys
-  const sortedKeys = Object.keys(params).sort();
+  const sortedKeys = Object.keys(params).sort((a, b) => a.localeCompare(b));
 
   // Build string for secure hash without URL encoding
   const signData = sortedKeys.map((key) => `${key}=${params[key]}`).join("&");
@@ -112,7 +112,7 @@ export const generateVNPayUrl = (paymentData: VNPayPaymentData): string => {
 
   // Create final query string with URL encoding
   const finalQueryString = Object.keys(finalParams)
-    .sort()
+    .sort((a, b) => a.localeCompare(b))
     .map((key) => `${key}=${encodeURIComponent(finalParams[key])}`)
     .join("&");
 
@@ -131,7 +131,7 @@ export const verifyVNPayResponse = (response: VNPayResponse): boolean => {
     // Sort parameters by key
     const sortedParams: Record<string, string> = {};
     Object.keys(params)
-      .sort()
+      .sort((a, b) => a.localeCompare(b))
       .forEach((key) => {
         sortedParams[key] = (params as any)[key];
       });
