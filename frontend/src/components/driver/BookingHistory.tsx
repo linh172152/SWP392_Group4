@@ -61,6 +61,7 @@ interface BookingItem {
   booking_id: string;
   booking_code: string;
   scheduled_at: string;
+  created_at: string;
   status: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
   station?: { name: string; address: string };
   vehicle?: { license_plate: string; vehicle_type: string; model?: string };
@@ -524,12 +525,18 @@ const BookingHistory: React.FC = () => {
             <h3>📅 Thời gian</h3>
             <div class="info-row">
               <span class="label">Ngày đặt:</span>
-              <span class="value">${new Date(booking.scheduled_at).toLocaleDateString('vi-VN')}</span>
+              <span class="value">${booking.created_at ? new Date(booking.created_at).toLocaleDateString('vi-VN') : new Date(booking.scheduled_at).toLocaleDateString('vi-VN')}</span>
             </div>
             <div class="info-row">
               <span class="label">Giờ đặt:</span>
-              <span class="value">${new Date(booking.scheduled_at).toLocaleTimeString('vi-VN')}</span>
+              <span class="value">${booking.created_at ? new Date(booking.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : new Date(booking.scheduled_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>
             </div>
+            ${booking.scheduled_at && booking.created_at && new Date(booking.scheduled_at).getTime() !== new Date(booking.created_at).getTime() ? `
+            <div class="info-row">
+              <span class="label">Thời gian hẹn:</span>
+              <span class="value">${new Date(booking.scheduled_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
+            ` : ''}
           </div>
 
           <div class="notice">
@@ -712,11 +719,24 @@ const BookingHistory: React.FC = () => {
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                   <div>
                     <p className="text-slate-600 dark:text-slate-400">Ngày đặt</p>
-                    <p className="font-medium text-slate-900 dark:text-white">{new Date(booking.scheduled_at).toLocaleDateString()}</p>
+                    <p className="font-medium text-slate-900 dark:text-white">
+                      {booking.created_at 
+                        ? new Date(booking.created_at).toLocaleDateString('vi-VN')
+                        : new Date(booking.scheduled_at).toLocaleDateString('vi-VN')}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-slate-600 dark:text-slate-400">Giờ</p>
-                    <p className="font-medium text-slate-900 dark:text-white">{new Date(booking.scheduled_at).toLocaleTimeString()}</p>
+                    <p className="text-slate-600 dark:text-slate-400">Giờ đặt</p>
+                    <p className="font-medium text-slate-900 dark:text-white">
+                      {booking.created_at 
+                        ? new Date(booking.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+                        : new Date(booking.scheduled_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                    {booking.scheduled_at && booking.created_at && new Date(booking.scheduled_at).getTime() !== new Date(booking.created_at).getTime() && (
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                        Hẹn: {new Date(booking.scheduled_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <p className="text-slate-600 dark:text-slate-400">Chi phí</p>

@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { Toaster } from './components/ui/sonner';
+import { Card, CardContent } from './components/ui/card';
+import { Button } from './components/ui/button';
+import { XCircle } from 'lucide-react';
 import LandingPage from './components/LandingPage';
 import AuthModal from './components/AuthModal';
 import GoogleCallback from './components/GoogleCallback';
 import DriverDashboard from './components/driver/DriverDashboard';
 import StaffDashboard from './components/staff/StaffDashboard';
 import AdminDashboard from './components/admin/AdminDashboard';
+import PaymentSuccess from './components/PaymentSuccess';
 
 export interface User {
   id: string;
@@ -20,6 +24,26 @@ export interface User {
   stationId?: string; // For staff - which station they work at
   permissions?: string[]; // For future granular permissions
 }
+
+const PaymentErrorPage: React.FC = () => {
+  const navigate = useNavigate();
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <Card className="glass-card border-0 shadow-xl max-w-md w-full">
+        <CardContent className="p-8 text-center">
+          <XCircle className="h-16 w-16 text-red-600 mx-auto mb-4" />
+          <h2 className="text-xl font-bold mb-2">Thanh toán thất bại</h2>
+          <p className="text-slate-600 dark:text-slate-400 mb-4">
+            Có lỗi xảy ra trong quá trình thanh toán
+          </p>
+          <Button onClick={() => navigate('/driver/wallet')} variant="outline">
+            Quay lại ví
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -74,6 +98,14 @@ function App() {
           <Route 
             path="/auth/error" 
             element={<GoogleCallback onLogin={handleLogin} />} 
+          />
+          <Route 
+            path="/payment/success" 
+            element={<PaymentSuccess />} 
+          />
+          <Route 
+            path="/payment/error" 
+            element={<PaymentErrorPage />} 
           />
           <Route 
             path="/driver/*" 
