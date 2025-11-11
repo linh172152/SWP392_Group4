@@ -46,19 +46,26 @@ const TopUpModal: React.FC<TopUpModalProps> = ({
         payment_method: paymentMethod,
       });
 
-      if (response.success) {
-        // If cash payment, success immediately
-        if (paymentMethod === 'cash') {
-          onSuccess();
-        } else {
-          // For online payments, redirect to payment gateway
-          // This will be handled by VNPay service
-          // For now, just show success message
-          alert('Đang chuyển hướng đến cổng thanh toán...');
-          // TODO: Handle VNPay/MoMo redirect
-          onSuccess();
-        }
+      if (!response.success) {
+        throw new Error(response.message || 'Không thể tạo giao dịch nạp tiền');
       }
+
+      // Cash: cập nhật ngay lập tức
+      if (paymentMethod === 'cash') {
+        onSuccess();
+        return;
+      }
+
+      const paymentUrl = response.data?.payment_url;
+
+      if (!paymentUrl) {
+        throw new Error('Không nhận được liên kết thanh toán từ hệ thống');
+      }
+
+      // Đóng modal trước khi chuyển hướng
+      onClose();
+      // Chuyển hướng tới cổng thanh toán
+      window.location.href = paymentUrl;
     } catch (err: any) {
       setError(err.message || 'Có lỗi xảy ra khi nạp tiền');
     } finally {

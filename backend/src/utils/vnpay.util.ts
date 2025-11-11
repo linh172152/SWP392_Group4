@@ -1,6 +1,6 @@
-import crypto from 'crypto-js';
-import moment from 'moment';
-import { vnpayConfig } from '../config/vnpay.config';
+import crypto from "crypto-js";
+import moment from "moment-timezone";
+import { vnpayConfig } from "../config/vnpay.config";
 
 export interface VNPayPaymentData {
   amount: number;
@@ -9,6 +9,7 @@ export interface VNPayPaymentData {
   orderType?: string;
   bankCode?: string;
   language?: string;
+  ipAddress?: string;
 }
 
 export interface VNPayResponse {
@@ -21,10 +22,14 @@ export interface VNPayResponse {
   vnp_ResponseCode: string;
   vnp_TmnCode: string;
   vnp_TransactionNo: string;
-  vnp_TransactionStatus: string;
+  vnp_TransactionStatus?: string;
   vnp_TxnRef: string;
+  vnp_SecureHashType?: string;
   vnp_SecureHash: string;
 }
+
+const formatVNPayTime = (value?: moment.MomentInput) =>
+  moment(value).tz("Asia/Ho_Chi_Minh").format(vnpayConfig.createDate);
 
 /**
  * Generate VNPay payment URL
@@ -34,29 +39,33 @@ export const generateVNPayUrl = (paymentData: VNPayPaymentData): string => {
     amount,
     orderId,
     orderDescription,
-    orderType = 'other',
-    bankCode = '',
-    language = 'vn'
+    orderType = "other",
+    bankCode = "",
+    language = "vn",
+    ipAddress,
   } = paymentData;
 
-  // Create date in VNPay format
-  const createDate = moment().format(vnpayConfig.createDate);
-  
+  // Create date in VNPay format (ICT time)
+  const now = moment().tz("Asia/Ho_Chi_Minh");
+  const createDate = formatVNPayTime(now);
+
   // Expire date (15 minutes from now)
-  const expireDate = moment().add(vnpayConfig.expireTime, 'minutes').format(vnpayConfig.createDate);
-  
+  const expireDate = formatVNPayTime(
+    now.clone().add(vnpayConfig.expireTime, "minutes")
+  );
+
   // Convert amount to VNPay format (multiply by 100)
   const vnpAmount = (amount * 100).toString();
-  
+
   // Create order info
   const orderInfo = orderDescription;
-  
+
   // Create return URL
   const returnUrl = vnpayConfig.returnUrl;
-  
+
   // Create IPN URL (not used in URL generation)
   // const ipnUrl = vnpayConfig.ipnUrl;
-  
+
   // Create parameters object
   const params: Record<string, string> = {
     vnp_Version: vnpayConfig.version,
@@ -69,9 +78,9 @@ export const generateVNPayUrl = (paymentData: VNPayPaymentData): string => {
     vnp_OrderType: orderType,
     vnp_Locale: language,
     vnp_ReturnUrl: returnUrl,
-    vnp_IpAddr: '127.0.0.1', // This should be the actual client IP
+    vnp_IpAddr: (ipAddress ?? "").toString().trim() || "127.0.0.1",
     vnp_CreateDate: createDate,
-    vnp_ExpireDate: expireDate
+    vnp_ExpireDate: expireDate,
   };
 
   // Add bank code if provided
@@ -79,32 +88,30 @@ export const generateVNPayUrl = (paymentData: VNPayPaymentData): string => {
     params.vnp_BankCode = bankCode;
   }
 
-  // Sort parameters by key
-  const sortedParams = Object.keys(params)
-    .sort()
-    .reduce((result: Record<string, string>, key) => {
-      result[key] = params[key];
-      return result;
-    }, {});
+  // Sort parameter keys
+  const sortedKeys = Object.keys(params).sort();
 
-  // Create query string
-  const queryString = Object.keys(sortedParams)
-    .map(key => `${key}=${encodeURIComponent(sortedParams[key])}`)
-    .join('&');
+  // Build string for secure hash without URL encoding
+  const signData = sortedKeys.map((key) => `${key}=${params[key]}`).join("&");
 
   // Create secure hash
-  const secureHash = crypto.HmacSHA512(queryString, vnpayConfig.hashSecret).toString();
+  const secureHash = crypto
+    .HmacSHA512(signData, vnpayConfig.hashSecret)
+    .toString(crypto.enc.Hex)
+    .toLowerCase();
 
-  // Add secure hash to parameters
+  // Add secure hash info to parameters
   const finalParams: Record<string, string> = {
-    ...sortedParams,
-    vnp_SecureHash: secureHash
+    ...params,
+    vnp_SecureHashType: vnpayConfig.secureHashType,
+    vnp_SecureHash: secureHash,
   };
 
-  // Create final query string
+  // Create final query string with URL encoding
   const finalQueryString = Object.keys(finalParams)
-    .map(key => `${key}=${encodeURIComponent(finalParams[key])}`)
-    .join('&');
+    .sort()
+    .map((key) => `${key}=${encodeURIComponent(finalParams[key])}`)
+    .join("&");
 
   // Return full VNPay URL
   return `${vnpayConfig.url}?${finalQueryString}`;
@@ -115,27 +122,30 @@ export const generateVNPayUrl = (paymentData: VNPayPaymentData): string => {
  */
 export const verifyVNPayResponse = (response: VNPayResponse): boolean => {
   try {
-    // Extract secure hash from response
-    const { vnp_SecureHash, ...params } = response;
-    
+    // Extract secure hash info from response
+    const { vnp_SecureHash, vnp_SecureHashType, ...params } = response;
+
     // Sort parameters by key
     const sortedParams: Record<string, string> = {};
     Object.keys(params)
       .sort()
-      .forEach(key => {
+      .forEach((key) => {
         sortedParams[key] = (params as any)[key];
       });
 
-    // Create query string
-    const queryString = Object.keys(sortedParams)
-      .map(key => `${key}=${encodeURIComponent(sortedParams[key])}`)
-      .join('&');
+    // Create string for hashing without URL encoding
+    const signData = Object.keys(sortedParams)
+      .map((key) => `${key}=${sortedParams[key]}`)
+      .join("&");
 
     // Generate secure hash
-    const generatedHash = crypto.HmacSHA512(queryString, vnpayConfig.hashSecret).toString();
+    const generatedHash = crypto
+      .HmacSHA512(signData, vnpayConfig.hashSecret)
+      .toString(crypto.enc.Hex)
+      .toLowerCase();
 
-    // Compare hashes
-    return generatedHash === vnp_SecureHash;
+    // Compare hashes (case-insensitive)
+    return generatedHash === (vnp_SecureHash || "").toLowerCase();
   } catch (error) {
     return false;
   }
@@ -145,7 +155,13 @@ export const verifyVNPayResponse = (response: VNPayResponse): boolean => {
  * Check if VNPay response is successful
  */
 export const isVNPaySuccess = (response: VNPayResponse): boolean => {
-  return response.vnp_ResponseCode === '00' && response.vnp_TransactionStatus === '00';
+  if (typeof response.vnp_TransactionStatus === "string") {
+    return (
+      response.vnp_ResponseCode === "00" &&
+      response.vnp_TransactionStatus === "00"
+    );
+  }
+  return response.vnp_ResponseCode === "00";
 };
 
 /**
@@ -153,21 +169,21 @@ export const isVNPaySuccess = (response: VNPayResponse): boolean => {
  */
 export const getVNPayResponseMessage = (responseCode: string): string => {
   const messages: Record<string, string> = {
-    '00': 'Giao dịch thành công',
-    '07': 'Trừ tiền thành công. Giao dịch bị nghi ngờ (liên quan tới lừa đảo, giao dịch bất thường)',
-    '09': 'Giao dịch không thành công do: Thẻ/Tài khoản của khách hàng chưa đăng ký dịch vụ InternetBanking',
-    '10': 'Xác thực thông tin thẻ/tài khoản không đúng quá 3 lần',
-    '11': 'Đã hết hạn chờ thanh toán. Xin vui lòng thực hiện lại giao dịch',
-    '12': 'Thẻ/Tài khoản của khách hàng bị khóa',
-    '13': 'Nhập sai mật khẩu xác thực giao dịch (OTP) quá số lần quy định',
-    '51': 'Tài khoản của quý khách không đủ số dư để thực hiện giao dịch',
-    '65': 'Tài khoản của quý khách đã vượt quá hạn mức giao dịch trong ngày',
-    '75': 'Ngân hàng thanh toán đang bảo trì',
-    '79': 'Nhập sai mật khẩu thanh toán quá số lần cho phép',
-    '99': 'Các lỗi khác (lỗi còn lại, không có trong danh sách mã lỗi đã liệt kê)'
+    "00": "Giao dịch thành công",
+    "07": "Trừ tiền thành công. Giao dịch bị nghi ngờ (liên quan tới lừa đảo, giao dịch bất thường)",
+    "09": "Giao dịch không thành công do: Thẻ/Tài khoản của khách hàng chưa đăng ký dịch vụ InternetBanking",
+    "10": "Xác thực thông tin thẻ/tài khoản không đúng quá 3 lần",
+    "11": "Đã hết hạn chờ thanh toán. Xin vui lòng thực hiện lại giao dịch",
+    "12": "Thẻ/Tài khoản của khách hàng bị khóa",
+    "13": "Nhập sai mật khẩu xác thực giao dịch (OTP) quá số lần quy định",
+    "51": "Tài khoản của quý khách không đủ số dư để thực hiện giao dịch",
+    "65": "Tài khoản của quý khách đã vượt quá hạn mức giao dịch trong ngày",
+    "75": "Ngân hàng thanh toán đang bảo trì",
+    "79": "Nhập sai mật khẩu thanh toán quá số lần cho phép",
+    "99": "Các lỗi khác (lỗi còn lại, không có trong danh sách mã lỗi đã liệt kê)",
   };
 
-  return messages[responseCode] || 'Lỗi không xác định';
+  return messages[responseCode] || "Lỗi không xác định";
 };
 
 /**

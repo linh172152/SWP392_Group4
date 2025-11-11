@@ -22,6 +22,7 @@ export interface CreatePaymentData {
   language?: string;
   paymentType?: PaymentType;
   metadata?: Record<string, unknown>;
+  ipAddress?: string;
 }
 
 export interface PaymentResult {
@@ -36,7 +37,17 @@ export interface PaymentResult {
  */
 export const createVNPayPayment = async (data: CreatePaymentData): Promise<PaymentResult> => {
   try {
-    const { userId, amount, orderDescription, orderType, bankCode, language, paymentType, metadata } = data;
+    const {
+      userId,
+      amount,
+      orderDescription,
+      orderType,
+      bankCode,
+      language,
+      paymentType,
+      metadata,
+      ipAddress,
+    } = data;
 
     // Validate user
     const user = await prisma.user.findUnique({
@@ -86,7 +97,8 @@ export const createVNPayPayment = async (data: CreatePaymentData): Promise<Payme
       orderDescription: orderDescription,
       orderType: orderType || 'other',
       bankCode: bankCode || '',
-      language: language || 'vn'
+      language: language || 'vn',
+      ipAddress: ipAddress,
     };
 
     // Generate VNPay URL

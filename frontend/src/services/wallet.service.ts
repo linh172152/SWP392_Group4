@@ -71,13 +71,23 @@ export interface TopUpRequest {
 export interface TopUpResponse {
   success: boolean;
   message: string;
-  data: {
+  data?: {
     balance?: number;
     topup_amount?: number;
     bonus_amount?: number;
     actual_amount?: number;
     package_id?: string;
     payment_method?: string;
+    payment_url?: string;
+    order_id?: string;
+    amount?: number;
+    topup_package?: {
+      package_id: string;
+      name: string;
+      topup_amount: number;
+      bonus_amount: number;
+      actual_amount: number;
+    };
   };
 }
 
