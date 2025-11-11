@@ -2,203 +2,153 @@ import crypto from "crypto-js";
 import moment from "moment-timezone";
 import { vnpayConfig } from "../config/vnpay.config";
 
-export interface VNPayPaymentData {
+export type VNPayParams = Record<string, string>;
+
+export interface VNPayRequestPayload {
   amount: number;
   orderId: string;
-  orderDescription: string;
+  orderInfo: string;
   orderType?: string;
   bankCode?: string;
-  language?: string;
-  ipAddress?: string;
+  locale?: string;
+  clientIp: string;
 }
 
-export interface VNPayResponse {
-  vnp_Amount: string;
-  vnp_BankCode: string;
-  vnp_BankTranNo: string;
-  vnp_CardType: string;
-  vnp_OrderInfo: string;
-  vnp_PayDate: string;
-  vnp_ResponseCode: string;
-  vnp_TmnCode: string;
-  vnp_TransactionNo: string;
-  vnp_TransactionStatus?: string;
-  vnp_TxnRef: string;
-  vnp_SecureHashType?: string;
-  vnp_SecureHash: string;
-}
+export type VNPayResponsePayload = Record<string, string>;
 
-const formatVNPayTime = (value?: moment.MomentInput) =>
-  moment(value).tz("Asia/Ho_Chi_Minh").format(vnpayConfig.createDate);
+const sortKeys = (source: VNPayParams): string[] =>
+  Object.keys(source).sort((a, b) => a.localeCompare(b));
 
-/**
- * Generate VNPay payment URL
- */
-export const generateVNPayUrl = (paymentData: VNPayPaymentData): string => {
-  const {
-    amount,
-    orderId,
-    orderDescription,
-    orderType = "other",
-    bankCode = "",
-    language = "vn",
-    ipAddress,
-  } = paymentData;
+const buildSignedData = (params: VNPayParams): string =>
+  sortKeys(params)
+    .map((key) => `${key}=${params[key]}`)
+    .join("&");
 
-  // Create date in VNPay format (ICT time)
-  const now = moment().tz("Asia/Ho_Chi_Minh");
-  const createDate = formatVNPayTime(now);
+const signDataWithSecret = (signed: string): string =>
+  crypto
+    .HmacSHA512(signed, vnpayConfig.hashSecret)
+    .toString(crypto.enc.Hex)
+    .toUpperCase();
 
-  // Expire date (15 minutes from now)
-  const expireDate = formatVNPayTime(
-    now.clone().add(vnpayConfig.expireTime, "minutes")
-  );
+const normalizeOrderInfo = (value: string): string =>
+  value.replace(/\s+/g, "");
 
-  // Convert amount to VNPay format (multiply by 100)
-  const vnpAmount = (amount * 100).toString();
+const formatAmount = (amount: number): string =>
+  Math.round(amount * 100).toString();
 
-  // Create order info (remove whitespace characters as per VNPay spec)
-  const orderInfo = orderDescription.replace(/\s+/g, "");
+export const buildVNPayRequestParams = (
+  payload: VNPayRequestPayload
+): VNPayParams => {
+  const timestamp = moment()
+    .tz("Asia/Ho_Chi_Minh")
+    .format(vnpayConfig.dateFormat);
+  const expireTime = moment(timestamp, vnpayConfig.dateFormat)
+    .add(vnpayConfig.expireTime, "minutes")
+    .format(vnpayConfig.dateFormat);
 
-  // Create return URL
-  const returnUrl = vnpayConfig.returnUrl;
-
-  // Create IPN URL (not used in URL generation)
-  // const ipnUrl = vnpayConfig.ipnUrl;
-
-  // Create parameters object
-  const params: Record<string, string> = {
+  const params: VNPayParams = {
     vnp_Version: vnpayConfig.version,
     vnp_Command: vnpayConfig.command,
     vnp_TmnCode: vnpayConfig.tmnCode,
-    vnp_Amount: vnpAmount,
+    vnp_Amount: formatAmount(payload.amount),
     vnp_CurrCode: vnpayConfig.currency,
-    vnp_TxnRef: orderId,
-    vnp_OrderInfo: orderInfo,
-    vnp_OrderType: orderType,
-    vnp_Locale: language,
-    vnp_ReturnUrl: returnUrl,
-    vnp_IpAddr: (ipAddress ?? "").toString().trim() || "127.0.0.1",
-    vnp_CreateDate: createDate,
-    vnp_ExpireDate: expireDate,
+    vnp_TxnRef: payload.orderId,
+    vnp_OrderInfo: normalizeOrderInfo(payload.orderInfo),
+    vnp_OrderType: payload.orderType || vnpayConfig.defaultOrderType,
+    vnp_Locale: payload.locale || vnpayConfig.locale,
+    vnp_ReturnUrl: vnpayConfig.returnUrl,
+    vnp_IpAddr: payload.clientIp || "127.0.0.1",
+    vnp_CreateDate: timestamp,
+    vnp_ExpireDate: expireTime,
   };
 
-  // Add bank code if provided
-  const trimmedBankCode = bankCode?.trim();
+  const trimmedBankCode = payload.bankCode?.trim();
   if (trimmedBankCode) {
     params.vnp_BankCode = trimmedBankCode;
   }
 
-  // Sort parameter keys
-  const sortedKeys = Object.keys(params).sort((a, b) => a.localeCompare(b));
+  return params;
+};
 
-  // Build string for secure hash without URL encoding
-  const signData = sortedKeys.map((key) => `${key}=${params[key]}`).join("&");
-  console.log("[VNPay] signData:", signData);
+export const generateVNPayPaymentUrl = (
+  payload: VNPayRequestPayload
+): { paymentUrl: string; params: VNPayParams; signedData: string } => {
+  const params = buildVNPayRequestParams(payload);
+  const signedData = buildSignedData(params);
+  const secureHash = signDataWithSecret(signedData);
 
-  // Create secure hash
-  const secureHash = crypto
-    .HmacSHA512(signData, vnpayConfig.hashSecret)
-    .toString(crypto.enc.Hex)
-    .toUpperCase();
-  console.log("[VNPay] secureHash:", secureHash);
-
-  // Add secure hash info to parameters
-  const finalParams: Record<string, string> = {
+  const fullParams: VNPayParams = {
     ...params,
     vnp_SecureHashType: vnpayConfig.secureHashType,
     vnp_SecureHash: secureHash,
   };
 
-  // Create final query string with URL encoding
-  const finalQueryString = Object.keys(finalParams)
-    .sort((a, b) => a.localeCompare(b))
-    .map((key) => `${key}=${encodeURIComponent(finalParams[key])}`)
+  const queryString = sortKeys(fullParams)
+    .map((key) => `${key}=${encodeURIComponent(fullParams[key])}`)
     .join("&");
 
-  // Return full VNPay URL
-  return `${vnpayConfig.url}?${finalQueryString}`;
+  return {
+    paymentUrl: `${vnpayConfig.url}?${queryString}`,
+    params: fullParams,
+    signedData,
+  };
 };
 
-/**
- * Verify VNPay response signature
- */
-export const verifyVNPayResponse = (response: VNPayResponse): boolean => {
-  try {
-    // Extract secure hash info from response
-    const { vnp_SecureHash, vnp_SecureHashType, ...params } = response;
+export const verifyVNPaySignature = (
+  response: VNPayResponsePayload
+): boolean => {
+  const { vnp_SecureHash, vnp_SecureHashType, ...rest } = response;
+  const signedData = buildSignedData(rest);
+  const expectedHash = signDataWithSecret(signedData);
+  return expectedHash === (vnp_SecureHash || "").toUpperCase();
+};
 
-    // Sort parameters by key
-    const sortedParams: Record<string, string> = {};
-    Object.keys(params)
-      .sort((a, b) => a.localeCompare(b))
-      .forEach((key) => {
-        sortedParams[key] = (params as any)[key];
-      });
+export const mapResponseToRecord = (
+  source: Record<string, unknown>
+): VNPayResponsePayload => {
+  const result: VNPayResponsePayload = {};
+  Object.entries(source).forEach(([key, value]) => {
+    if (typeof value === "string") {
+      result[key] = value;
+    } else if (Array.isArray(value) && value.length > 0) {
+      result[key] = String(value[0]);
+    } else if (value != null) {
+      result[key] = String(value);
+    }
+  });
+  return result;
+};
 
-    // Create string for hashing without URL encoding
-    const signData = Object.keys(sortedParams)
-      .map((key) => `${key}=${sortedParams[key]}`)
-      .join("&");
-
-    // Generate secure hash
-    const generatedHash = crypto
-      .HmacSHA512(signData, vnpayConfig.hashSecret)
-      .toString(crypto.enc.Hex)
-      .toUpperCase();
-
-    // Compare hashes (case-insensitive)
-    return generatedHash === (vnp_SecureHash || "").toUpperCase();
-  } catch (error) {
+export const isVNPaySuccess = (response: VNPayResponsePayload): boolean => {
+  if (response.vnp_ResponseCode !== "00") {
     return false;
   }
-};
-
-/**
- * Check if VNPay response is successful
- */
-export const isVNPaySuccess = (response: VNPayResponse): boolean => {
   if (typeof response.vnp_TransactionStatus === "string") {
-    return (
-      response.vnp_ResponseCode === "00" &&
-      response.vnp_TransactionStatus === "00"
-    );
+    return response.vnp_TransactionStatus === "00";
   }
-  return response.vnp_ResponseCode === "00";
+  return true;
 };
 
-/**
- * Get VNPay response message
- */
-export const getVNPayResponseMessage = (responseCode: string): string => {
+export const getVNPayResponseMessage = (code: string): string => {
   const messages: Record<string, string> = {
     "00": "Giao dịch thành công",
-    "07": "Trừ tiền thành công. Giao dịch bị nghi ngờ (liên quan tới lừa đảo, giao dịch bất thường)",
-    "09": "Giao dịch không thành công do: Thẻ/Tài khoản của khách hàng chưa đăng ký dịch vụ InternetBanking",
-    "10": "Xác thực thông tin thẻ/tài khoản không đúng quá 3 lần",
-    "11": "Đã hết hạn chờ thanh toán. Xin vui lòng thực hiện lại giao dịch",
-    "12": "Thẻ/Tài khoản của khách hàng bị khóa",
-    "13": "Nhập sai mật khẩu xác thực giao dịch (OTP) quá số lần quy định",
-    "51": "Tài khoản của quý khách không đủ số dư để thực hiện giao dịch",
-    "65": "Tài khoản của quý khách đã vượt quá hạn mức giao dịch trong ngày",
-    "75": "Ngân hàng thanh toán đang bảo trì",
-    "79": "Nhập sai mật khẩu thanh toán quá số lần cho phép",
-    "99": "Các lỗi khác (lỗi còn lại, không có trong danh sách mã lỗi đã liệt kê)",
+    "07": "Trừ tiền thành công nhưng giao dịch nghi ngờ",
+    "09": "Thẻ/Tài khoản chưa đăng ký Internet Banking",
+    "10": "Xác thực thông tin thẻ/tài khoản sai quá 3 lần",
+    "11": "Giao dịch hết hạn chờ thanh toán",
+    "12": "Thẻ/Tài khoản bị khóa",
+    "13": "Nhập sai mật khẩu OTP quá số lần quy định",
+    "24": "Khách hàng hủy giao dịch",
+    "51": "Không đủ số dư",
+    "65": "Vượt hạn mức giao dịch",
+    "75": "Ngân hàng đang bảo trì",
+    "79": "Nhập sai mật khẩu thanh toán quá số lần",
+    "99": "Lỗi không xác định",
   };
-
-  return messages[responseCode] || "Lỗi không xác định";
+  return messages[code] || "Lỗi không xác định";
 };
 
-/**
- * Format amount for VNPay (multiply by 100)
- */
-export const formatVNPayAmount = (amount: number): string => {
-  return (amount * 100).toString();
-};
-
-/**
- * Parse amount from VNPay response (divide by 100)
- */
 export const parseVNPayAmount = (amount: string): number => {
-  return parseInt(amount) / 100;
+  const value = parseInt(amount, 10);
+  return Number.isFinite(value) ? value / 100 : 0;
 };
