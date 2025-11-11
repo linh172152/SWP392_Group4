@@ -65,6 +65,8 @@ export interface CompleteBookingData {
   new_battery_code: string;
   battery_model: string;
   old_battery_status?: "good" | "damaged" | "maintenance";
+  old_battery_charge: number;
+  new_battery_charge: number;
   notes?: string;
 }
 
