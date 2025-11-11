@@ -106,58 +106,48 @@ const TopUpPackageManagement: React.FC = () => {
   const activePackages = packages.filter((p) => p.is_active).length;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-100 p-6">
-      {/* Hero Header */}
-      <div className="max-w-7xl mx-auto mb-8">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 p-8 shadow-2xl">
-          <div className="absolute inset-0 bg-black/10"></div>
-          <div className="relative z-10">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="p-4 bg-white/20 rounded-2xl backdrop-blur-sm">
-                <Wallet className="h-10 w-10 text-white" />
-              </div>
-              <div>
-                <h1 className="text-4xl font-black text-white tracking-tight">
-                  Quản Lí Gói Nạp
-                </h1>
-                <p className="text-emerald-100 text-lg mt-1">
-                  Quản lý các gói nạp tiền cho ví
-                </p>
-              </div>
-            </div>
-
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-              <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-blue-500/20 rounded-lg">
-                    <Package className="h-6 w-6 text-blue-200" />
-                  </div>
-                  <div>
-                    <p className="text-emerald-100 text-sm">Total Packages</p>
-                    <p className="text-3xl font-bold text-white">{totalPackages}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-green-500/20 rounded-lg">
-                    <Zap className="h-6 w-6 text-green-200" />
-                  </div>
-                  <div>
-                    <p className="text-emerald-100 text-sm">Active Packages</p>
-                    <p className="text-3xl font-bold text-white">{activePackages}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Decorative shapes */}
-          <div className="absolute -right-16 -top-16 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
-          <div className="absolute -left-16 -bottom-16 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl"></div>
+    <div className="container mx-auto max-w-7xl px-4 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Quản lý Gói Nạp</h1>
+          <p className="text-muted-foreground">
+            Quản lý các gói nạp tiền cho ví người dùng.
+          </p>
         </div>
+        <button
+          onClick={() => {
+            setShowForm((v) => !v);
+            setNewPackage({ name: '', description: '', topup_amount: '', bonus_amount: '', is_active: true });
+            setEditingPackage(null);
+          }}
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+        >
+          <Plus className="h-4 w-4" />
+          Thêm gói mới
+        </button>
+      </div>
+
+      {/* Statistics Cards */}
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+        <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-blue-700">Tổng gói</CardTitle>
+            <Package className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-800">{totalPackages}</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-r from-green-50 to-emerald-100 border-green-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-green-700">Gói đang hoạt động</CardTitle>
+            <Zap className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-700">{activePackages}</div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Main Content */}

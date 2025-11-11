@@ -25,11 +25,12 @@ import {
   SelectValue,
 } from '../ui/select';
 import { toast } from 'sonner';
-import { TrashIcon, UserPlusIcon } from 'lucide-react';
+import { TrashIcon, UserPlusIcon, Search, Filter, Users, UserCheck, UserX, Shield } from 'lucide-react';
 import {
   getAllUsers,
   createUser,
   updateUserStatus,
+  updateUserRole,
   deleteUser,
 } from '../../services/admin.service';
 import type { AdminUser } from '../../services/admin.service';
@@ -137,21 +138,19 @@ const CreateUserModal = ({
         />
       </div>
 
-      <div className="space-y-2">
+        <div className="space-y-2">
         <Label className="font-medium text-gray-700">Vai trò</Label>
         <Select value={role} onValueChange={setRole}>
           <SelectTrigger className="border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
             <SelectValue placeholder="Chọn vai trò" />
           </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ADMIN">Admin</SelectItem>
-            <SelectItem value="STAFF">Staff</SelectItem>
-            <SelectItem value="DRIVER">User</SelectItem>
+          <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
+            <SelectItem value="ADMIN" className="hover:bg-red-50 cursor-pointer">Admin</SelectItem>
+            <SelectItem value="STAFF" className="hover:bg-blue-50 cursor-pointer">Nhân viên</SelectItem>
+            <SelectItem value="DRIVER" className="hover:bg-green-50 cursor-pointer">Tài xế</SelectItem>
           </SelectContent>
         </Select>
-      </div>
-
-      <DialogFooter className="mt-6 flex justify-end space-x-3 pt-4 border-t">
+      </div>      <DialogFooter className="mt-6 flex justify-end space-x-3 pt-4 border-t">
         <Button
           variant="outline"
           onClick={onClose}
@@ -177,6 +176,11 @@ const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  
+  // Filter states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -194,6 +198,18 @@ const UserManagement: React.FC = () => {
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  // Filter users based on search term, role, and status
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = !searchTerm || 
+      user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesRole = roleFilter === 'ALL' || user.role === roleFilter;
+    const matchesStatus = statusFilter === 'ALL' || user.status === statusFilter;
+    
+    return matchesSearch && matchesRole && matchesStatus;
+  });
 
   const handleCreateUser = async (userData: {
     password: string;
@@ -235,6 +251,18 @@ const UserManagement: React.FC = () => {
     }
   };
 
+  const handleUpdateRole = async (userId: string, role: string) => {
+    try {
+      const res = await updateUserRole(userId, role);
+      if (res.success) {
+        toast.success('Cập nhật vai trò thành công');
+        fetchUsers();
+      } else throw new Error(res.message || 'Cập nhật vai trò thất bại');
+    } catch (err: any) {
+      toast.error(err.message || 'Lỗi khi cập nhật vai trò');
+    }
+  };
+
   const handleDeleteUser = async (userId: string) => {
     if (window.confirm('Bạn có chắc chắn muốn xóa người dùng này?')) {
       try {
@@ -250,38 +278,151 @@ const UserManagement: React.FC = () => {
   };
 
   return (
-    <div className="p-8 bg-gray-50 min-h-screen">
-      <div className="flex justify-between items-center mb-6">
+    <div className="container mx-auto max-w-7xl px-4 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            👥 Quản lý người dùng
-          </h1>
-          <p className="text-gray-600 mt-1">
-            Quản lý danh sách và quyền của người dùng trong hệ thống
+          <h1 className="text-3xl font-bold tracking-tight">Quản lý người dùng</h1>
+          <p className="text-muted-foreground">
+            Quản lý danh sách và quyền của người dùng trong hệ thống.
           </p>
         </div>
-        <Button
-          onClick={() => setIsCreateModalOpen(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white"
-        >
-          <UserPlusIcon className="mr-2 h-4 w-4" />
+        <Button onClick={() => setIsCreateModalOpen(true)} className="gap-2">
+          <UserPlusIcon className="h-4 w-4" />
           Thêm người dùng
         </Button>
       </div>
 
-      <Card className="shadow-md border border-gray-200">
+      {/* Statistics Cards */}
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-4">
+        <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-blue-700">
+              Tổng người dùng
+              {(searchTerm || roleFilter !== 'ALL' || statusFilter !== 'ALL') && (
+                <span className="text-xs text-blue-600 block">({filteredUsers.length} kết quả)</span>
+              )}
+            </CardTitle>
+            <Users className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-800">{users.length}</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-r from-green-50 to-emerald-100 border-green-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-green-700">Đang hoạt động</CardTitle>
+            <UserCheck className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-700">
+              {users.filter(u => u.status === 'ACTIVE').length}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-r from-amber-50 to-yellow-100 border-amber-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-amber-700">Admin</CardTitle>
+            <Shield className="h-4 w-4 text-amber-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-amber-800">
+              {users.filter(u => u.role === 'ADMIN').length}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-r from-red-50 to-rose-100 border-red-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-red-700">Không hoạt động</CardTitle>
+            <UserX className="h-4 w-4 text-red-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-700">
+              {users.filter(u => u.status === 'INACTIVE').length}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters */}
+      <Card>
         <CardHeader>
-          <CardTitle className="text-xl font-semibold text-gray-800">
-            Danh sách người dùng
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            Bộ lọc
           </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
+            {/* Search */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Tìm kiếm</label>
+              <div className="relative">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Tìm theo tên hoặc email..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
+            </div>
+
+            {/* Role Filter */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Vai trò</label>
+              <Select value={roleFilter} onValueChange={setRoleFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Chọn vai trò" />
+                </SelectTrigger>
+                <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
+                  <SelectItem value="ALL" className="hover:bg-gray-50 cursor-pointer">Tất cả vai trò</SelectItem>
+                  <SelectItem value="ADMIN" className="hover:bg-red-50 cursor-pointer">Admin</SelectItem>
+                  <SelectItem value="STAFF" className="hover:bg-blue-50 cursor-pointer">Nhân viên</SelectItem>
+                  <SelectItem value="DRIVER" className="hover:bg-green-50 cursor-pointer">Tài xế</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Status Filter */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Trạng thái</label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Chọn trạng thái" />
+                </SelectTrigger>
+                <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
+                  <SelectItem value="ALL" className="hover:bg-gray-50 cursor-pointer">Tất cả trạng thái</SelectItem>
+                  <SelectItem value="ACTIVE" className="hover:bg-green-50 cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <UserCheck className="h-4 w-4 text-green-600" />
+                      Đang hoạt động
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="INACTIVE" className="hover:bg-red-50 cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <UserX className="h-4 w-4 text-red-600" />
+                      Không hoạt động
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* User List */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Danh sách người dùng</CardTitle>
           <CardDescription>Toàn bộ người dùng trong hệ thống</CardDescription>
         </CardHeader>
-
         <CardContent>
           {loading ? (
-            <div className="flex justify-center py-10">
-              <div className="animate-spin h-8 w-8 border-4 border-blue-400 border-t-transparent rounded-full"></div>
-              <p className="ml-3 text-blue-600 font-medium">Đang tải...</p>
+            <div className="flex flex-col justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600 mb-4"></div>
+              <p className="text-gray-600 animate-pulse">Đang tải danh sách người dùng...</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -297,7 +438,7 @@ const UserManagement: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map((u) => (
+                  {filteredUsers.map((u) => (
                     <tr
                       key={u.user_id}
                       className="border-t hover:bg-gray-50 transition-colors"
@@ -306,17 +447,39 @@ const UserManagement: React.FC = () => {
                       <td className="p-3">{u.email}</td>
                       <td className="p-3">{u.phone || '—'}</td>
                       <td className="p-3">
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            u.role === 'ADMIN'
-                              ? 'bg-red-100 text-red-700'
-                              : u.role === 'STAFF'
-                              ? 'bg-blue-100 text-blue-700'
-                              : 'bg-green-100 text-green-700'
-                          }`}
+                        <Select
+                          value={u.role}
+                          onValueChange={(newRole) =>
+                            handleUpdateRole(u.user_id, newRole)
+                          }
                         >
-                          {u.role}
-                        </span>
+                          <SelectTrigger className="w-[120px]">
+                            <div className="flex items-center gap-2">
+                              <Shield className="h-3 w-3" />
+                              <SelectValue />
+                            </div>
+                          </SelectTrigger>
+                          <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
+                            <SelectItem value="ADMIN">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                                Admin
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="STAFF">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                                Nhân viên
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="DRIVER">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                                Tài xế
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
                       </td>
                       <td className="p-3">
                         <Select
@@ -325,12 +488,22 @@ const UserManagement: React.FC = () => {
                             handleUpdateStatus(u.user_id, newStatus)
                           }
                         >
-                          <SelectTrigger className="w-[120px]">
+                          <SelectTrigger className="w-[140px]">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
-                            <SelectItem value="ACTIVE">Active</SelectItem>
-                            <SelectItem value="INACTIVE">Inactive</SelectItem>
+                            <SelectItem value="ACTIVE">
+                              <div className="flex items-center gap-2">
+                                <UserCheck className="h-4 w-4 text-green-600" />
+                                Hoạt động
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="INACTIVE">
+                              <div className="flex items-center gap-2">
+                                <UserX className="h-4 w-4 text-red-600" />
+                                Không hoạt động
+                              </div>
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                       </td>

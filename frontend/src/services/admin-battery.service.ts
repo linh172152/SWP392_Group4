@@ -5,7 +5,7 @@ export interface Battery {
   battery_id: string;
   battery_code: string;
   model: string;
-  status: 'available' | 'charging' | 'in_use' | 'maintenance' | 'damaged';
+  status: 'full' | 'reserved' | 'charging' | 'in_use' | 'maintenance' | 'damaged';
   health_percentage: number;
   cycle_count: number;
   station_id: string;
@@ -98,17 +98,70 @@ class AdminBatteryService {
   }
 
   async getBatteryStats() {
-    const url = `${this.baseURL}/stats`;
-    return await authFetch(url);
+    // Backend exposes battery reports under admin dashboard routes
+    // Map the report response to the frontend `BatteryStats` shape
+    const url = `${API_BASE_URL}/admin/dashboard/batteries`;
+    const res = await authFetch(url);
+    if (!res || !res.success) return res;
+
+    const d = res.data || {};
+    const mapped: BatteryStats = {
+      total: d.total_batteries || 0,
+      by_status: d.status_breakdown || {},
+      by_model: d.model_breakdown || [],
+      low_health_count: d.health_metrics?.low_health_count || 0,
+      avg_health: d.health_metrics?.average_health || 0,
+      avg_cycle_count: d.health_metrics?.average_cycle_count || 0,
+    };
+
+    return {
+      success: true,
+      message: res.message,
+      data: mapped,
+    };
   }
 
   async getLowHealthBatteries(threshold: number = 70) {
-    const url = `${this.baseURL}/low-health?threshold=${threshold}`;
-    return await authFetch(url);
+    // Use admin dashboard batteries report to get low-health IDs,
+    // then fetch full battery objects by ID (controller provides /admin/batteries/:id)
+    const url = `${API_BASE_URL}/admin/dashboard/batteries?health_threshold=${threshold}`;
+    const res = await authFetch(url);
+    if (!res || !res.success) return res;
+
+    const ids: string[] = res.data?.health_metrics?.low_health_battery_ids || [];
+    const batteries = await Promise.all(
+      ids.map(async (id) => {
+        try {
+          const r = await this.getBatteryById(id);
+          return r?.data || null;
+        } catch (e) {
+          return null;
+        }
+      })
+    );
+
+    return {
+      success: true,
+      message: res.message,
+      data: {
+        batteries: batteries.filter((b) => b !== null),
+        threshold,
+        count: batteries.filter((b) => b !== null).length,
+      },
+    };
   }
 
   async getBatteryById(id: string) {
     const url = `${this.baseURL}/${id}`;
+    return await authFetch(url);
+  }
+
+  async getBatteryHistory(id: string, params?: { page?: number; limit?: number }) {
+    const qs = new URLSearchParams();
+    if (params?.page) qs.set('page', String(params.page));
+    if (params?.limit) qs.set('limit', String(params.limit));
+
+    const url = `${this.baseURL}/${id}/history${qs.toString() ? `?${qs.toString()}` : ''}`;
     return await authFetch(url);
   }
 

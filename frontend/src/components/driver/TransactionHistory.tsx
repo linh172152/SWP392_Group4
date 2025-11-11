@@ -11,7 +11,8 @@ import {
   Battery,
   Calendar,
   CreditCard,
-  Filter
+  Filter,
+  Star
 } from 'lucide-react';
 import { getUserTransactions, Transaction } from '../../services/transaction.service';
 import { formatCurrency, formatDate } from '../../utils/format';
@@ -22,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../ui/select';
+import RatingModal from './RatingModal';
 
 const TransactionHistory: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -30,6 +32,8 @@ const TransactionHistory: React.FC = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [limit] = useState(10);
+  const [ratingModalOpen, setRatingModalOpen] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
 
   const loadTransactions = async (pageNum: number = 1, status?: string) => {
     setLoading(true);
@@ -84,6 +88,16 @@ const TransactionHistory: React.FC = () => {
       default:
         return method;
     }
+  };
+
+  const handleOpenRating = (transaction: Transaction) => {
+    setSelectedTransaction(transaction);
+    setRatingModalOpen(true);
+  };
+
+  const handleRatingSuccess = () => {
+    // Reload transactions sau khi đánh giá thành công
+    loadTransactions(page, statusFilter);
   };
 
   return (
@@ -161,6 +175,18 @@ const TransactionHistory: React.FC = () => {
               {transactions.map((transaction) => {
                 const amount = transaction.payment?.amount || 0;
                 const isFree = amount === 0;
+                const canRate = !!(transaction.station_id || transaction.station);
+                
+                // Debug log
+                if (canRate && !transaction.station_rating) {
+                  console.log('[TransactionHistory] Transaction có thể đánh giá:', {
+                    transaction_id: transaction.transaction_id,
+                    transaction_code: transaction.transaction_code,
+                    station_id: transaction.station_id,
+                    has_station: !!transaction.station,
+                    has_rating: !!transaction.station_rating,
+                  });
+                }
                 
                 return (
                   <div
@@ -264,6 +290,35 @@ const TransactionHistory: React.FC = () => {
                         </div>
                       </div>
                     )}
+
+                    {/* Rating Section */}
+                    {(transaction.station_id || transaction.station) && (
+                      <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                        {transaction.station_rating ? (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Star className="h-4 w-4 text-yellow-400 fill-current" />
+                            <span className="text-slate-600 dark:text-slate-400">
+                              Đã đánh giá: <span className="font-medium text-slate-900 dark:text-white">{transaction.station_rating.rating}/5</span>
+                            </span>
+                            {transaction.station_rating.comment && (
+                              <span className="text-slate-500 dark:text-slate-400 italic">
+                                - "{transaction.station_rating.comment}"
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenRating(transaction)}
+                            className="w-full glass border-blue-200/50 dark:border-purple-400/30 hover:bg-blue-50/50 dark:hover:bg-purple-500/10"
+                          >
+                            <Star className="mr-2 h-4 w-4" />
+                            Đánh giá dịch vụ
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -296,6 +351,22 @@ const TransactionHistory: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Rating Modal */}
+      {selectedTransaction && (selectedTransaction.station || selectedTransaction.station_id) && (
+        <RatingModal
+          open={ratingModalOpen}
+          onClose={() => {
+            setRatingModalOpen(false);
+            setSelectedTransaction(null);
+          }}
+          onSuccess={handleRatingSuccess}
+          stationId={selectedTransaction.station?.station_id || selectedTransaction.station_id}
+          stationName={selectedTransaction.station?.name || 'Trạm đổi pin'}
+          transactionId={selectedTransaction.transaction_id}
+          transactionCode={selectedTransaction.transaction_code}
+        />
+      )}
     </div>
   );
 };
