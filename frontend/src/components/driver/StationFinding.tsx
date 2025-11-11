@@ -120,21 +120,29 @@ const StationFinding: React.FC = () => {
     }
   }, [userLocation, findNearbyPublicStations]);
 
-  // Tự động tìm trạm gần đây khi có vị trí (chỉ gọi 1 lần)
+  // Load tất cả trạm khi component mount (mặc định)
   useEffect(() => {
-    if (userLocation && !hasSearchedRef.current) {
+    if (!hasSearchedRef.current) {
       hasSearchedRef.current = true;
-      handleFindNearby();
+      // Load tất cả trạm mặc định (không cần location)
+      searchStations('').catch((err) => {
+        console.error("[StationFinding] Error loading all stations:", err);
+      });
     }
-    // Chỉ chạy khi userLocation thay đổi từ null sang có giá trị
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userLocation?.latitude, userLocation?.longitude]);
+  }, []);
 
   // Tìm kiếm trạm
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
-      hasSearchedRef.current = false; // Reset để có thể tìm lại
-      handleFindNearby();
+      // Nếu search rỗng, load tất cả trạm
+      try {
+        console.log('[StationFinding] Loading all stations');
+        await searchStations('');
+        console.log('[StationFinding] All stations loaded');
+      } catch (err) {
+        console.error("[StationFinding] Error loading all stations:", err);
+      }
       return;
     }
 
@@ -273,10 +281,10 @@ const StationFinding: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Nearby Stations */}
+      {/* Stations List */}
       <div>
         <h2 className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-blue-900 dark:from-white dark:to-blue-100 bg-clip-text text-transparent mb-4">
-          {searchQuery ? 'Kết quả tìm kiếm' : 'Trạm gần đây'}
+          {searchQuery ? 'Kết quả tìm kiếm' : 'Tất cả trạm'}
         </h2>
 
         {/* Loading State */}

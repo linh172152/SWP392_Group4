@@ -52,11 +52,13 @@ const TopUpModal: React.FC<TopUpModalProps> = ({
           onSuccess();
         } else {
           // For online payments, redirect to payment gateway
-          // This will be handled by VNPay service
-          // For now, just show success message
-          alert('Đang chuyển hướng đến cổng thanh toán...');
-          // TODO: Handle VNPay/MoMo redirect
-          onSuccess();
+          if (response.data?.payment_url) {
+            // Redirect to VNPay/MoMo payment gateway
+            window.location.href = response.data.payment_url;
+          } else {
+            setError('Không thể tạo liên kết thanh toán. Vui lòng thử lại.');
+            setLoading(false);
+          }
         }
       }
     } catch (err: any) {

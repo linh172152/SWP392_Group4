@@ -96,12 +96,54 @@ const Wallet: React.FC = () => {
 
   const getTransactionLabel = (transaction: WalletTransaction) => {
     const type = getTransactionType(transaction);
+    
+    // Nạp tiền
     if (type === 'topup') {
       return `Nạp tiền: ${transaction.topup_package?.name || 'Nạp tiền'}`;
     }
-    if (transaction.transaction?.booking) {
-      return `Thanh toán: ${transaction.transaction.booking.station?.name || 'Đổi pin'}`;
+    
+    // Thanh toán đổi pin
+    if (transaction.transaction_id) {
+      // Có thông tin booking và station
+      if (transaction.transaction?.booking?.station?.name) {
+        return `Thanh toán đổi pin tại ${transaction.transaction.booking.station.name}`;
+      }
+      // Có transaction code nhưng không có booking info
+      if (transaction.transaction?.transaction_code) {
+        return `Thanh toán đổi pin - ${transaction.transaction.transaction_code}`;
+      }
+      // Chỉ có transaction_id
+      return 'Thanh toán đổi pin';
     }
+    
+    // Thanh toán bằng gói subscription
+    if (transaction.subscription_id) {
+      const packageName = transaction.subscription?.package?.name || 'Gói đăng ký';
+      return `Thanh toán bằng gói: ${packageName}`;
+    }
+    
+    // Trường hợp khác - hiển thị payment_type nếu có
+    if (transaction.payment_type) {
+      const paymentTypeLabels: Record<string, string> = {
+        'topup': 'Nạp tiền',
+        'wallet_topup': 'Nạp tiền',
+        'booking': 'Thanh toán đổi pin',
+        'battery_swap': 'Thanh toán đổi pin',
+        'swap': 'Thanh toán đổi pin',
+        'subscription': 'Thanh toán gói đăng ký',
+        'package_payment': 'Thanh toán gói đăng ký',
+        'refund': 'Hoàn tiền',
+        'wallet_refund': 'Hoàn tiền',
+      };
+      // Luôn dịch sang tiếng Việt, không hiển thị thuật ngữ tiếng Anh
+      const translatedLabel = paymentTypeLabels[transaction.payment_type.toLowerCase()];
+      if (translatedLabel) {
+        return translatedLabel;
+      }
+      // Nếu không tìm thấy trong danh sách, vẫn dịch chung chung
+      return 'Giao dịch';
+    }
+    
     return 'Giao dịch khác';
   };
 
