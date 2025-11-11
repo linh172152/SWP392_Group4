@@ -43,8 +43,16 @@ export const getUserVehicles = asyncHandler(
  */
 export const addVehicle = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user?.userId;
-  const { license_plate, vehicle_type, make, brand, model, year, battery_model } =
-    req.body;
+  const {
+    license_plate,
+    vehicle_type,
+    make,
+    brand,
+    model,
+    year,
+    battery_model,
+    current_battery_code,
+  } = req.body;
 
   if (!userId) {
     throw new CustomError("User not authenticated", 401);
@@ -59,14 +67,14 @@ export const addVehicle = asyncHandler(async (req: Request, res: Response) => {
 
   // Normalize vehicle_type: support both backend (car/motorbike) and frontend (CAR/MOTORBIKE/TRUCK)
   let normalizedVehicleType = vehicle_type?.toLowerCase();
-  if (normalizedVehicleType === 'truck') {
-    normalizedVehicleType = 'car';
+  if (normalizedVehicleType === "truck") {
+    normalizedVehicleType = "car";
   }
-  if (normalizedVehicleType !== 'car' && normalizedVehicleType !== 'motorbike') {
-    throw new CustomError(
-      "Vehicle type must be 'car' or 'motorbike'",
-      400
-    );
+  if (
+    normalizedVehicleType !== "car" &&
+    normalizedVehicleType !== "motorbike"
+  ) {
+    throw new CustomError("Vehicle type must be 'car' or 'motorbike'", 400);
   }
 
   // Handle make/brand: support both field names
@@ -84,31 +92,120 @@ export const addVehicle = asyncHandler(async (req: Request, res: Response) => {
     );
   }
 
-  const vehicle = await prisma.vehicle.create({
-    data: {
-      license_plate,
-      vehicle_type: normalizedVehicleType as any,
-      make: vehicleMake,
-      model,
-      year,
-      battery_model,
-      user_id: userId,
-    },
-    include: {
-      user: {
-        select: {
-          user_id: true,
-          full_name: true,
-          email: true,
-        },
+  const trimmedBatteryCode =
+    typeof current_battery_code === "string"
+      ? current_battery_code.trim()
+      : current_battery_code === undefined || current_battery_code === null
+        ? undefined
+        : String(current_battery_code).trim();
+
+  if (!trimmedBatteryCode) {
+    throw new CustomError(
+      "Current battery code is required when registering a vehicle",
+      400
+    );
+  }
+
+  const batteryExists = await prisma.battery.findUnique({
+    where: { battery_code: trimmedBatteryCode },
+    select: { battery_id: true },
+  });
+
+  if (batteryExists) {
+    throw new CustomError(
+      `Battery code "${trimmedBatteryCode}" already exists. Please enter the exact code provided with the new vehicle.`,
+      400
+    );
+  }
+
+  const defaultStation = await prisma.station.findFirst({
+    where: { status: "active" },
+    select: { station_id: true, name: true },
+  });
+
+  if (!defaultStation) {
+    throw new CustomError(
+      "Không tìm thấy trạm đang hoạt động để ghi nhận pin mới. Vui lòng liên hệ quản trị viên.",
+      500
+    );
+  }
+
+  console.log(
+    `[addVehicle] Creating battery "${trimmedBatteryCode}" for vehicle ${license_plate}`
+  );
+
+  const { createdVehicle } = await prisma.$transaction(async (tx) => {
+    const createdBattery = await tx.battery.create({
+      data: {
+        battery_code: trimmedBatteryCode,
+        model: battery_model,
+        status: "in_use",
+        current_charge: 100,
+        station_id: defaultStation.station_id,
       },
-    },
+      select: {
+        battery_id: true,
+        battery_code: true,
+        status: true,
+        current_charge: true,
+      },
+    });
+
+    const newVehicle = await tx.vehicle.create({
+      data: {
+        license_plate,
+        vehicle_type: normalizedVehicleType as any,
+        make: vehicleMake,
+        model,
+        year,
+        battery_model,
+        current_battery_id: createdBattery.battery_id,
+        user_id: userId,
+      } as any,
+      include: {
+        user: {
+          select: {
+            user_id: true,
+            full_name: true,
+            email: true,
+          },
+        },
+        current_battery: {
+          select: {
+            battery_id: true,
+            battery_code: true,
+            status: true,
+            current_charge: true,
+          },
+        } as any,
+      } as any,
+    });
+
+    await (tx as any).batteryHistory.create({
+      data: {
+        battery_id: createdBattery.battery_id,
+        vehicle_id: newVehicle.vehicle_id,
+        station_id: defaultStation.station_id,
+        action: "issued",
+        notes: `Pin ${createdBattery.battery_code} đăng ký cùng xe ${newVehicle.license_plate}`,
+      },
+    });
+
+    return { createdVehicle: newVehicle };
+  });
+
+  console.log(`[addVehicle] ✅ Vehicle created successfully:`, {
+    vehicle_id: createdVehicle.vehicle_id,
+    license_plate: createdVehicle.license_plate,
+    current_battery_id: createdVehicle.current_battery_id,
+    current_battery: createdVehicle.current_battery,
+    has_current_battery: !!createdVehicle.current_battery,
   });
 
   res.status(201).json({
     success: true,
     message: "Vehicle added successfully",
-    data: vehicle,
+    data: createdVehicle,
   });
 });
 
@@ -159,8 +256,16 @@ export const updateVehicle = asyncHandler(
   async (req: Request, res: Response) => {
     const userId = req.user?.userId;
     const { id } = req.params;
-    const { license_plate, vehicle_type, make, brand, model, year, battery_model } =
-      req.body;
+    const {
+      license_plate,
+      vehicle_type,
+      make,
+      brand,
+      model,
+      year,
+      battery_model,
+      current_battery_code,
+    } = req.body;
 
     if (!userId) {
       throw new CustomError("User not authenticated", 401);
@@ -170,6 +275,13 @@ export const updateVehicle = asyncHandler(
       where: {
         vehicle_id: id,
         user_id: userId,
+      },
+      include: {
+        current_battery: {
+          select: {
+            battery_code: true,
+          },
+        },
       },
     });
 
@@ -181,14 +293,14 @@ export const updateVehicle = asyncHandler(
     let normalizedVehicleType = vehicle_type;
     if (vehicle_type) {
       normalizedVehicleType = vehicle_type.toLowerCase();
-      if (normalizedVehicleType === 'truck') {
-        normalizedVehicleType = 'car';
+      if (normalizedVehicleType === "truck") {
+        normalizedVehicleType = "car";
       }
-      if (normalizedVehicleType !== 'car' && normalizedVehicleType !== 'motorbike') {
-        throw new CustomError(
-          "Vehicle type must be 'car' or 'motorbike'",
-          400
-        );
+      if (
+        normalizedVehicleType !== "car" &&
+        normalizedVehicleType !== "motorbike"
+      ) {
+        throw new CustomError("Vehicle type must be 'car' or 'motorbike'", 400);
       }
     }
 
@@ -212,11 +324,43 @@ export const updateVehicle = asyncHandler(
       }
     }
 
+    if (current_battery_code !== undefined) {
+      const trimmedNewCode =
+        typeof current_battery_code === "string"
+          ? current_battery_code.trim()
+          : current_battery_code;
+
+      const existingCode = vehicle.current_battery?.battery_code ?? null;
+
+      if (
+        (trimmedNewCode === null || trimmedNewCode === "") &&
+        existingCode !== null
+      ) {
+        throw new CustomError(
+          "Không thể xoá mã pin hiện tại. Vui lòng liên hệ nhân viên trạm để hỗ trợ đổi pin.",
+          400
+        );
+      }
+
+      if (
+        typeof trimmedNewCode === "string" &&
+        trimmedNewCode.length > 0 &&
+        trimmedNewCode !== existingCode
+      ) {
+        throw new CustomError(
+          "Không thể thay đổi mã pin trực tiếp. Vui lòng liên hệ nhân viên trạm để đổi pin.",
+          400
+        );
+      }
+    }
+
     const updatedVehicle = await prisma.vehicle.update({
       where: { vehicle_id: id },
       data: {
         ...(license_plate && { license_plate }),
-        ...(normalizedVehicleType && { vehicle_type: normalizedVehicleType as any }),
+        ...(normalizedVehicleType && {
+          vehicle_type: normalizedVehicleType as any,
+        }),
         ...(vehicleMake !== undefined && { make: vehicleMake }),
         ...(model !== undefined && { model }),
         ...(year !== undefined && { year }),
