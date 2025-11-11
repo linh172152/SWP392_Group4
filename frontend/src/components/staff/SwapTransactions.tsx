@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
+import { Avatar, AvatarFallback } from '../ui/avatar';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
@@ -21,14 +21,12 @@ import {
   AlertCircle,
   Car,
   Battery,
-  ArrowRight,
   RefreshCw,
   X,
   Loader2,
   Eye,
   Phone,
   User,
-  MapPin,
   Calendar,
   Search,
   Filter,
@@ -87,6 +85,8 @@ const SwapTransactions: React.FC = () => {
   const [newBatteryCode, setNewBatteryCode] = useState('');
   const [batteryModel, setBatteryModel] = useState('');
   const [oldBatteryStatus, setOldBatteryStatus] = useState<'good' | 'damaged' | 'maintenance'>('good');
+  const [oldBatteryCharge, setOldBatteryCharge] = useState<number>(0);
+  const [newBatteryCharge, setNewBatteryCharge] = useState<number>(100);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelConfirmed, setCancelConfirmed] = useState(false);
   const [completeError, setCompleteError] = useState<string | null>(null);
@@ -301,6 +301,8 @@ const SwapTransactions: React.FC = () => {
     setNewBatteryCode('');
     setBatteryModel(booking.battery_model || '');
     setOldBatteryStatus('good');
+    setOldBatteryCharge(0);
+    setNewBatteryCharge(100);
     setCompleteError(null); // Reset error
     setCompleteDialogOpen(true);
   };
@@ -316,15 +318,39 @@ const SwapTransactions: React.FC = () => {
       return;
     }
 
+    // Validate và convert battery charge to number
+    const oldCharge = Number(oldBatteryCharge);
+    const newCharge = Number(newBatteryCharge);
+
+    if (isNaN(oldCharge) || oldCharge < 0 || oldCharge > 100) {
+      toast({
+        title: 'Lỗi',
+        description: 'Mức sạc pin cũ phải từ 0-100%',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (isNaN(newCharge) || newCharge < 0 || newCharge > 100) {
+      toast({
+        title: 'Lỗi',
+        description: 'Mức sạc pin mới phải từ 0-100%',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       setActionLoading(selectedBooking.booking_id);
       setCompleteError(null); // Reset error trước khi submit
       
       const response = await completeBooking(selectedBooking.booking_id, {
-        old_battery_code: oldBatteryCode,
-        new_battery_code: newBatteryCode,
-        battery_model: batteryModel,
+        old_battery_code: oldBatteryCode.trim(),
+        new_battery_code: newBatteryCode.trim(),
+        battery_model: batteryModel.trim(),
         old_battery_status: oldBatteryStatus,
+        old_battery_charge: oldCharge, // Đảm bảo là number
+        new_battery_charge: newCharge, // Đảm bảo là number
       });
       
       if (response.success) {
@@ -1001,15 +1027,15 @@ const SwapTransactions: React.FC = () => {
 
       {/* Complete Booking Dialog */}
       <Dialog open={completeDialogOpen} onOpenChange={setCompleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>Hoàn thành đổi pin</DialogTitle>
             <DialogDescription>
               Nhập thông tin pin để hoàn tất giao dịch
             </DialogDescription>
           </DialogHeader>
           {selectedBooking && (
-            <div className="space-y-4">
+            <div className="space-y-4 overflow-y-auto flex-1 pr-2 -mr-2">
               <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
                 <p className="text-sm">
                   <strong>Khách hàng:</strong> {selectedBooking.user?.full_name}
@@ -1034,6 +1060,29 @@ const SwapTransactions: React.FC = () => {
                       {completeError.includes('not found') && (
                         <p className="text-xs text-red-600 dark:text-red-400 mt-2">
                           💡 Kiểm tra lại mã pin cũ. Mã pin phải tồn tại trong hệ thống kho pin.
+                        </p>
+                      )}
+                      {completeError.includes('không khớp với pin đã giữ') && (() => {
+                        // Extract mã pin đã giữ từ error message
+                        const match = completeError.match(/pin đã giữ \(([^)]+)\)/);
+                        const reservedBatteryCode = match ? match[1] : null;
+                        return (
+                          <div className="text-xs text-red-600 dark:text-red-400 mt-2 space-y-1">
+                            <p className="font-semibold">💡 Hướng dẫn:</p>
+                            {reservedBatteryCode && (
+                              <p className="bg-red-100 dark:bg-red-900/30 px-2 py-1 rounded font-mono font-bold">
+                                Mã pin đã giữ: {reservedBatteryCode}
+                              </p>
+                            )}
+                            <p>• Mã pin mới phải khớp với pin đã được giữ cho booking này</p>
+                            <p>• Kiểm tra lại mã pin trên nhãn pin thực tế</p>
+                            <p>• Nếu pin đã bị thay đổi/điều phối, vui lòng yêu cầu driver đặt lại booking</p>
+                          </div>
+                        );
+                      })()}
+                      {completeError.includes('không khớp với pin hiện tại của xe') && (
+                        <p className="text-xs text-red-600 dark:text-red-400 mt-2">
+                          💡 Mã pin cũ phải khớp với pin đang được sử dụng trên xe của khách hàng. Vui lòng kiểm tra lại.
                         </p>
                       )}
                     </div>
@@ -1132,9 +1181,83 @@ const SwapTransactions: React.FC = () => {
                   <option value="maintenance">Cần bảo trì</option>
                 </select>
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="oldBatteryCharge" className="flex items-center gap-2">
+                  <Battery className="h-4 w-4 text-orange-600" />
+                  Mức sạc pin cũ (%) <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="oldBatteryCharge"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  placeholder="Nhập % (0-100)"
+                  value={oldBatteryCharge}
+                  onChange={(e) => {
+                    const inputValue = e.target.value;
+                    if (inputValue === '') {
+                      setOldBatteryCharge(0);
+                      return;
+                    }
+                    const numValue = parseInt(inputValue, 10);
+                    if (!isNaN(numValue)) {
+                      setOldBatteryCharge(Math.max(0, Math.min(100, numValue)));
+                    }
+                  }}
+                  onBlur={(e) => {
+                    if (e.target.value === '' || isNaN(parseInt(e.target.value, 10))) {
+                      setOldBatteryCharge(0);
+                    }
+                  }}
+                  disabled={actionLoading === selectedBooking.booking_id}
+                  className="font-mono"
+                />
+                <p className="text-xs text-gray-500">
+                  💡 Nhập mức sạc hiện tại của pin cũ (0-100%)
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="newBatteryCharge" className="flex items-center gap-2">
+                  <Battery className="h-4 w-4 text-green-600" />
+                  Mức sạc pin mới (%) <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="newBatteryCharge"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  placeholder="Nhập % (0-100)"
+                  value={newBatteryCharge}
+                  onChange={(e) => {
+                    const inputValue = e.target.value;
+                    if (inputValue === '') {
+                      setNewBatteryCharge(100);
+                      return;
+                    }
+                    const numValue = parseInt(inputValue, 10);
+                    if (!isNaN(numValue)) {
+                      setNewBatteryCharge(Math.max(0, Math.min(100, numValue)));
+                    }
+                  }}
+                  onBlur={(e) => {
+                    if (e.target.value === '' || isNaN(parseInt(e.target.value, 10))) {
+                      setNewBatteryCharge(100);
+                    }
+                  }}
+                  disabled={actionLoading === selectedBooking.booking_id}
+                  className="font-mono"
+                />
+                <p className="text-xs text-gray-500">
+                  💡 Nhập mức sạc của pin mới (0-100%)
+                </p>
+              </div>
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="flex-shrink-0 border-t pt-4 mt-4">
             <Button 
               variant="outline" 
               onClick={() => setCompleteDialogOpen(false)}
@@ -1144,7 +1267,18 @@ const SwapTransactions: React.FC = () => {
             </Button>
             <Button 
               onClick={handleCompleteBooking}
-              disabled={!oldBatteryCode.trim() || !newBatteryCode.trim() || !batteryModel.trim() || actionLoading === selectedBooking?.booking_id}
+              disabled={
+                !oldBatteryCode.trim() || 
+                !newBatteryCode.trim() || 
+                !batteryModel.trim() || 
+                isNaN(Number(oldBatteryCharge)) ||
+                Number(oldBatteryCharge) < 0 || 
+                Number(oldBatteryCharge) > 100 ||
+                isNaN(Number(newBatteryCharge)) ||
+                Number(newBatteryCharge) < 0 || 
+                Number(newBatteryCharge) > 100 ||
+                actionLoading === selectedBooking?.booking_id
+              }
             >
               {actionLoading === selectedBooking?.booking_id ? (
                 <>
