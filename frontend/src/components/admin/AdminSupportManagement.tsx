@@ -19,6 +19,13 @@ import {
   AlertCircle
 } from 'lucide-react';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/select';
+import {
   getAdminTickets,
   getAdminTicketDetails,
   assignTicket,
@@ -469,44 +476,118 @@ const AdminSupportManagement: React.FC = () => {
               {/* Status Filter */}
               <div className="flex items-center gap-2">
                 <Filter className="h-5 w-5 text-slate-500" />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-3 py-2 border-2 border-slate-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none bg-white"
-                >
-                  <option value="all">Tất cả trạng thái</option>
-                  <option value="open">Mở</option>
-                  <option value="in_progress">Đang xử lý</option>
-                  <option value="resolved">Đã giải quyết</option>
-                  <option value="closed">Đã đóng</option>
-                </select>
+                <div className="min-w-[160px]">
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="Trạng thái" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
+                      <SelectItem value="all" className="hover:bg-gray-50 cursor-pointer">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                          Tất cả trạng thái
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="open" className="hover:bg-blue-50 cursor-pointer">
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-blue-600" />
+                          Mở
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="in_progress" className="hover:bg-yellow-50 cursor-pointer">
+                        <div className="flex items-center gap-2">
+                          <Edit3 className="h-4 w-4 text-yellow-600" />
+                          Đang xử lý
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="resolved" className="hover:bg-green-50 cursor-pointer">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                          Đã giải quyết
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="closed" className="hover:bg-gray-50 cursor-pointer">
+                        <div className="flex items-center gap-2">
+                          <X className="h-4 w-4 text-gray-600" />
+                          Đã đóng
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {/* Priority Filter */}
-              <select
-                value={priorityFilter}
-                onChange={(e) => setPriorityFilter(e.target.value)}
-                className="px-3 py-2 border-2 border-slate-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none bg-white"
-              >
-                <option value="all">Tất cả mức độ</option>
-                <option value="low">Thấp</option>
-                <option value="medium">Trung bình</option>
-                <option value="high">Cao</option>
-                <option value="urgent">Khẩn cấp</option>
-              </select>
+              <div className="min-w-[150px]">
+                <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="Mức độ" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
+                    <SelectItem value="all" className="hover:bg-gray-50 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                        Tất cả mức độ
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="low" className="hover:bg-gray-50 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4 text-gray-500" />
+                        Thấp
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="medium" className="hover:bg-blue-50 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4 text-blue-500" />
+                        Trung bình
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="high" className="hover:bg-orange-50 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 text-orange-500" />
+                        Cao
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="urgent" className="hover:bg-red-50 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4 text-red-500" />
+                        Khẩn cấp
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
               {/* Assigned Filter */}
-              <select
-                value={assignedFilter}
-                onChange={(e) => setAssignedFilter(e.target.value)}
-                className="px-3 py-2 border-2 border-slate-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none bg-white"
-              >
-                <option value="all">Tất cả nhân viên</option>
-                <option value="unassigned">Chưa gán</option>
-                {staff.map((s) => (
-                  <option key={s.user_id} value={s.user_id}>{s.full_name}</option>
-                ))}
-              </select>
+              <div className="min-w-[160px]">
+                <Select value={assignedFilter} onValueChange={setAssignedFilter}>
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="Nhân viên" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
+                    <SelectItem value="all" className="hover:bg-gray-50 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-gray-500" />
+                        Tất cả nhân viên
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="unassigned" className="hover:bg-orange-50 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-orange-500" />
+                        Chưa gán
+                      </div>
+                    </SelectItem>
+                    {staff.map((s) => (
+                      <SelectItem key={s.user_id} value={s.user_id} className="hover:bg-blue-50 cursor-pointer">
+                        <div className="flex items-center gap-2">
+                          <UserCheck className="h-4 w-4 text-blue-500" />
+                          {s.full_name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </CardHeader>
 
@@ -818,19 +899,27 @@ const AdminSupportManagement: React.FC = () => {
                   <label className="block text-sm font-semibold text-slate-700 mb-2">
                     Chọn nhân viên
                   </label>
-                  <select
-                    value={assignFormData.staff_id}
-                    onChange={(e) => setAssignFormData(prev => ({ ...prev, staff_id: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none"
-                    required
+                  <Select 
+                    value={assignFormData.staff_id} 
+                    onValueChange={(value) => setAssignFormData(prev => ({ ...prev, staff_id: value }))}
                   >
-                    <option value="">Chọn nhân viên...</option>
-                    {staff.map((member) => (
-                      <option key={member.user_id} value={member.user_id}>
-                        {member.full_name} - {member.email}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full h-12 border-2 border-slate-200 rounded-xl focus:border-blue-500">
+                      <SelectValue placeholder="Chọn nhân viên..." />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
+                      {staff.map((member) => (
+                        <SelectItem key={member.user_id} value={member.user_id} className="hover:bg-blue-50 cursor-pointer">
+                          <div className="flex items-center gap-3">
+                            <UserCheck className="h-4 w-4 text-blue-500" />
+                            <div>
+                              <div className="font-medium">{member.full_name}</div>
+                              <div className="text-xs text-slate-500">{member.email}</div>
+                            </div>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
@@ -955,17 +1044,40 @@ const AdminSupportManagement: React.FC = () => {
                   <label className="block text-sm font-medium text-slate-700 mb-2">
                     Trạng thái mới *
                   </label>
-                  <select
-                    value={statusFormData.status}
-                    onChange={(e) => setStatusFormData({ ...statusFormData, status: e.target.value as any })}
-                    className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none"
-                    required
+                  <Select 
+                    value={statusFormData.status} 
+                    onValueChange={(value) => setStatusFormData({ ...statusFormData, status: value as any })}
                   >
-                    <option value="open">Mở</option>
-                    <option value="in_progress">Đang xử lý</option>
-                    <option value="resolved">Đã giải quyết</option>
-                    <option value="closed">Đã đóng</option>
-                  </select>
+                    <SelectTrigger className="w-full h-11 border-2 border-slate-200 rounded-xl focus:border-blue-500">
+                      <SelectValue placeholder="Chọn trạng thái..." />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
+                      <SelectItem value="open" className="hover:bg-blue-50 cursor-pointer">
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-blue-600" />
+                          Mở
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="in_progress" className="hover:bg-yellow-50 cursor-pointer">
+                        <div className="flex items-center gap-2">
+                          <Edit3 className="h-4 w-4 text-yellow-600" />
+                          Đang xử lý
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="resolved" className="hover:bg-green-50 cursor-pointer">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                          Đã giải quyết
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="closed" className="hover:bg-gray-50 cursor-pointer">
+                        <div className="flex items-center gap-2">
+                          <X className="h-4 w-4 text-gray-600" />
+                          Đã đóng
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {(statusFormData.status === 'resolved' || statusFormData.status === 'closed') && (

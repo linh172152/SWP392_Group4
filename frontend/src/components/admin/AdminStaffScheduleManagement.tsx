@@ -17,6 +17,13 @@ import {
   DialogTitle,
 } from '../ui/dialog';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/select';
+import {
   Calendar,
   Clock,
   Search,
@@ -529,26 +536,45 @@ const AdminStaffScheduleManagement: React.FC = () => {
   );
 
   // Reset all filters and apply immediately
+  // Auto-apply filters whenever any filter value changes (except searchTerm which is client-side)
+  useEffect(() => {
+    const applyFilters = async () => {
+      try {
+        console.log('Applying filters:', {
+          staff_id: staffFilter,
+          station_id: stationFilter, 
+          shift_date: dateFilter,
+          status: statusFilter !== 'all' ? statusFilter : undefined
+        });
+        
+        const response = await adminGetStaffSchedules({
+          staff_id: staffFilter || undefined,
+          station_id: stationFilter || undefined,
+          shift_date: dateFilter || undefined,
+          status: statusFilter !== 'all' ? statusFilter : undefined,
+          limit: 100,
+          page: 1
+        });
+        setSchedules(response.data.schedules || []);
+        setRefreshKey(prev => prev + 1); // Force re-render
+      } catch (error) {
+        console.error('Error applying filters:', error);
+        toast.error('Lỗi khi áp dụng bộ lọc');
+        setSchedules([]);
+      }
+    };
+
+    // Apply filters automatically whenever server-side filter values change
+    applyFilters();
+  }, [statusFilter, staffFilter, stationFilter, dateFilter]);
+
   const resetFilters = async () => {
     setSearchTerm('');
     setStatusFilter('all');
     setStaffFilter('');
     setStationFilter('');
     setDateFilter('');
-    
-    // Automatically fetch schedules with reset filters
-    try {
-      const response = await adminGetStaffSchedules({
-        limit: 100,
-        page: 1
-      });
-      setSchedules(response.data.schedules || []);
-      setRefreshKey(prev => prev + 1); // Force re-render
-      toast.success('Đã reset bộ lọc và tải lại dữ liệu');
-    } catch (error) {
-      console.error('Error fetching schedules after reset:', error);
-      toast.error('Lỗi khi tải lại dữ liệu');
-    }
+    toast.success('Đã reset bộ lọc');
   };
 
   const handleViewSchedule = (schedule: AdminStaffSchedule) => {
@@ -619,11 +645,20 @@ const AdminStaffScheduleManagement: React.FC = () => {
 
   // Ensure schedules is always an array for filtering
   const safeSchedules = Array.isArray(schedules) ? schedules : [];
-  // Ensure schedules is always an array for filtering
+  
+  // Apply all filters including search term (client-side filtering for search)
   const filteredSchedules = safeSchedules
     .filter(schedule => {
-      if (statusFilter !== 'all' && schedule.status !== statusFilter) return false;
+      // Search term filter (client-side)
       if (searchTerm && !schedule.staff?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+      
+      // Note: statusFilter, staffFilter, stationFilter, dateFilter are already applied server-side via useEffect
+      // But we keep them here for consistency and immediate filtering of search results
+      if (statusFilter !== 'all' && schedule.status !== statusFilter) return false;
+      if (staffFilter && schedule.staff_id !== staffFilter) return false;
+      if (stationFilter && schedule.station_id !== stationFilter) return false;
+      if (dateFilter && !schedule.shift_date.startsWith(dateFilter)) return false;
+      
       return true;
     })
     .sort((a, b) => {
@@ -752,41 +787,91 @@ const AdminStaffScheduleManagement: React.FC = () => {
                 />
               </div>
             </div>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-              className="px-3 py-2 border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="all">Tất cả trạng thái</option>
-              <option value="scheduled">Đã lên lịch</option>
-              <option value="completed">Hoàn thành</option>
-              <option value="absent">Vắng mặt</option>
-              <option value="cancelled">Đã hủy</option>
-            </select>
-            <select
-              value={staffFilter}
-              onChange={(e) => setStaffFilter(e.target.value)}
-              className="px-3 py-2 border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="">Tất cả nhân viên</option>
-              {staff.map((s) => (
-                <option key={s.user_id} value={s.user_id}>
-                  {s.full_name}
-                </option>
-              ))}
-            </select>
-            <select
-              value={stationFilter}
-              onChange={(e) => setStationFilter(e.target.value)}
-              className="px-3 py-2 border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="">Tất cả trạm</option>
-              {stations.map((station) => (
-                <option key={station.station_id} value={station.station_id}>
-                  {station.name}
-                </option>
-              ))}
-            </select>
+            <div className="min-w-[140px]">
+              <Select value={statusFilter} onValueChange={(value: StatusFilter) => setStatusFilter(value)}>
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Trạng thái" />
+                </SelectTrigger>
+                <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
+                  <SelectItem value="all" className="hover:bg-gray-50 cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                      Tất cả trạng thái
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="scheduled" className="hover:bg-blue-50 cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <CalendarDays className="h-4 w-4 text-blue-600" />
+                      Đã lên lịch
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="completed" className="hover:bg-green-50 cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <UserCheck className="h-4 w-4 text-green-600" />
+                      Hoàn thành
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="absent" className="hover:bg-red-50 cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <UserX className="h-4 w-4 text-red-600" />
+                      Vắng mặt
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="cancelled" className="hover:bg-gray-50 cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-gray-600" />
+                      Đã hủy
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="min-w-[160px]">
+              <Select value={staffFilter} onValueChange={setStaffFilter}>
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Nhân viên" />
+                </SelectTrigger>
+                <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
+                  <SelectItem value="" className="hover:bg-gray-50 cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4 text-gray-500" />
+                      Tất cả nhân viên
+                    </div>
+                  </SelectItem>
+                  {staff.map((s) => (
+                    <SelectItem key={s.user_id} value={s.user_id} className="hover:bg-blue-50 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        <UserCheck className="h-4 w-4 text-blue-500" />
+                        {s.full_name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="min-w-[140px]">
+              <Select value={stationFilter} onValueChange={setStationFilter}>
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Trạm" />
+                </SelectTrigger>
+                <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
+                  <SelectItem value="" className="hover:bg-gray-50 cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <Building className="h-4 w-4 text-gray-500" />
+                      Tất cả trạm
+                    </div>
+                  </SelectItem>
+                  {stations.map((station) => (
+                    <SelectItem key={station.station_id} value={station.station_id} className="hover:bg-green-50 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        <Building className="h-4 w-4 text-green-500" />
+                        {station.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <Input
               type="date"
               value={dateFilter}
@@ -795,14 +880,6 @@ const AdminStaffScheduleManagement: React.FC = () => {
             />
           </div>
           <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              onClick={fetchSchedules}
-              className="gap-2"
-            >
-              <Filter className="h-4 w-4" />
-              Áp dụng bộ lọc
-            </Button>
             <Button onClick={resetFilters} variant="outline" className="gap-2">
               <Filter className="h-4 w-4" />
               Đặt lại bộ lọc
@@ -932,36 +1009,54 @@ const AdminStaffScheduleManagement: React.FC = () => {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Nhân viên *</label>
-                <select
-                  name="staff_id"
-                  value={formData.staff_id}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full px-3 py-2 border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                <Select 
+                  value={formData.staff_id} 
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, staff_id: value }))}
                 >
-                  <option value="">Chọn nhân viên</option>
-                  {staff.map((s) => (
-                    <option key={s.user_id} value={s.user_id}>
-                      {s.full_name} - {s.email}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full h-11 border border-input rounded-md">
+                    <SelectValue placeholder="Chọn nhân viên" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
+                    {staff.map((s) => (
+                      <SelectItem key={s.user_id} value={s.user_id} className="hover:bg-blue-50 cursor-pointer">
+                        <div className="flex items-center gap-3">
+                          <UserCheck className="h-4 w-4 text-blue-500" />
+                          <div>
+                            <div className="font-medium">{s.full_name}</div>
+                            <div className="text-xs text-slate-500">{s.email}</div>
+                          </div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Trạm</label>
-                <select
-                  name="station_id"
-                  value={formData.station_id || ''}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                <Select 
+                  value={formData.station_id || ''} 
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, station_id: value || null }))}
                 >
-                  <option value="">Chọn trạm (tuỳ chọn)</option>
-                  {stations.map((station) => (
-                    <option key={station.station_id} value={station.station_id}>
-                      {station.name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full h-11 border border-input rounded-md">
+                    <SelectValue placeholder="Chọn trạm (tuỳ chọn)" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
+                    <SelectItem value="" className="hover:bg-gray-50 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        <Building className="h-4 w-4 text-gray-500" />
+                        Không chỉ định trạm
+                      </div>
+                    </SelectItem>
+                    {stations.map((station) => (
+                      <SelectItem key={station.station_id} value={station.station_id} className="hover:bg-green-50 cursor-pointer">
+                        <div className="flex items-center gap-2">
+                          <Building className="h-4 w-4 text-green-500" />
+                          {station.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -1020,17 +1115,40 @@ const AdminStaffScheduleManagement: React.FC = () => {
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Trạng thái</label>
-              <select
-                name="status"
-                value={formData.status}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              <Select 
+                value={formData.status} 
+                onValueChange={(value: 'scheduled' | 'completed' | 'absent' | 'cancelled') => setFormData(prev => ({ ...prev, status: value }))}
               >
-                <option value="scheduled">Đã lên lịch</option>
-                <option value="completed">Hoàn thành</option>
-                <option value="absent">Vắng mặt</option>
-                <option value="cancelled">Đã hủy</option>
-              </select>
+                <SelectTrigger className="w-full h-11 border border-input rounded-md">
+                  <SelectValue placeholder="Chọn trạng thái" />
+                </SelectTrigger>
+                <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
+                  <SelectItem value="scheduled" className="hover:bg-blue-50 cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <CalendarDays className="h-4 w-4 text-blue-600" />
+                      Đã lên lịch
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="completed" className="hover:bg-green-50 cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <UserCheck className="h-4 w-4 text-green-600" />
+                      Hoàn thành
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="absent" className="hover:bg-red-50 cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <UserX className="h-4 w-4 text-red-600" />
+                      Vắng mặt
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="cancelled" className="hover:bg-gray-50 cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-gray-600" />
+                      Đã hủy
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">

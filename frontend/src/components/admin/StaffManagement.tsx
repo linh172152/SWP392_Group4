@@ -338,6 +338,19 @@ const StaffManagement: React.FC = () => {
 
   return (
     <div className="container mx-auto max-w-7xl px-4 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Quản lý Nhân viên</h1>
+          <p className="text-muted-foreground">
+            Quản lý thông tin và phân công nhân viên cho các trạm.
+          </p>
+        </div>
+        <Button onClick={() => setIsAddDialogOpen(true)} className="gap-2">
+          <Plus className="h-4 w-4" />
+          Thêm nhân viên
+        </Button>
+      </div>
 
       {/* Statistics Cards */}
       <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
@@ -368,20 +381,6 @@ const StaffManagement: React.FC = () => {
             <div className="text-2xl font-bold text-red-700">{inactiveStaff}</div>
           </CardContent>
         </Card>
-      </div>
-
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Quản lý Nhân viên</h1>
-          <p className="text-muted-foreground">
-            Quản lý thông tin và phân công nhân viên cho các trạm.
-          </p>
-        </div>
-        <Button onClick={() => setIsAddDialogOpen(true)} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Thêm nhân viên
-        </Button>
       </div>
 
       {/* Filters */}
