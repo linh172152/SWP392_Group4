@@ -98,7 +98,7 @@ export const generateVNPayUrl = (paymentData: VNPayPaymentData): string => {
   const secureHash = crypto
     .HmacSHA512(signData, vnpayConfig.hashSecret)
     .toString(crypto.enc.Hex)
-    .toLowerCase();
+    .toUpperCase();
 
   // Add secure hash info to parameters
   const finalParams: Record<string, string> = {
@@ -142,10 +142,10 @@ export const verifyVNPayResponse = (response: VNPayResponse): boolean => {
     const generatedHash = crypto
       .HmacSHA512(signData, vnpayConfig.hashSecret)
       .toString(crypto.enc.Hex)
-      .toLowerCase();
+      .toUpperCase();
 
     // Compare hashes (case-insensitive)
-    return generatedHash === (vnp_SecureHash || "").toLowerCase();
+    return generatedHash === (vnp_SecureHash || "").toUpperCase();
   } catch (error) {
     return false;
   }
