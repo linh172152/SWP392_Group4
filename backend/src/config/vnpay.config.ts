@@ -9,8 +9,7 @@ export const vnpayConfig = {
   returnUrl:
     process.env.VNPAY_RETURN_URL ||
     "http://localhost:3000/api/payments/vnpay/return",
-  ipnUrl:
-    process.env.VNPAY_IPN_URL || "http://localhost:3000/api/payments/vnpay/ipn",
+  ipnUrl: process.env.VNPAY_IPN_URL || "",
 
   // VNPay API endpoints
   queryUrl: "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction",
