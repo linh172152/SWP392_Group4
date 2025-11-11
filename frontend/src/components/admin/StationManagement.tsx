@@ -40,73 +40,6 @@ const StationManagement: React.FC = () => {
   const [showDetails, setShowDetails] = useState(false);
   const [editingStation, setEditingStation] = useState<Station | null>(null);
 
-  // Mock data for development
-  const mockStations: Station[] = [
-    {
-      id: 'ST001',
-      station_id: 'ST001',
-      name: 'Trạm Thành phố',
-      address: '123 Đường Chính, Quận 1, TP.HCM',
-      coordinates: { lat: 10.762622, lng: 106.660172 },
-      status: 'active',
-      capacity: 12,
-      available_batteries: 8,
-      charging_batteries: 3,
-      maintenance_batteries: 1,
-      daily_swaps: 47,
-      daily_revenue: 1247.50,
-      uptime: 99.2,
-      operating_hours: '24/7',
-      manager: {
-        user_id: 'USER001',
-        full_name: 'Nguyễn Văn Quản lý',
-        phone: '+84 901 234 567'
-      }
-    },
-    {
-      id: 'ST002',
-      station_id: 'ST002',
-      name: 'Trạm Trung tâm Thương mại',
-      address: '456 Đại lộ Mua sắm, Quận 3, TP.HCM',
-      coordinates: { lat: 10.786785, lng: 106.700471 },
-      status: 'active',
-      capacity: 20,
-      available_batteries: 15,
-      charging_batteries: 4,
-      maintenance_batteries: 1,
-      daily_swaps: 68,
-      daily_revenue: 1876.25,
-      uptime: 97.8,
-      operating_hours: '6 AM - 11 PM',
-      manager: {
-        user_id: 'USER002',
-        full_name: 'Trần Thị Quản lý',
-        phone: '+84 902 345 678'
-      }
-    },
-    {
-      id: 'ST003',
-      station_id: 'ST003',
-      name: 'Trạm Nghỉ Cao tốc A1',
-      address: 'Cao tốc A1 hướng Bắc Km 42',
-      coordinates: { lat: 10.950000, lng: 106.800000 },
-      status: 'maintenance',
-      capacity: 16,
-      available_batteries: 6,
-      charging_batteries: 8,
-      maintenance_batteries: 2,
-      daily_swaps: 34,
-      daily_revenue: 892.75,
-      uptime: 89.5,
-      operating_hours: '24/7',
-      manager: {
-        user_id: 'USER003',
-        full_name: 'Lê Hoàng Quản lý',
-        phone: '+84 903 456 789'
-      }
-    }
-  ];
-
   // Fetch stations from API
   const fetchStations = async () => {
     try {
@@ -152,21 +85,21 @@ const StationManagement: React.FC = () => {
           });
           
           console.log('Transformed stations:', transformedStations);
-          setStations(transformedStations.length > 0 ? transformedStations : mockStations);
+          setStations(transformedStations);
         } else {
           console.error('Invalid API response format:', res);
-          setStations(mockStations);
-          toast.error('Định dạng dữ liệu không hợp lệ - Đang hiển thị dữ liệu mẫu');
+          setStations([]);
+          toast.error('Định dạng dữ liệu không hợp lệ');
         }
       } else {
         console.error('API Error:', res.message);
-        setStations(mockStations);
-        toast.error(res.message || 'Lỗi khi tải danh sách trạm - Đang hiển thị dữ liệu mẫu');
+        setStations([]);
+        toast.error(res.message || 'Lỗi khi tải danh sách trạm');
       }
     } catch (err: any) {
       console.error('Load stations error:', err);
-      setStations(mockStations);
-      toast.error('Lỗi kết nối API - Đang hiển thị dữ liệu mẫu');
+      setStations([]);
+      toast.error('Lỗi kết nối API');
     }
   };
 
@@ -519,14 +452,34 @@ const StationManagement: React.FC = () => {
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
+              <SelectTrigger className="h-10 bg-white border border-gray-300 shadow-sm">
                 <SelectValue placeholder="Trạng thái" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tất cả trạng thái</SelectItem>
-                <SelectItem value="active">Trực tuyến</SelectItem>
-                <SelectItem value="closed">Ngoại tuyến</SelectItem>
-                <SelectItem value="maintenance">Bảo trì</SelectItem>
+              <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
+                <SelectItem value="all" className="hover:bg-gray-50 cursor-pointer">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                    Tất cả trạng thái
+                  </div>
+                </SelectItem>
+                <SelectItem value="active" className="hover:bg-green-50 cursor-pointer">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    Trực tuyến
+                  </div>
+                </SelectItem>
+                <SelectItem value="closed" className="hover:bg-red-50 cursor-pointer">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-red-600" />
+                    Ngoại tuyến
+                  </div>
+                </SelectItem>
+                <SelectItem value="maintenance" className="hover:bg-yellow-50 cursor-pointer">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-yellow-600" />
+                    Bảo trì
+                  </div>
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
