@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '../ui/card';
@@ -13,14 +12,11 @@ import type { Station } from '../../services/station.service';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
-import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
 import {
   Users,
   Search,
   Mail,
   Phone,
-  Clock,
-  Calendar,
   UserCheck,
   UserX,
   Building,
@@ -146,32 +142,14 @@ const StaffManagement: React.FC = () => {
     }
   };
 
-  const handleDeleteStaff = async (id: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await staffService.deleteStaff(id);
-      if (response.success) {
-        setStaffList(prev => prev.filter(p => p.id !== id));
-      } else {
-        throw new Error(response.message || 'Không thể xóa nhân viên');
-      }
-    } catch (err: any) {
-      console.error('Error deleting staff:', err);
-      setError(err.message || 'Không thể xóa nhân viên');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const getStatusColor = (status: Staff['status']) => {
     switch (status) {
       case 'ACTIVE':
-        return 'bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-400';
+        return 'bg-green-100 text-green-800 border-green-200';
       case 'INACTIVE':
-        return 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-400';
+        return 'bg-red-100 text-red-800 border-red-200';
       default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-500/20 dark:text-gray-400';
+        return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
@@ -268,49 +246,39 @@ const StaffManagement: React.FC = () => {
     }
 
     return filteredStaff.map((staff, idx) => (
-      <Card key={staff.user_id ?? staff.email ?? `staff-${idx}`} className="glass-card border-0 glow-hover group">
+      <Card key={staff.user_id ?? staff.email ?? `staff-${idx}`} className="transition-all duration-200 hover:shadow-lg">
         <CardContent className="p-6">
-          <div className="flex items-start space-x-4">
-            <Avatar className="w-16 h-16 ring-2 ring-green-500/20 dark:ring-emerald-500/20">
-              <AvatarImage src={staff.avatar || undefined} />
-              <AvatarFallback className="bg-gradient-to-r from-green-500 to-emerald-500 text-white text-lg">
-                {staff.full_name ? staff.full_name.charAt(0) : staff.email?.charAt(0) ?? '?'}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    {staff.full_name || staff.email?.split('@')[0] || '—'}
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{staff.role || 'Nhân viên'}</p>
-                </div>
-                <Badge className={getStatusColor(staff.status)}>
-                  {getStatusIcon(staff.status)}
-                  <span className="ml-1">{getStatusLabel(staff.status)}</span>
-                </Badge>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="bg-blue-100 p-3 rounded-full">
+                <Users className="h-6 w-6 text-blue-600" />
               </div>
-              <div className="grid grid-cols-1 gap-2 text-sm">
-                <div className="flex items-center space-x-2">
-                  <Mail className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                  <span className="text-gray-600 dark:text-gray-300">{staff.email}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Phone className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                  <span className="text-gray-600 dark:text-gray-300">{staff.phone || 'Chưa cập nhật'}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Building className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                  <span className="text-gray-600 dark:text-gray-300">{staff.station?.name || 'Chưa phân công'}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Calendar className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                  <span className="text-gray-600 dark:text-gray-300">
-                    Tham gia: {new Date(staff.created_at).toLocaleDateString('vi-VN')}
-                  </span>
+              <div className="space-y-1">
+                <h3 className="font-semibold text-lg">
+                  {staff.full_name || staff.email?.split('@')[0] || '—'}
+                </h3>
+                <div className="flex items-center space-x-4 text-sm text-gray-600">
+                  <div className="flex items-center gap-1">
+                    <Mail className="h-4 w-4" />
+                    {staff.email}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Phone className="h-4 w-4" />
+                    {staff.phone || 'Chưa cập nhật'}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Building className="h-4 w-4" />
+                    {staff.station?.name || 'Chưa phân công'}
+                  </div>
                 </div>
               </div>
-              <div className="flex space-x-2 pt-2">
+            </div>
+            <div className="flex items-center space-x-3">
+              <Badge className={getStatusColor(staff.status)}>
+                {getStatusIcon(staff.status)}
+                <span className="ml-1">{getStatusLabel(staff.status)}</span>
+              </Badge>
+              <div className="flex gap-2">
                 <Button
                   variant="outline"
                   size="sm"
@@ -318,7 +286,7 @@ const StaffManagement: React.FC = () => {
                     console.log('Opening edit dialog for staff:', staff);
                     setSelectedStaff(staff);
                   }}
-                  className="flex-1 glass border-purple-200/50 dark:border-purple-400/30 hover:bg-purple-50/50 dark:hover:bg-purple-500/10"
+                  className="gap-1"
                 >
                   Chỉnh sửa
                 </Button>
@@ -333,7 +301,7 @@ const StaffManagement: React.FC = () => {
                         setError('ID nhân viên không hợp lệ');
                       }
                     }}
-                    className="flex-1 glass border-red-200/50 dark:border-red-400/30 hover:bg-red-50/50 dark:hover:bg-red-500/10"
+                    className="gap-1 text-red-600 hover:text-red-700"
                   >
                     Vô hiệu hóa
                   </Button>
@@ -348,7 +316,7 @@ const StaffManagement: React.FC = () => {
                         setError('ID nhân viên không hợp lệ');
                       }
                     }}
-                    className="flex-1 glass border-green-200/50 dark:border-green-400/30 hover:bg-green-50/50 dark:hover:bg-green-500/10"
+                    className="gap-1 text-green-600 hover:text-green-700"
                   >
                     Kích hoạt
                   </Button>
@@ -356,79 +324,89 @@ const StaffManagement: React.FC = () => {
               </div>
             </div>
           </div>
+          {staff.created_at && (
+            <div className="mt-4 p-3 bg-gray-50 rounded-md">
+              <p className="text-sm text-gray-600">
+                <strong>Tham gia:</strong> {new Date(staff.created_at).toLocaleDateString('vi-VN')}
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
     ));
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <header>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">👥 Quản lý Nhân viên</h1>
-        <p className="mt-2 text-gray-600 dark:text-gray-400">Quản lý thông tin và phân công nhân viên cho các trạm</p>
-      </header>
+    <div className="container mx-auto max-w-7xl px-4 space-y-6">
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card key="total-staff" className="glass-card border-0">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">Tổng nhân viên</CardTitle>
-            <Users className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+      {/* Statistics Cards */}
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
+        <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-blue-700">Tổng nhân viên</CardTitle>
+            <Users className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">{totalStaff}</div>
+            <div className="text-2xl font-bold text-blue-800">{totalStaff}</div>
           </CardContent>
         </Card>
-        <Card key="active-staff" className="glass-card border-0">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-green-600 dark:text-green-400">Đang làm việc</CardTitle>
-            <UserCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
+        <Card className="bg-gradient-to-r from-green-50 to-emerald-100 border-green-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-green-700">Đang làm việc</CardTitle>
+            <UserCheck className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{activeStaff}</div>
+            <div className="text-2xl font-bold text-green-700">{activeStaff}</div>
           </CardContent>
         </Card>
-        <Card key="inactive-staff" className="glass-card border-0">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-red-600 dark:text-red-400">Không hoạt động</CardTitle>
-            <UserX className="h-4 w-4 text-red-600 dark:text-red-400" />
+        <Card className="bg-gradient-to-r from-red-50 to-rose-100 border-red-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-red-700">Không hoạt động</CardTitle>
+            <UserX className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600 dark:text-red-400">{inactiveStaff}</div>
+            <div className="text-2xl font-bold text-red-700">{inactiveStaff}</div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Search & Add */}
-      <Card key="search" className="glass-card border-0">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Danh sách Nhân viên</CardTitle>
-            <CardDescription>Quản lý tất cả nhân viên trong hệ thống</CardDescription>
-          </div>
-          <Button
-            onClick={() => setIsAddDialogOpen(true)}
-            className="bg-gradient-to-r from-purple-500 to-violet-500 text-white hover:from-purple-600 hover:to-violet-600"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Thêm Nhân viên
-          </Button>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Quản lý Nhân viên</h1>
+          <p className="text-muted-foreground">
+            Quản lý thông tin và phân công nhân viên cho các trạm.
+          </p>
+        </div>
+        <Button onClick={() => setIsAddDialogOpen(true)} className="gap-2">
+          <Plus className="h-4 w-4" />
+          Thêm nhân viên
+        </Button>
+      </div>
+
+      {/* Filters */}
+      <Card className="bg-gradient-to-r from-slate-50 to-gray-100 border-slate-200">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-lg flex items-center gap-2 text-slate-700">
+            <Search className="h-5 w-5 text-slate-600" />
+            Tìm kiếm và lọc
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400 dark:text-gray-500" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Tìm kiếm theo tên, email, vị trí..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 glass border-gray-200/50 dark:border-gray-700/50"
+              className="pl-10"
             />
           </div>
         </CardContent>
       </Card>
 
       {/* Staff List */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="space-y-4">
         {renderStaffList()}
       </div>
 

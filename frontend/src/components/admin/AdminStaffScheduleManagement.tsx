@@ -124,12 +124,11 @@ interface CalendarViewProps {
   onDeleteSchedule: (scheduleId: string) => void;
 }
 
-const CalendarView: React.FC<CalendarViewProps> = ({ schedules, onViewSchedule, onEditSchedule, onDeleteSchedule }) => {
+const CalendarView: React.FC<CalendarViewProps> = ({ schedules, onViewSchedule }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   
   // Get first day of current month
   const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-  const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
   
   // Get first day of calendar (might be from previous month)
   const firstDayOfCalendar = new Date(firstDayOfMonth);
