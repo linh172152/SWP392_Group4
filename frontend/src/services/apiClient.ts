@@ -57,9 +57,18 @@ export async function authFetch(input: string, options: FetchOptions = {}) {
     
     // Handle 401 - redirect to login
     if (res.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/admin/login';
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+      localStorage.removeItem("ev_swap_user");
+
+      const currentPath = window.location.pathname;
+      if (currentPath.startsWith("/staff")) {
+        window.location.href = "/staff/login";
+      } else if (currentPath.startsWith("/admin")) {
+        window.location.href = "/admin/login";
+      } else {
+        window.location.href = "/";
+      }
     }
     
     const err = new Error((data && data.message) || res.statusText || "Request failed");
