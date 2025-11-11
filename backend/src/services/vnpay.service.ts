@@ -1,17 +1,16 @@
-import { PrismaClient, Prisma, PaymentType } from '@prisma/client';
-import type { Payment } from '@prisma/client';
-import { 
-  generateVNPayUrl, 
-  verifyVNPayResponse, 
-  isVNPaySuccess, 
+import { Prisma, PaymentType } from "@prisma/client";
+import type { Payment } from "@prisma/client";
+import {
+  generateVNPayUrl,
+  verifyVNPayResponse,
+  isVNPaySuccess,
   getVNPayResponseMessage,
   parseVNPayAmount,
   VNPayPaymentData,
-  VNPayResponse
-} from '../utils/vnpay.util';
-import { CustomError } from '../middlewares/error.middleware';
-
-const prisma = new PrismaClient();
+  VNPayResponse,
+} from "../utils/vnpay.util";
+import { CustomError } from "../middlewares/error.middleware";
+import { prisma } from "../server";
 
 export interface CreatePaymentData {
   userId: string;
@@ -23,6 +22,7 @@ export interface CreatePaymentData {
   paymentType?: PaymentType;
   metadata?: Record<string, unknown>;
   ipAddress?: string;
+  topupPackageId?: string;
 }
 
 export interface PaymentResult {
@@ -35,7 +35,9 @@ export interface PaymentResult {
 /**
  * Create VNPay payment
  */
-export const createVNPayPayment = async (data: CreatePaymentData): Promise<PaymentResult> => {
+export const createVNPayPayment = async (
+  data: CreatePaymentData & { topupPackageId?: string }
+): Promise<PaymentResult> => {
   try {
     const {
       userId,
@@ -47,19 +49,20 @@ export const createVNPayPayment = async (data: CreatePaymentData): Promise<Payme
       paymentType,
       metadata,
       ipAddress,
+      topupPackageId,
     } = data;
 
     // Validate user
     const user = await prisma.user.findUnique({
-      where: { user_id: userId }
+      where: { user_id: userId },
     });
 
     if (!user) {
-      throw new CustomError('User not found', 404);
+      throw new CustomError("User not found", 404);
     }
 
-    if (user.status !== 'ACTIVE') {
-      throw new CustomError('User account is inactive', 401);
+    if (user.status !== "ACTIVE") {
+      throw new CustomError("User account is inactive", 401);
     }
 
     // Generate order ID
@@ -69,11 +72,14 @@ export const createVNPayPayment = async (data: CreatePaymentData): Promise<Payme
     const baseMetadata: Record<string, any> = {
       order_id: orderId,
       order_description: orderDescription,
-      order_type: orderType || 'other',
+      order_type: orderType || "other",
       ...(metadata ?? {}),
     };
 
-    if (baseMetadata.type === 'wallet_topup' && typeof baseMetadata.wallet_topup_processed === 'undefined') {
+    if (
+      baseMetadata.type === "wallet_topup" &&
+      typeof baseMetadata.wallet_topup_processed === "undefined"
+    ) {
       baseMetadata.wallet_topup_processed = false;
     }
 
@@ -81,13 +87,14 @@ export const createVNPayPayment = async (data: CreatePaymentData): Promise<Payme
       data: {
         user_id: userId,
         amount: amount,
-        payment_method: 'vnpay',
-        payment_status: 'pending',
+        payment_method: "vnpay",
+        payment_status: "pending",
         payment_gateway_ref: orderId,
         created_at: new Date(),
-        payment_type: paymentType ?? 'OTHER',
+        payment_type: paymentType ?? "OTHER",
         metadata: baseMetadata,
-      }
+        topup_package_id: topupPackageId ?? null,
+      },
     });
 
     // Create VNPay payment data
@@ -95,9 +102,9 @@ export const createVNPayPayment = async (data: CreatePaymentData): Promise<Payme
       amount: amount,
       orderId: orderId,
       orderDescription: orderDescription,
-      orderType: orderType || 'other',
-      bankCode: bankCode || '',
-      language: language || 'vn',
+      orderType: orderType || "other",
+      bankCode: bankCode || "",
+      language: language || "vn",
       ipAddress: ipAddress,
     };
 
@@ -108,20 +115,22 @@ export const createVNPayPayment = async (data: CreatePaymentData): Promise<Payme
       paymentUrl,
       orderId,
       amount,
-      orderDescription
+      orderDescription,
     };
   } catch (error) {
     if (error instanceof CustomError) {
       throw error;
     }
-    throw new CustomError('Failed to create VNPay payment', 500);
+    throw new CustomError("Failed to create VNPay payment", 500);
   }
 };
 
 /**
  * Handle VNPay return callback
  */
-export const handleVNPayReturn = async (response: VNPayResponse): Promise<{
+export const handleVNPayReturn = async (
+  response: VNPayResponse
+): Promise<{
   success: boolean;
   message: string;
   paymentId?: string;
@@ -132,38 +141,76 @@ export const handleVNPayReturn = async (response: VNPayResponse): Promise<{
     if (!verifyVNPayResponse(response)) {
       return {
         success: false,
-        message: 'Invalid VNPay response signature'
-      };
-    }
-
-    // Check if payment is successful
-    if (!isVNPaySuccess(response)) {
-      const message = getVNPayResponseMessage(response.vnp_ResponseCode);
-      return {
-        success: false,
-        message: `Payment failed: ${message}`
+        message: "Invalid VNPay response signature",
       };
     }
 
     // Find payment by order ID
     const payment = await prisma.payment.findFirst({
-      where: { payment_gateway_ref: response.vnp_TxnRef }
+      where: { payment_gateway_ref: response.vnp_TxnRef },
     });
 
     if (!payment) {
       return {
         success: false,
-        message: 'Payment not found'
+        message: "Payment not found",
       };
     }
 
-    // Update payment status
     const metadata = (payment.metadata as Record<string, any> | null) ?? {};
+    const responseAmount = parseVNPayAmount(response.vnp_Amount);
+    const expectedAmount = Number(payment.amount);
+
+    if (Number.isFinite(expectedAmount) && responseAmount !== expectedAmount) {
+      await prisma.payment.update({
+        where: { payment_id: payment.payment_id },
+        data: {
+          payment_status: "failed",
+          metadata: {
+            ...metadata,
+            vnp_transaction_no: response.vnp_TransactionNo,
+            vnp_response_code: response.vnp_ResponseCode,
+            payment_failure_reason: "amount_mismatch",
+            expected_amount: expectedAmount,
+            received_amount: responseAmount,
+          },
+        },
+      });
+
+      return {
+        success: false,
+        message: "Payment amount mismatch",
+        paymentId: payment.payment_id,
+      };
+    }
+
+    if (!isVNPaySuccess(response)) {
+      const message = getVNPayResponseMessage(response.vnp_ResponseCode);
+
+      await prisma.payment.update({
+        where: { payment_id: payment.payment_id },
+        data: {
+          payment_status: "failed",
+          metadata: {
+            ...metadata,
+            vnp_transaction_no: response.vnp_TransactionNo,
+            vnp_response_code: response.vnp_ResponseCode,
+            payment_failure_reason: message,
+          },
+        },
+      });
+
+      return {
+        success: false,
+        message: `Payment failed: ${message}`,
+        paymentId: payment.payment_id,
+      };
+    }
 
     const updatedPayment = await prisma.payment.update({
       where: { payment_id: payment.payment_id },
       data: {
-        payment_status: 'completed',
+        payment_status: "completed",
         paid_at: new Date(),
         metadata: {
           ...metadata,
@@ -171,22 +218,22 @@ export const handleVNPayReturn = async (response: VNPayResponse): Promise<{
           card_type: response.vnp_CardType,
           vnp_transaction_no: response.vnp_TransactionNo,
           vnp_response_code: response.vnp_ResponseCode,
-        }
-      }
+        },
+      },
     });
 
     await applyWalletTopupIfNeeded(payment, updatedPayment);
 
     return {
       success: true,
-      message: 'Payment successful',
+      message: "Payment successful",
       paymentId: updatedPayment.payment_id,
-      amount: parseVNPayAmount(response.vnp_Amount)
+      amount: responseAmount,
     };
   } catch (error) {
     return {
       success: false,
-      message: 'Failed to process VNPay return'
+      message: "Failed to process VNPay return",
     };
   }
 };
@@ -194,81 +241,14 @@ export const handleVNPayReturn = async (response: VNPayResponse): Promise<{
 /**
  * Handle VNPay IPN (Instant Payment Notification)
  */
-export const handleVNPayIPN = async (response: VNPayResponse): Promise<{
-  success: boolean;
-  message: string;
-}> => {
-  try {
-    // Verify response signature
-    if (!verifyVNPayResponse(response)) {
-      return {
-        success: false,
-        message: 'Invalid VNPay response signature'
-      };
-    }
-
-    // Find payment by order ID
-    const payment = await prisma.payment.findFirst({
-      where: { payment_gateway_ref: response.vnp_TxnRef }
-    });
-
-    if (!payment) {
-      return {
-        success: false,
-        message: 'Payment not found'
-      };
-    }
-
-    // Update payment status based on response
-    let paymentStatus: 'pending' | 'completed' | 'failed' = 'pending';
-    
-    if (isVNPaySuccess(response)) {
-      paymentStatus = 'completed';
-    } else {
-      paymentStatus = 'failed';
-    }
-
-    // Update payment
-    const metadata = (payment.metadata as Record<string, any> | null) ?? {};
-
-    const updatedPayment = await prisma.payment.update({
-      where: { payment_id: payment.payment_id },
-      data: {
-        payment_status: paymentStatus,
-        paid_at: paymentStatus === 'completed' ? new Date() : payment.paid_at,
-        metadata: {
-          ...metadata,
-          bank_code: response.vnp_BankCode ?? metadata.bank_code,
-          card_type: response.vnp_CardType ?? metadata.card_type,
-          vnp_transaction_no: response.vnp_TransactionNo,
-          vnp_response_code: response.vnp_ResponseCode,
-        },
-      }
-    });
-
-    if (paymentStatus === 'completed') {
-      await applyWalletTopupIfNeeded(payment, updatedPayment);
-    }
-
-    return {
-      success: true,
-      message: 'IPN processed successfully'
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: 'Failed to process VNPay IPN'
-    };
-  }
-};
-
 const applyWalletTopupIfNeeded = async (
   originalPayment: Payment,
   updatedPayment: Payment
 ) => {
-  const metadata = (updatedPayment.metadata as Record<string, any> | null) ?? {};
+  const metadata =
+    (updatedPayment.metadata as Record<string, any> | null) ?? {};
 
-  if (metadata?.type !== 'wallet_topup') {
+  if (metadata?.type !== "wallet_topup") {
     return;
   }
 
@@ -276,7 +256,9 @@ const applyWalletTopupIfNeeded = async (
     return;
   }
 
-  const actualAmountNumber = Number(metadata.actual_amount ?? metadata.topup_amount ?? 0);
+  const actualAmountNumber = Number(
+    metadata.actual_amount ?? metadata.topup_amount ?? 0
+  );
 
   if (!Number.isFinite(actualAmountNumber) || actualAmountNumber <= 0) {
     return;
@@ -301,7 +283,7 @@ const applyWalletTopupIfNeeded = async (
     await tx.payment.update({
       where: { payment_id: originalPayment.payment_id },
       data: {
-        payment_type: 'TOPUP',
+        payment_type: "TOPUP",
         metadata: {
           ...metadata,
           wallet_topup_processed: true,
@@ -315,19 +297,23 @@ const applyWalletTopupIfNeeded = async (
 /**
  * Get payment history for user
  */
-export const getUserPaymentHistory = async (userId: string, page: number = 1, limit: number = 10) => {
+export const getUserPaymentHistory = async (
+  userId: string,
+  page: number = 1,
+  limit: number = 10
+) => {
   try {
     const skip = (page - 1) * limit;
 
     const payments = await prisma.payment.findMany({
       where: { user_id: userId },
-      orderBy: { created_at: 'desc' },
+      orderBy: { created_at: "desc" },
       skip,
-      take: limit
+      take: limit,
     });
 
     const total = await prisma.payment.count({
-      where: { user_id: userId }
+      where: { user_id: userId },
     });
 
     return {
@@ -336,11 +322,11 @@ export const getUserPaymentHistory = async (userId: string, page: number = 1, li
         page,
         limit,
         total,
-        pages: Math.ceil(total / limit)
-      }
+        pages: Math.ceil(total / limit),
+      },
     };
   } catch (error) {
-    throw new CustomError('Failed to get payment history', 500);
+    throw new CustomError("Failed to get payment history", 500);
   }
 };
 
@@ -356,14 +342,14 @@ export const getPaymentById = async (paymentId: string) => {
           select: {
             user_id: true,
             full_name: true,
-            email: true
-          }
-        }
-      }
+            email: true,
+          },
+        },
+      },
     });
 
     if (!payment) {
-      throw new CustomError('Payment not found', 404);
+      throw new CustomError("Payment not found", 404);
     }
 
     return payment;
@@ -371,6 +357,6 @@ export const getPaymentById = async (paymentId: string) => {
     if (error instanceof CustomError) {
       throw error;
     }
-    throw new CustomError('Failed to get payment', 500);
+    throw new CustomError("Failed to get payment", 500);
   }
 };

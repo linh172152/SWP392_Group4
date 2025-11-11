@@ -1,13 +1,12 @@
-import { Router } from 'express';
+import { Router } from "express";
 import {
   createPayment,
   handleReturn,
-  handleIPN,
   getPaymentHistory,
   getPayment,
-  testVNPay
-} from '../controllers/vnpay.controller';
-import { authenticateToken } from '../middlewares/auth.middleware';
+  testVNPay,
+} from "../controllers/vnpay.controller";
+import { authenticateToken } from "../middlewares/auth.middleware";
 
 const router = Router();
 
@@ -32,25 +31,7 @@ const router = Router();
  *       400:
  *         description: Invalid payment data
  */
-router.get('/return', handleReturn);
-
-/**
- * @swagger
- * /api/payments/vnpay/ipn:
- *   post:
- *     summary: VNPay IPN (Instant Payment Notification)
- *     tags: [Payments]
- *     requestBody:
- *       required: true
- *       content:
- *         application/x-www-form-urlencoded:
- *           schema:
- *             type: object
- *     responses:
- *       200:
- *         description: IPN processed successfully
- */
-router.post('/ipn', handleIPN);
+router.get("/return", handleReturn);
 
 /**
  * @swagger
@@ -62,7 +43,7 @@ router.post('/ipn', handleIPN);
  *       200:
  *         description: VNPay test successful
  */
-router.get('/test', testVNPay);
+router.get("/test", testVNPay);
 
 /**
  * @swagger
@@ -86,6 +67,8 @@ router.get('/test', testVNPay);
  *                 type: number
  *               orderInfo:
  *                 type: string
+ *               orderDescription:
+ *                 type: string
  *               returnUrl:
  *                 type: string
  *     responses:
@@ -94,7 +77,7 @@ router.get('/test', testVNPay);
  *       401:
  *         description: Unauthorized
  */
-router.post('/create', authenticateToken, createPayment);
+router.post("/create", authenticateToken, createPayment);
 
 /**
  * @swagger
@@ -110,7 +93,7 @@ router.post('/create', authenticateToken, createPayment);
  *       401:
  *         description: Unauthorized
  */
-router.get('/history', authenticateToken, getPaymentHistory);
+router.get("/history", authenticateToken, getPaymentHistory);
 
 /**
  * @swagger
@@ -134,15 +117,6 @@ router.get('/history', authenticateToken, getPaymentHistory);
  *       404:
  *         description: Payment not found
  */
-router.get('/:paymentId', authenticateToken, getPayment);
+router.get("/:paymentId", authenticateToken, getPayment);
 
 export default router;
-
-
-
-
-
-
-
-
-

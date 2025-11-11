@@ -2,13 +2,12 @@ import { Request, Response } from "express";
 import {
   createVNPayPayment,
   handleVNPayReturn,
-  handleVNPayIPN,
   getUserPaymentHistory,
   getPaymentById,
   CreatePaymentData,
 } from "../services/vnpay.service";
-import { asyncHandler } from "../middlewares/error.middleware";
-import { notificationService } from "../server";
+import { asyncHandler, CustomError } from "../middlewares/error.middleware";
+import { notificationService, prisma } from "../server";
 // import { authenticateToken } from '../middlewares/auth.middleware';
 
 /**
@@ -18,8 +17,14 @@ export const createPayment = asyncHandler(
   async (req: Request, res: Response) => {
     try {
       const userId = req.user?.userId;
-      const { amount, orderDescription, orderType, bankCode, language } =
-        req.body;
+      const {
+        amount,
+        orderDescription,
+        orderInfo,
+        orderType,
+        bankCode,
+        language,
+      } = req.body;
 
       if (!userId) {
         return res.status(401).json({
@@ -35,20 +40,44 @@ export const createPayment = asyncHandler(
         });
       }
 
-      if (!orderDescription) {
+      const normalizedDescription = orderDescription ?? orderInfo;
+
+      if (!normalizedDescription) {
         return res.status(400).json({
           success: false,
           message: "Order description is required",
         });
       }
 
+      const forwardedFor = req.headers["x-forwarded-for"];
+      let clientIp =
+        (Array.isArray(forwardedFor)
+          ? forwardedFor[0]
+          : forwardedFor?.split(",")[0]
+        )?.trim() || "";
+
+      if (!clientIp) {
+        clientIp =
+          req.socket.remoteAddress ||
+          req.ip ||
+          (req as any).connection?.remoteAddress ||
+          "127.0.0.1";
+      }
+
+      if (clientIp.startsWith("::ffff:")) {
+        clientIp = clientIp.substring(7);
+      } else if (clientIp === "::1") {
+        clientIp = "127.0.0.1";
+      }
+
       const paymentData: CreatePaymentData = {
         userId,
         amount,
-        orderDescription,
+        orderDescription: normalizedDescription,
         orderType,
         bankCode,
         language,
+        ipAddress: clientIp,
       };
 
       const result = await createVNPayPayment(paymentData);
@@ -59,6 +88,13 @@ export const createPayment = asyncHandler(
         data: result,
       });
     } catch (error) {
+      if (error instanceof CustomError) {
+        return res.status(error.statusCode).json({
+          success: false,
+          message: error.message,
+        });
+      }
+      console.error("Failed to create VNPay payment:", error);
       return res.status(500).json({
         success: false,
         message: "Failed to create VNPay payment",
@@ -144,28 +180,6 @@ export const handleReturn = asyncHandler(
 );
 
 /**
- * Handle VNPay IPN (Instant Payment Notification)
- */
-export const handleIPN = asyncHandler(async (req: Request, res: Response) => {
-  try {
-    const response = req.body;
-
-    const result = await handleVNPayIPN(response);
-
-    // VNPay expects specific response format
-    return res.status(200).json({
-      RspCode: result.success ? "00" : "99",
-      Message: result.message,
-    });
-  } catch (error) {
-    return res.status(200).json({
-      RspCode: "99",
-      Message: "Failed to process IPN",
-    });
-  }
-});
-
-/**
  * Get payment history for user
  */
 export const getPaymentHistory = asyncHandler(
@@ -240,9 +254,21 @@ export const testVNPay = asyncHandler(async (_req: Request, res: Response) => {
       language: "vn",
     };
 
-    // Create test payment
+    const user = await prisma.user.findFirst({
+      where: { role: "DRIVER", status: "ACTIVE" },
+      orderBy: { created_at: "asc" },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "No active driver user found. Please create a driver account before testing VNPay.",
+      });
+    }
+
     const result = await createVNPayPayment({
-      userId: "test-user-id",
+      userId: user.user_id,
       ...testData,
     });
 
@@ -256,6 +282,13 @@ export const testVNPay = asyncHandler(async (_req: Request, res: Response) => {
       },
     });
   } catch (error) {
+    if (error instanceof CustomError) {
+      return res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+    }
+    console.error("Failed to test VNPay:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to test VNPay",
