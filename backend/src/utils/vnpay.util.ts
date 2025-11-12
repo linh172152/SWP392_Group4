@@ -99,7 +99,9 @@ export const generateVNPayUrl = (paymentData: VNPayPaymentData): string => {
   const sortedKeys = Object.keys(params).sort((a, b) => a.localeCompare(b));
 
   // Build string for secure hash without URL encoding
-  const signData = sortedKeys.map((key) => `${key}=${params[key]}`).join("&");
+  const signData = sortedKeys
+    .map((key) => `${key}=${encodeURIComponent(params[key])}`)
+    .join("&");
   console.log("[VNPay] signData:", signData);
 
   // Create secure hash
@@ -142,7 +144,7 @@ export const verifyVNPayResponse = (response: VNPayResponse): boolean => {
 
     // Create string for hashing without URL encoding
     const signData = sortedKeys
-      .map((key) => `${key}=${sortedParams[key]}`)
+      .map((key) => `${key}=${encodeURIComponent(sortedParams[key] ?? "")}`)
       .join("&");
     console.log("[VNPay] verify signData:", signData);
 
