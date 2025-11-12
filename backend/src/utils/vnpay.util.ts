@@ -129,22 +129,27 @@ export const verifyVNPayResponse = (response: VNPayResponse): boolean => {
 
     // Sort parameters by key
     const sortedParams: Record<string, string> = {};
-    Object.keys(params)
-      .sort((a, b) => a.localeCompare(b))
-      .forEach((key) => {
-        sortedParams[key] = (params as any)[key];
-      });
+    const sortedKeys = Object.keys(params).sort((a, b) => a.localeCompare(b));
+    sortedKeys.forEach((key) => {
+      sortedParams[key] = (params as any)[key];
+    });
 
     // Create string for hashing without URL encoding
-    const signData = Object.keys(sortedParams)
+    const signData = sortedKeys
       .map((key) => `${key}=${sortedParams[key]}`)
       .join("&");
+    console.log("[VNPay] verify signData:", signData);
 
     // Generate secure hash
     const generatedHash = crypto
       .HmacSHA512(signData, vnpayConfig.hashSecret)
       .toString(crypto.enc.Hex)
       .toLowerCase();
+    console.log("[VNPay] verify generatedHash:", generatedHash);
+    console.log(
+      "[VNPay] verify receivedHash:",
+      (vnp_SecureHash || "").toLowerCase()
+    );
 
     // Compare hashes (case-insensitive)
     return generatedHash === (vnp_SecureHash || "").toLowerCase();

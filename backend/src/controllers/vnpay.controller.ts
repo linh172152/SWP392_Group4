@@ -111,6 +111,10 @@ export const handleReturn = asyncHandler(
     try {
       const response = req.query as any;
 
+      console.log("--- VNPAY RETURN RECEIVED ---");
+      console.log("Raw Query Response:", response);
+      console.log("-----------------------------");
+
       const result = await handleVNPayReturn(response);
 
       if (result.success) {
