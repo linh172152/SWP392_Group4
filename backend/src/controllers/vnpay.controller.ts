@@ -77,7 +77,7 @@ export const createPayment = asyncHandler(
         orderType,
         bankCode,
         language,
-        clientIp,
+        ipAddress: clientIp,
       };
 
       const result = await createVNPayPayment(paymentData);
@@ -109,7 +109,9 @@ export const createPayment = asyncHandler(
 export const handleReturn = asyncHandler(
   async (req: Request, res: Response) => {
     try {
-      const result = await handleVNPayReturn(req.query as Record<string, unknown>);
+      const response = req.query as any;
+
+      const result = await handleVNPayReturn(response);
 
       if (result.success) {
         // Send payment success notification
