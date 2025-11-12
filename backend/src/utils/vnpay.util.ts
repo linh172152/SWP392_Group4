@@ -57,8 +57,14 @@ export const generateVNPayUrl = (paymentData: VNPayPaymentData): string => {
   // Convert amount to VNPay format (multiply by 100)
   const vnpAmount = (amount * 100).toString();
 
-  // Create order info: collapse multiple spaces but keep readable content
-  const orderInfo = orderDescription.replace(/\s+/g, " ").trim();
+  // Create order info: normalize to ASCII and replace non-alphanumeric with underscores
+  const orderInfo =
+    orderDescription
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 255) || "ORDER_INFO";
 
   // Create return URL
   const returnUrl = vnpayConfig.returnUrl;
