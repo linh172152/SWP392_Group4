@@ -200,7 +200,7 @@ export const topUpWallet = asyncHandler(async (req: Request, res: Response) => {
     orderDescription: `Wallet top-up: ${topupPackage.name}`,
     orderType: "other",
     paymentType: "TOPUP",
-    clientIp,
+    ipAddress: clientIp,
     topupPackageId: package_id,
     metadata: {
       type: "wallet_topup",
