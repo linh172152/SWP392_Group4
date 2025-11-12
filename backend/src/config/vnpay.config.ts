@@ -7,41 +7,52 @@ const requireEnv = (key: string): string => {
   return value;
 };
 
-export const vnpayConfig = {
+const requireHttpsUrl = (key: string, fallback?: string): string => {
+  const raw = (process.env[key] ?? fallback ?? "").trim();
+  if (!raw) {
+    throw new Error(`[VNPay] Missing required URL for ${key}`);
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error(`[VNPay] ${key} must be a valid URL`);
+  }
+  if (parsed.protocol !== "https:") {
+    throw new Error(`[VNPay] ${key} must use HTTPS`);
+  }
+  return parsed.toString();
+};
+
+const optionalHttpsUrl = (key: string): string => {
+  const raw = (process.env[key] ?? "").trim();
+  if (!raw) {
+    return "";
+  }
+  return requireHttpsUrl(key);
+};
+
+export const vnpayConfig = Object.freeze({
   tmnCode: requireEnv("VNPAY_TMN_CODE"),
   hashSecret: requireEnv("VNPAY_HASH_SECRET"),
-  url:
-    process.env.VNPAY_URL?.trim() ||
-    "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html",
-  returnUrl: requireEnv("VNPAY_RETURN_URL"),
-  ipnUrl: process.env.VNPAY_IPN_URL?.trim() || "",
+  url: requireHttpsUrl(
+    "VNPAY_URL",
+    "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
+  ),
+  returnUrl: requireHttpsUrl("VNPAY_RETURN_URL"),
+  ipnUrl: optionalHttpsUrl("VNPAY_IPN_URL"),
 
-  // VNPay API endpoints
   queryUrl: "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction",
   refundUrl: "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction",
 
-  // VNPay version
   version: "2.1.0",
-
-  // VNPay command
   command: "pay",
-
-  // VNPay currency
   currency: "VND",
-
-  // VNPay locale
   locale: "vn",
-
-  // VNPay order type
   orderType: "other",
-
-  // VNPay create date format
   createDate: "YYYYMMDDHHmmss",
-  secureHashType: "HmacSHA512",
-
-  // VNPay expire time (minutes)
   expireTime: 15,
-};
+});
 
 console.log(
   "[VNPay] TMN:",
