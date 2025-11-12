@@ -57,8 +57,8 @@ export const generateVNPayUrl = (paymentData: VNPayPaymentData): string => {
   // Convert amount to VNPay format (multiply by 100)
   const vnpAmount = (amount * 100).toString();
 
-  // Create order info (remove whitespace characters as per VNPay spec)
-  const orderInfo = orderDescription.replace(/\s+/g, "");
+  // Create order info: collapse multiple spaces but keep readable content
+  const orderInfo = orderDescription.replace(/\s+/g, " ").trim();
 
   // Create return URL
   const returnUrl = vnpayConfig.returnUrl;
