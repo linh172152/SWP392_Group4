@@ -28,6 +28,12 @@ export interface Booking {
     make?: string;
     model: string;
     year?: number;
+    current_battery?: {
+      battery_id: string;
+      battery_code: string;
+      status: string;
+      current_charge: number;
+    } | null;
   };
   transaction?: {
     transaction_id: string;
@@ -98,15 +104,18 @@ export interface CreateBookingResponse {
 export interface BookingResponse {
   success: boolean;
   message: string;
-  data: Booking | CreateBookingResponse | {
-    bookings: Booking[];
-    pagination: {
-      page: number;
-      limit: number;
-      total: number;
-      pages: number;
-    };
-  };
+  data:
+    | Booking
+    | CreateBookingResponse
+    | {
+        bookings: Booking[];
+        pagination: {
+          page: number;
+          limit: number;
+          total: number;
+          pages: number;
+        };
+      };
 }
 
 const getAuthHeaders = () => {
@@ -147,11 +156,16 @@ export const bookingService = {
   },
 
   // Tạo booking mới (đặt lịch)
-  async createBooking(bookingData: CreateBookingData): Promise<CreateBookingResponse> {
+  async createBooking(
+    bookingData: CreateBookingData
+  ): Promise<CreateBookingResponse> {
     // Default use_subscription = true nếu không được chỉ định
     const requestData = {
       ...bookingData,
-      use_subscription: bookingData.use_subscription !== undefined ? bookingData.use_subscription : true,
+      use_subscription:
+        bookingData.use_subscription !== undefined
+          ? bookingData.use_subscription
+          : true,
     };
 
     const response = await fetch(API_ENDPOINTS.DRIVER.BOOKINGS, {
@@ -251,4 +265,3 @@ export const bookingService = {
 };
 
 export default bookingService;
-

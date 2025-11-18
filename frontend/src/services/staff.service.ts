@@ -1,5 +1,5 @@
-import { API_BASE_URL, API_ENDPOINTS } from '../config/api';
-import authFetch from './apiClient';
+import { API_BASE_URL, API_ENDPOINTS } from "../config/api";
+import authFetch from "./apiClient";
 
 // Booking interfaces
 export interface StaffBooking {
@@ -30,7 +30,20 @@ export interface StaffBooking {
     make?: string;
     year?: number;
     battery_model?: string;
+    current_battery?: {
+      battery_id: string;
+      battery_code: string;
+      status: string;
+      current_charge: number;
+    } | null;
   };
+  locked_battery?: {
+    battery_id: string;
+    battery_code: string;
+    model: string;
+    status: string;
+    current_charge: number;
+  } | null;
   station?: {
     station_id: string;
     name: string;
@@ -48,6 +61,18 @@ export interface StaffBooking {
     swap_started_at?: string;
     swap_completed_at?: string;
     swap_duration_minutes?: number;
+    old_battery?: {
+      battery_id: string;
+      battery_code: string;
+      model: string;
+      current_charge: number;
+    } | null;
+    new_battery?: {
+      battery_id: string;
+      battery_code: string;
+      model: string;
+      current_charge: number;
+    } | null;
   };
   checked_in_by_staff?: {
     user_id: string;
@@ -80,7 +105,7 @@ export interface Staff {
   position: string;
   name: any;
   id: string;
-  user_id: string;  // API uses user_id instead of id
+  user_id: string; // API uses user_id instead of id
   full_name: string;
   email: string;
   phone: string;
@@ -89,8 +114,8 @@ export interface Staff {
     id: string;
     name: string;
   } | null;
-  status: 'ACTIVE' | 'INACTIVE';  // API uses uppercase status
-  created_at: string;  // This is used as join_date
+  status: "ACTIVE" | "INACTIVE"; // API uses uppercase status
+  created_at: string; // This is used as join_date
   updated_at: string;
   avatar?: string | null;
   auth_provider?: string;
@@ -111,7 +136,7 @@ export interface CreateStaffData {
   phone: string;
   station_id: string | null;
   role?: string;
-  status: 'ACTIVE' | 'INACTIVE';
+  status: "ACTIVE" | "INACTIVE";
 }
 
 export async function getAllStaff(params?: {
@@ -122,13 +147,15 @@ export async function getAllStaff(params?: {
   limit?: number;
 }) {
   const qs = new URLSearchParams();
-  if (params?.station_id) qs.set('station_id', params.station_id);
-  if (params?.status) qs.set('status', params.status);
-  if (params?.search) qs.set('search', params.search);
-  if (params?.page) qs.set('page', String(params.page));
-  if (params?.limit) qs.set('limit', String(params.limit));
+  if (params?.station_id) qs.set("station_id", params.station_id);
+  if (params?.status) qs.set("status", params.status);
+  if (params?.search) qs.set("search", params.search);
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.limit) qs.set("limit", String(params.limit));
 
-  const url = `${API_BASE_URL}/admin/staff${qs.toString() ? `?${qs.toString()}` : ''}`;
+  const url = `${API_BASE_URL}/admin/staff${
+    qs.toString() ? `?${qs.toString()}` : ""
+  }`;
   const res = await authFetch(url);
   return res; // expected { success, message, data }
 }
@@ -142,8 +169,8 @@ export async function getStaffById(id: string) {
 export async function createStaff(data: CreateStaffData) {
   const url = `${API_BASE_URL}/admin/staff`;
   const res = await authFetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
   return res;
@@ -152,8 +179,8 @@ export async function createStaff(data: CreateStaffData) {
 export async function updateStaff(id: string, data: Partial<Staff>) {
   const url = `${API_BASE_URL}/admin/staff/${id}`;
   const res = await authFetch(url, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
   return res;
@@ -162,7 +189,7 @@ export async function updateStaff(id: string, data: Partial<Staff>) {
 export async function deleteStaff(id: string) {
   const url = `${API_BASE_URL}/admin/staff/${id}`;
   const res = await authFetch(url, {
-    method: 'DELETE',
+    method: "DELETE",
   });
   return res;
 }
@@ -180,11 +207,13 @@ export async function getStationBookings(params?: {
   limit?: number;
 }) {
   const qs = new URLSearchParams();
-  if (params?.status) qs.set('status', params.status);
-  if (params?.page) qs.set('page', String(params.page));
-  if (params?.limit) qs.set('limit', String(params.limit));
+  if (params?.status) qs.set("status", params.status);
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.limit) qs.set("limit", String(params.limit));
 
-  const url = `${API_ENDPOINTS.STAFF.BOOKINGS}${qs.toString() ? `?${qs.toString()}` : ''}`;
+  const url = `${API_ENDPOINTS.STAFF.BOOKINGS}${
+    qs.toString() ? `?${qs.toString()}` : ""
+  }`;
   const res = await authFetch(url);
   return res; // { success, message, data: { bookings, pagination } }
 }
@@ -201,11 +230,14 @@ export async function getBookingDetails(bookingId: string) {
 /**
  * Xác nhận booking (verify số điện thoại)
  */
-export async function confirmBooking(bookingId: string, data: ConfirmBookingData) {
+export async function confirmBooking(
+  bookingId: string,
+  data: ConfirmBookingData
+) {
   const url = API_ENDPOINTS.STAFF.CONFIRM_BOOKING(bookingId);
   const res = await authFetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
   return res; // { success, message, data: { booking, message } }
@@ -214,11 +246,14 @@ export async function confirmBooking(bookingId: string, data: ConfirmBookingData
 /**
  * Hoàn thành booking (đổi pin)
  */
-export async function completeBooking(bookingId: string, data: CompleteBookingData) {
+export async function completeBooking(
+  bookingId: string,
+  data: CompleteBookingData
+) {
   const url = API_ENDPOINTS.STAFF.COMPLETE_BOOKING(bookingId);
   const res = await authFetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
   return res; // { success, message, data: { transaction, payment, wallet_balance, message } }
@@ -227,11 +262,14 @@ export async function completeBooking(bookingId: string, data: CompleteBookingDa
 /**
  * Hủy booking
  */
-export async function cancelBooking(bookingId: string, data?: CancelBookingData) {
+export async function cancelBooking(
+  bookingId: string,
+  data?: CancelBookingData
+) {
   const url = API_ENDPOINTS.STAFF.CANCEL_BOOKING(bookingId);
   const res = await authFetch(url, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data || {}),
   });
   return res; // { success, message, data: booking }
@@ -292,12 +330,48 @@ export async function getStationBatteries(params?: {
   model?: string;
 }) {
   const qs = new URLSearchParams();
-  if (params?.status) qs.set('status', params.status);
-  if (params?.model) qs.set('model', params.model);
+  if (params?.status) qs.set("status", params.status);
+  if (params?.model) qs.set("model", params.model);
 
-  const url = `${API_ENDPOINTS.STAFF.BATTERIES}${qs.toString() ? `?${qs.toString()}` : ''}`;
+  const url = `${API_ENDPOINTS.STAFF.BATTERIES}${
+    qs.toString() ? `?${qs.toString()}` : ""
+  }`;
   const res = await authFetch(url);
   return res; // { success, message, data: batteries[] }
+}
+
+/**
+ * Lấy danh sách pin có sẵn cho booking (cho staff)
+ */
+export interface AvailableBattery {
+  battery_id: string;
+  battery_code: string;
+  model: string;
+  status: string;
+  current_charge: number;
+  capacity_kwh?: number | null;
+  health_percentage?: number | null;
+}
+
+export interface GetAvailableBatteriesResponse {
+  success: boolean;
+  message: string;
+  data: {
+    batteries: AvailableBattery[];
+    booking: {
+      booking_id: string;
+      battery_model: string;
+      locked_battery_id: string | null;
+    };
+  };
+}
+
+export async function getAvailableBatteries(
+  bookingId: string
+): Promise<GetAvailableBatteriesResponse> {
+  const url = API_ENDPOINTS.STAFF.AVAILABLE_BATTERIES(bookingId);
+  const res = await authFetch(url);
+  return res;
 }
 
 // ============================================
@@ -314,12 +388,15 @@ export async function getMyStaffSchedules(params?: {
   include_past?: boolean;
 }) {
   const qs = new URLSearchParams();
-  if (params?.from) qs.set('from', params.from);
-  if (params?.to) qs.set('to', params.to);
-  if (params?.status) qs.set('status', params.status);
-  if (params?.include_past !== undefined) qs.set('include_past', String(params.include_past));
+  if (params?.from) qs.set("from", params.from);
+  if (params?.to) qs.set("to", params.to);
+  if (params?.status) qs.set("status", params.status);
+  if (params?.include_past !== undefined)
+    qs.set("include_past", String(params.include_past));
 
-  const url = `${API_ENDPOINTS.STAFF.SCHEDULES}${qs.toString() ? `?${qs.toString()}` : ''}`;
+  const url = `${API_ENDPOINTS.STAFF.SCHEDULES}${
+    qs.toString() ? `?${qs.toString()}` : ""
+  }`;
   const res = await authFetch(url);
   return res; // { success, message, data: schedules[] }
 }
@@ -336,8 +413,8 @@ export async function updateScheduleStatus(
 ) {
   const url = API_ENDPOINTS.STAFF.UPDATE_SCHEDULE_STATUS(scheduleId);
   const res = await authFetch(url, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
   return res; // { success, message, data: schedule }
@@ -350,17 +427,18 @@ export default {
   createStaff,
   updateStaff,
   deleteStaff,
-  
+
   // Staff booking operations
   getStationBookings,
   getBookingDetails,
   confirmBooking,
   completeBooking,
   cancelBooking,
-  
+
   // Staff battery operations
   getStationBatteries,
-  
+  getAvailableBatteries,
+
   // Staff schedule operations
   getMyStaffSchedules,
   updateScheduleStatus,

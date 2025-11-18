@@ -64,12 +64,13 @@ export const loginSchema = Joi.object({
 
 /**
  * Refresh token validation schema
+ * Note: refreshToken can come from body or cookie, so it's optional in body
  */
 export const refreshTokenSchema = Joi.object({
   refreshToken: Joi.string()
-    .required()
+    .optional()
     .messages({
-      'any.required': 'Refresh token is required'
+      'string.base': 'Refresh token must be a string'
     })
 });
 

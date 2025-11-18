@@ -249,7 +249,7 @@ const TransactionHistory: React.FC = () => {
                     )}
 
                     {/* Vehicle & Battery Info */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {transaction.vehicle && (
                         <div className="p-3 rounded-lg bg-slate-100 dark:bg-slate-700/50">
                           <div className="flex items-center gap-2 mb-2">
@@ -264,19 +264,36 @@ const TransactionHistory: React.FC = () => {
                         </div>
                       )}
 
-                      {transaction.new_battery && (
-                        <div className="p-3 rounded-lg bg-slate-100 dark:bg-slate-700/50">
+                      {transaction.old_battery && (
+                        <div className="p-3 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800/50">
                           <div className="flex items-center gap-2 mb-2">
-                            <Battery className="h-4 w-4 text-slate-600 dark:text-slate-400" />
-                            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                            <Battery className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                            <span className="text-sm font-medium text-orange-700 dark:text-orange-300">
+                              Pin cũ
+                            </span>
+                          </div>
+                          <div className="text-sm font-mono font-semibold text-slate-900 dark:text-white">
+                            {transaction.old_battery.battery_code}
+                          </div>
+                          <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                            {transaction.old_battery.model} - {transaction.old_battery.current_charge}%
+                          </div>
+                        </div>
+                      )}
+
+                      {transaction.new_battery && (
+                        <div className="p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/50">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Battery className="h-4 w-4 text-green-600 dark:text-green-400" />
+                            <span className="text-sm font-medium text-green-700 dark:text-green-300">
                               Pin mới
                             </span>
                           </div>
-                          <div className="text-sm text-slate-900 dark:text-white">
-                            {transaction.new_battery.battery_code} - {transaction.new_battery.model}
+                          <div className="text-sm font-mono font-semibold text-slate-900 dark:text-white">
+                            {transaction.new_battery.battery_code}
                           </div>
                           <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                            {transaction.new_battery.capacity_kwh}kWh - {transaction.new_battery.current_charge}%
+                            {transaction.new_battery.model} - {transaction.new_battery.current_charge}%
                           </div>
                         </div>
                       )}

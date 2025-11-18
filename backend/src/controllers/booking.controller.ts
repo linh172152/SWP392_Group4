@@ -439,6 +439,14 @@ export const getUserBookings = asyncHandler(
             make: true,
             model: true,
             year: true,
+            current_battery: {
+              select: {
+                battery_id: true,
+                battery_code: true,
+                status: true,
+                current_charge: true,
+              },
+            },
           },
         },
         transaction: {
@@ -899,6 +907,14 @@ export const getBookingDetails = asyncHandler(
             model: true,
             make: true,
             year: true,
+            current_battery: {
+              select: {
+                battery_id: true,
+                battery_code: true,
+                status: true,
+                current_charge: true,
+              },
+            },
           },
         },
         transaction: {

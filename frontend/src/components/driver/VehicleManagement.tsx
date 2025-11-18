@@ -46,7 +46,7 @@ interface VehicleItem {
 const VehicleManagement: React.FC = () => {
   const [vehicles, setVehicles] = useState<VehicleItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
   const navigate = useNavigate();
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -62,23 +62,23 @@ const VehicleManagement: React.FC = () => {
     batteryModels: [],
   });
   const [editForm, setEditForm] = useState({
-    make: '',
-    model: '',
-    year: '',
-    license_plate: '',
-    battery_model: '',
-    current_battery_code: '',
-    vehicle_type: 'car'
+    make: "",
+    model: "",
+    year: "",
+    license_plate: "",
+    battery_model: "",
+    current_battery_code: "",
+    vehicle_type: "car",
   });
   // Thêm mới: dùng biến form
   const [form, setForm] = useState({
-    make: '',
-    model: '',
-    year: '',
-    license_plate: '',
-    vehicle_type: 'car',
-    battery_model: '',
-    current_battery_code: '',
+    make: "",
+    model: "",
+    year: "",
+    license_plate: "",
+    vehicle_type: "car",
+    battery_model: "",
+    current_battery_code: "",
   });
 
   const getDaysSinceLastSwap = (lastSwapDate?: string) => {
@@ -92,12 +92,13 @@ const VehicleManagement: React.FC = () => {
 
   const loadVehicles = async () => {
     setLoading(true);
-    setError('');
+    setError("");
     try {
       const res = await fetchWithAuth(API_ENDPOINTS.DRIVER.VEHICLES);
       const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || 'Tải danh sách xe thất bại');
-      console.log('[VehicleManagement] Loaded vehicles:', data.data);
+      if (!res.ok || !data.success)
+        throw new Error(data.message || "Tải danh sách xe thất bại");
+      console.log("[VehicleManagement] Loaded vehicles:", data.data);
       // Log current_battery info for each vehicle
       data.data.forEach((v: VehicleItem) => {
         console.log(`[VehicleManagement] Vehicle ${v.license_plate}:`, {
@@ -108,7 +109,7 @@ const VehicleManagement: React.FC = () => {
       });
       setVehicles(data.data);
     } catch (e: any) {
-      setError(e.message || 'Có lỗi xảy ra');
+      setError(e.message || "Có lỗi xảy ra");
     } finally {
       setLoading(false);
     }
@@ -116,10 +117,10 @@ const VehicleManagement: React.FC = () => {
 
   const addVehicle = async () => {
     setLoading(true);
-    setError('');
+    setError("");
     try {
       if (!form.current_battery_code?.trim()) {
-        setError('Vui lòng nhập mã pin hiện tại (bắt buộc)');
+        setError("Vui lòng nhập mã pin hiện tại (bắt buộc)");
         setLoading(false);
         return;
       }
@@ -132,18 +133,19 @@ const VehicleManagement: React.FC = () => {
         model: form.model || undefined,
         year: form.year ? Number(form.year) : undefined,
       };
-      console.log('[VehicleManagement] Adding vehicle with body:', body);
+      console.log("[VehicleManagement] Adding vehicle with body:", body);
       const res = await fetchWithAuth(API_ENDPOINTS.DRIVER.VEHICLES, {
-        method: 'POST',
+        method: "POST",
         body: JSON.stringify(body),
       });
       const data = await res.json();
-      console.log('[VehicleManagement] Add vehicle response:', data);
-      if (!res.ok || !data.success) throw new Error(data.message || 'Thêm xe thất bại');
-      
+      console.log("[VehicleManagement] Add vehicle response:", data);
+      if (!res.ok || !data.success)
+        throw new Error(data.message || "Thêm xe thất bại");
+
       // Log the created vehicle data
       if (data.data) {
-        console.log('[VehicleManagement] Created vehicle:', {
+        console.log("[VehicleManagement] Created vehicle:", {
           vehicle_id: data.data.vehicle_id,
           license_plate: data.data.license_plate,
           current_battery_id: data.data.current_battery_id,
@@ -157,24 +159,28 @@ const VehicleManagement: React.FC = () => {
       setError('');
       await loadVehicles();
     } catch (e: any) {
-      console.error('[VehicleManagement] Error adding vehicle:', e);
-      setError(e.message || 'Có lỗi xảy ra');
+      console.error("[VehicleManagement] Error adding vehicle:", e);
+      setError(e.message || "Có lỗi xảy ra");
     } finally {
       setLoading(false);
     }
   };
 
   const deleteVehicle = async (vehicleId: string) => {
-    if (!confirm('Bạn có chắc muốn xóa xe này?')) return;
+    if (!confirm("Bạn có chắc muốn xóa xe này?")) return;
     setLoading(true);
-    setError('');
+    setError("");
     try {
-      const res = await fetchWithAuth(`${API_ENDPOINTS.DRIVER.VEHICLES}/${vehicleId}`, { method: 'DELETE' });
+      const res = await fetchWithAuth(
+        `${API_ENDPOINTS.DRIVER.VEHICLES}/${vehicleId}`,
+        { method: "DELETE" }
+      );
       const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || 'Xóa xe thất bại');
+      if (!res.ok || !data.success)
+        throw new Error(data.message || "Xóa xe thất bại");
       await loadVehicles();
     } catch (e: any) {
-      const msg = e.message || 'Có lỗi xảy ra';
+      const msg = e.message || "Có lỗi xảy ra";
       setError(msg);
     } finally {
       setLoading(false);
@@ -182,7 +188,7 @@ const VehicleManagement: React.FC = () => {
   };
 
   const startEdit = (vehicle: VehicleItem) => {
-    console.log('[VehicleManagement] startEdit - vehicle data:', {
+    console.log("[VehicleManagement] startEdit - vehicle data:", {
       vehicle_id: vehicle.vehicle_id,
       license_plate: vehicle.license_plate,
       current_battery: vehicle.current_battery,
@@ -190,27 +196,41 @@ const VehicleManagement: React.FC = () => {
       current_battery_code: vehicle.current_battery_code,
     });
     setEditingId(vehicle.vehicle_id);
-    const batteryCode = vehicle.current_battery?.battery_code || vehicle.current_battery_code || '';
-    console.log('[VehicleManagement] startEdit - extracted battery_code:', batteryCode);
+    const batteryCode =
+      vehicle.current_battery?.battery_code ||
+      vehicle.current_battery_code ||
+      "";
+    console.log(
+      "[VehicleManagement] startEdit - extracted battery_code:",
+      batteryCode
+    );
     setEditForm({
-      make: vehicle.make || '',
-      model: vehicle.model || '',
-      year: vehicle.year ? String(vehicle.year) : '',
+      make: vehicle.make || "",
+      model: vehicle.model || "",
+      year: vehicle.year ? String(vehicle.year) : "",
       license_plate: vehicle.license_plate,
       battery_model: vehicle.battery_model,
       current_battery_code: batteryCode,
-      vehicle_type: 'car'
+      vehicle_type: "car",
     });
   };
 
   const cancelEdit = () => {
     setEditingId(null);
-    setEditForm({ make: '', model: '', year: '', license_plate: '', battery_model: '', current_battery_code: '', vehicle_type: 'car' });
+    setEditForm({
+      make: "",
+      model: "",
+      year: "",
+      license_plate: "",
+      battery_model: "",
+      current_battery_code: "",
+      vehicle_type: "car",
+    });
   };
 
   const updateVehicle = async (vehicleId: string) => {
     setLoading(true);
-    setError('');
+    setError("");
     try {
       const body = {
         license_plate: editForm.license_plate,
@@ -219,16 +239,28 @@ const VehicleManagement: React.FC = () => {
         year: editForm.year ? Number(editForm.year) : undefined,
         battery_model: editForm.battery_model,
         current_battery_code: editForm.current_battery_code.trim() || undefined,
-        vehicle_type: 'car'
+        vehicle_type: "car",
       };
-      const res = await fetchWithAuth(`${API_ENDPOINTS.DRIVER.VEHICLES}/${vehicleId}`, { method: 'PUT', body: JSON.stringify(body) });
+      const res = await fetchWithAuth(
+        `${API_ENDPOINTS.DRIVER.VEHICLES}/${vehicleId}`,
+        { method: "PUT", body: JSON.stringify(body) }
+      );
       const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || 'Cập nhật xe thất bại');
+      if (!res.ok || !data.success)
+        throw new Error(data.message || "Cập nhật xe thất bại");
       setEditingId(null);
-      setEditForm({make: '', model: '', year: '', license_plate: '', battery_model: '', current_battery_code: '', vehicle_type: 'car'});
+      setEditForm({
+        make: "",
+        model: "",
+        year: "",
+        license_plate: "",
+        battery_model: "",
+        current_battery_code: "",
+        vehicle_type: "car",
+      });
       await loadVehicles();
     } catch (e: any) {
-      setError(e.message || 'Có lỗi xảy ra');
+      setError(e.message || "Có lỗi xảy ra");
     } finally {
       setLoading(false);
     }
@@ -337,18 +369,26 @@ const VehicleManagement: React.FC = () => {
     const handleFocus = () => {
       loadVehicles();
     };
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
   }, []);
 
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="float">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-blue-900 dark:from-white dark:to-blue-100 bg-clip-text text-transparent">Xe của tôi</h1>
-          <p className="text-slate-600 dark:text-slate-300">Quản lý thông tin xe và lịch sử thay pin</p>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-blue-900 dark:from-white dark:to-blue-100 bg-clip-text text-transparent">
+            Xe của tôi
+          </h1>
+          <p className="text-slate-600 dark:text-slate-300">
+            Quản lý thông tin xe và lịch sử thay pin
+          </p>
         </div>
-        <Button onClick={() => setShowAddForm(true)} className="gradient-primary text-white shadow-lg hover:shadow-xl transition-all duration-300" disabled={loading}>
+        <Button
+          onClick={() => setShowAddForm(true)}
+          className="gradient-primary text-white shadow-lg hover:shadow-xl transition-all duration-300"
+          disabled={loading}
+        >
           <Plus className="mr-2 h-4 w-4" />
           Thêm Xe
         </Button>
@@ -357,9 +397,13 @@ const VehicleManagement: React.FC = () => {
       {error && (
         <div className="text-sm text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-500/10 p-3 rounded-lg border border-red-200/50 dark:border-red-500/20">
           {error}
-          {error.toLowerCase().includes('active bookings') && (
+          {error.toLowerCase().includes("active bookings") && (
             <div className="mt-2">
-              <Button size="sm" variant="outline" onClick={() => navigate('/driver/bookings')}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => navigate("/driver/bookings")}
+              >
                 Xem các đơn đang hoạt động
               </Button>
             </div>
@@ -375,8 +419,12 @@ const VehicleManagement: React.FC = () => {
                 <Car className="h-5 w-5 text-white" />
               </div>
               <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Tổng số xe</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{vehicles.length}</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  Tổng số xe
+                </p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {vehicles.length}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -389,8 +437,12 @@ const VehicleManagement: React.FC = () => {
                 <Zap className="h-5 w-5 text-white" />
               </div>
               <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Tổng lần thay pin</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{vehicles.reduce((sum, _v) => sum + 0, 0)}</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  Tổng lần thay pin
+                </p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {vehicles.reduce((sum, _v) => sum + 0, 0)}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -399,9 +451,13 @@ const VehicleManagement: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {vehicles.map((vehicle) => {
-          if (editingId === vehicle.vehicle_id) { // SHOW EDIT FORM
+          if (editingId === vehicle.vehicle_id) {
+            // SHOW EDIT FORM
             return (
-              <Card key={vehicle.vehicle_id} className="glass-card border-0 glow-hover group">
+              <Card
+                key={vehicle.vehicle_id}
+                className="glass-card border-0 glow-hover group"
+              >
                 <CardContent className="p-6">
                   <div className="flex-col space-y-2">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -431,11 +487,25 @@ const VehicleManagement: React.FC = () => {
                       </div>
                       <div className="space-y-2">
                         <Label>Năm sản xuất</Label>
-                        <Input type="number" value={editForm.year} onChange={e => setEditForm(f=>({...f,year:e.target.value}))} />
+                        <Input
+                          type="number"
+                          value={editForm.year}
+                          onChange={(e) =>
+                            setEditForm((f) => ({ ...f, year: e.target.value }))
+                          }
+                        />
                       </div>
                       <div className="space-y-2">
                         <Label>Biển số xe</Label>
-                        <Input value={editForm.license_plate} onChange={e=>setEditForm(f=>({...f,license_plate:e.target.value}))} />
+                        <Input
+                          value={editForm.license_plate}
+                          onChange={(e) =>
+                            setEditForm((f) => ({
+                              ...f,
+                              license_plate: e.target.value,
+                            }))
+                          }
+                        />
                       </div>
                       <div className="space-y-2 md:col-span-2">
                         <Label>Model Pin</Label>
@@ -451,9 +521,14 @@ const VehicleManagement: React.FC = () => {
                       </div>
                       <div className="space-y-2 md:col-span-2">
                         <Label>Mã Pin hiện tại</Label>
-                        <Input 
-                          value={editForm.current_battery_code} 
-                          onChange={e => setEditForm(f=>({...f,current_battery_code:e.target.value}))} 
+                        <Input
+                          value={editForm.current_battery_code}
+                          onChange={(e) =>
+                            setEditForm((f) => ({
+                              ...f,
+                              current_battery_code: e.target.value,
+                            }))
+                          }
                           placeholder="VD: BAT-TD-007"
                           className="bg-white dark:bg-slate-800"
                         />
@@ -465,8 +540,16 @@ const VehicleManagement: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex space-x-2 pt-2">
-                      <Button className="gradient-primary text-white" onClick={() => updateVehicle(vehicle.vehicle_id)} disabled={loading}>Lưu</Button>
-                      <Button variant="outline" onClick={cancelEdit}>Hủy</Button>
+                      <Button
+                        className="gradient-primary text-white"
+                        onClick={() => updateVehicle(vehicle.vehicle_id)}
+                        disabled={loading}
+                      >
+                        Lưu
+                      </Button>
+                      <Button variant="outline" onClick={cancelEdit}>
+                        Hủy
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
@@ -475,36 +558,56 @@ const VehicleManagement: React.FC = () => {
           }
           // XÓA các thống kê dư, chỉ hiển thị đúng thông tin xe mà BE có
           return (
-            <Card key={vehicle.vehicle_id} className="glass-card border-0 glow-hover group">
+            <Card
+              key={vehicle.vehicle_id}
+              className="glass-card border-0 glow-hover group"
+            >
               <CardContent className="p-6">
                 <div className="flex items-start space-x-4">
                   <div className="relative">
-                    <img 
-                      src={'https://images.unsplash.com/photo-1560958089-b8a1929cea89?auto=format&fit=crop&w=300&q=60'} 
-                      alt="Car" className="w-24 h-24 object-cover rounded-lg shadow-lg" />
+                    <img
+                      src={
+                        "https://images.unsplash.com/photo-1560958089-b8a1929cea89?auto=format&fit=crop&w=300&q=60"
+                      }
+                      alt="Car"
+                      className="w-24 h-24 object-cover rounded-lg shadow-lg"
+                    />
                   </div>
                   <div className="flex-1 space-y-2">
                     <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                      {(vehicle.make || 'EV')} {vehicle.model || ''}</h3>
-                    <div className="flex items-center space-x-2 text-sm text-slate-600 dark:text-slate-400">
-                      <span>Biển số: {vehicle.license_plate}</span>
-                      {vehicle.year ? (<><span>•</span><span>{vehicle.year}</span></>) : null}
+                      {vehicle.make || "EV"} {vehicle.model || ""}
+                    </h3>
+                    <div className="space-y-1 text-sm text-slate-600 dark:text-slate-400">
+                      <div>Biển số: {vehicle.license_plate}</div>
+                      <div>Model pin: {vehicle.battery_model}</div>
+                      {(() => {
+                        const batteryCode =
+                          vehicle.current_battery?.battery_code ||
+                          vehicle.current_battery_code;
+                        return batteryCode ? (
+                          <div className="text-slate-700 dark:text-slate-300">
+                            Mã Pin hiện tại:{" "}
+                            <span className="font-mono font-semibold text-slate-900 dark:text-white">
+                              {batteryCode}
+                            </span>
+                          </div>
+                        ) : null;
+                      })()}
+                      <div>Loại xe: {vehicle.vehicle_type || "car"}</div>
                     </div>
-                    <div className="text-sm">Model pin: {vehicle.battery_model}</div>
-                    {(() => {
-                      const batteryCode = vehicle.current_battery?.battery_code || vehicle.current_battery_code;
-                      return batteryCode ? (
-                        <div className="text-sm">Mã Pin hiện tại: <span className="font-medium">{batteryCode}</span></div>
-                      ) : null;
-                    })()}
-                    <div className="text-sm">Loại xe: car</div>
                     <div className="flex space-x-2 pt-2">
-                      <Button variant="outline" size="sm" className="glass border-blue-200/50 dark:border-purple-400/30 hover:bg-blue-50/50 dark:hover:bg-purple-500/10" onClick={() => startEdit(vehicle)} disabled={loading}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="glass border-blue-200/50 dark:border-purple-400/30 hover:bg-blue-50/50 dark:hover:bg-purple-500/10"
+                        onClick={() => startEdit(vehicle)}
+                        disabled={loading}
+                      >
                         Chỉnh sửa
                       </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
+                      <Button
+                        variant="outline"
+                        size="sm"
                         className="glass border-red-200/50 dark:border-red-400/30 hover:bg-red-50/50 dark:hover:bg-red-500/10"
                         onClick={() => deleteVehicle(vehicle.vehicle_id)}
                         disabled={loading}
