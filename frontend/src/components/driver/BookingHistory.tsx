@@ -78,7 +78,17 @@ interface BookingItem {
   status: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
   is_instant?: boolean; // Flag instant booking
   station?: { name: string; address: string };
-  vehicle?: { license_plate: string; vehicle_type: string; model?: string };
+  vehicle?: { 
+    license_plate: string; 
+    vehicle_type: string; 
+    model?: string;
+    current_battery?: {
+      battery_id: string;
+      battery_code: string;
+      status: string;
+      current_charge: number;
+    } | null;
+  };
   transaction?: { 
     amount?: number; 
     payment_status?: string;
@@ -90,6 +100,7 @@ interface BookingItem {
   locked_wallet_amount?: number;
   hold_expires_at?: string | null;
   battery_model?: string; // Battery model for this booking
+  [key: string]: any; // Allow additional fields from API
 }
 
 const BookingHistory: React.FC = () => {
@@ -919,13 +930,7 @@ const BookingHistory: React.FC = () => {
                           <Zap className="h-3 w-3 mr-1" />
                           Miễn phí - Gói dịch vụ
                         </Badge>
-                        {isUsingSubscription(booking) && (
-                          <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 shadow-md">
-                            <Package className="h-3 w-3 mr-1" />
-                            <Zap className="h-3 w-3 mr-1" />
-                            Miễn phí - Gói dịch vụ
-                          </Badge>
-                        )}
+                      )}
                       </div>
                       <p className="text-sm text-slate-600 dark:text-slate-400">
                         {booking.station?.address || "—"}
