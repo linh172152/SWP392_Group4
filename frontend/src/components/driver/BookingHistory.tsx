@@ -75,32 +75,12 @@ interface BookingItem {
   booking_code: string;
   scheduled_at: string;
   created_at: string;
-  status: "pending" | "confirmed" | "in_progress" | "completed" | "cancelled";
-  station?: {
-    name: string;
-    address: string;
-    station_id?: string;
-    latitude?: string | number;
-    longitude?: string | number;
-  };
-  vehicle?: {
-    vehicle_id?: string;
-    license_plate: string;
-    vehicle_type: string;
-    make?: string;
-    model?: string;
-    year?: number;
-    current_battery?: {
-      battery_id: string;
-      battery_code: string;
-      status: string;
-      current_charge: number;
-    } | null;
-  };
-  transaction?: {
-    transaction_id?: string;
-    transaction_code?: string;
-    amount?: number;
+  status: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
+  is_instant?: boolean; // Flag instant booking
+  station?: { name: string; address: string };
+  vehicle?: { license_plate: string; vehicle_type: string; model?: string };
+  transaction?: { 
+    amount?: number; 
     payment_status?: string;
   };
   pricing_preview?: PricingPreview;
@@ -109,7 +89,7 @@ interface BookingItem {
   locked_subscription_id?: string | null;
   locked_wallet_amount?: number;
   hold_expires_at?: string | null;
-  [key: string]: any; // Allow additional fields from API
+  battery_model?: string; // Battery model for this booking
 }
 
 const BookingHistory: React.FC = () => {
@@ -265,70 +245,111 @@ const BookingHistory: React.FC = () => {
 
   // Kiểm tra booking có sử dụng gói dịch vụ không
   const isUsingSubscription = (booking: BookingItem): boolean => {
-    // Ưu tiên dùng pricing_preview từ BE (chính xác hơn)
-    if (booking.pricing_preview) {
-      return (
-        booking.pricing_preview.is_covered_by_subscription &&
-        booking.pricing_preview.pricing_source === "subscription"
-      );
+    // QUAN TRỌNG: Ưu tiên dùng hold_summary.use_subscription - đây là thông tin chính xác từ BE khi booking được tạo
+    // hold_summary chứa quyết định cuối cùng của driver khi đặt chỗ
+    if (booking.hold_summary && booking.hold_summary.use_subscription !== undefined) {
+      return booking.hold_summary.use_subscription === true;
     }
-
-    // Fallback: Case 1: Booking đã completed và có transaction với amount = 0 và payment_status = completed
-    if (
-      booking.status === "completed" &&
-      booking.transaction?.amount === 0 &&
-      booking.transaction?.payment_status === "completed"
-    ) {
-      return true;
+    
+    // Fallback: Dùng use_subscription field trực tiếp từ booking (nếu có)
+    // Đây là field driver đã chọn khi đặt chỗ
+    if (booking.use_subscription !== undefined) {
+      return booking.use_subscription === true;
     }
-    // Case 2: Booking chưa completed nhưng user có subscription active tại thời điểm đặt
-    if (
-      (booking.status === "confirmed" || booking.status === "in_progress") &&
-      activeSubscription
-    ) {
-      const bookingDate = new Date(booking.scheduled_at);
-      const subStart = new Date(activeSubscription.start_date);
-      const subEnd = new Date(activeSubscription.end_date);
-      // Booking nằm trong thời gian subscription
-      if (bookingDate >= subStart && bookingDate <= subEnd) {
-        return true;
-      }
-    }
+    
+    // Nếu không có thông tin rõ ràng, mặc định là KHÔNG dùng subscription
+    // (vì driver phải chủ động chọn dùng gói)
     return false;
   };
 
-  // Lấy giá hiển thị từ pricing_preview hoặc transaction
-  const getDisplayPrice = (
-    booking: BookingItem
-  ): { price: number | null; isFree: boolean; message?: string } => {
-    // Ưu tiên dùng pricing_preview từ BE
+  // Lấy giá hiển thị từ booking.use_subscription, locked_wallet_amount, transaction, hoặc pricing_preview
+  const getDisplayPrice = (booking: BookingItem): { price: number | null; isFree: boolean; message?: string } => {
+    // QUAN TRỌNG: Ưu tiên dùng booking.use_subscription và booking.locked_wallet_amount từ database
+    // Đây là thông tin chính xác về quyết định của driver khi đặt chỗ
+    
+    // Nếu driver đã chọn dùng subscription → miễn phí
+    if (booking.use_subscription === true) {
+      // Có thể có hold_summary với subscription_name (khi mới tạo booking)
+      const subscriptionName = booking.hold_summary?.subscription_name;
+      return { 
+        price: 0, 
+        isFree: true, 
+        message: subscriptionName ? `Sử dụng gói "${subscriptionName}"` : 'Miễn phí - Sử dụng gói dịch vụ'
+      };
+    }
+    
+    // Nếu driver KHÔNG chọn dùng subscription
+    if (booking.use_subscription === false) {
+      // Nếu có locked_wallet_amount > 0 → đã trừ tiền từ ví
+      if (booking.locked_wallet_amount && booking.locked_wallet_amount > 0) {
+        return { 
+          price: booking.locked_wallet_amount, 
+          isFree: false, 
+          message: `Đã trừ từ ví: ${Number(booking.locked_wallet_amount).toLocaleString('vi-VN')}₫` 
+        };
+      }
+      
+      // Nếu booking đã completed → dùng transaction amount
+      if (booking.status === 'completed' && booking.transaction?.amount !== undefined) {
+        // Nếu transaction amount = 0 → có thể là lỗi hoặc đã refund, nhưng vẫn hiển thị 0
+        return { 
+          price: booking.transaction.amount, 
+          isFree: false 
+        };
+      }
+      
+      // Nếu chưa trừ tiền (chưa complete) → dùng pricing_preview hoặc hiển thị "sẽ trừ"
+      if (booking.pricing_preview?.estimated_price !== null && booking.pricing_preview?.estimated_price !== undefined) {
+        return { 
+          price: booking.pricing_preview.estimated_price, 
+          isFree: false, 
+          message: 'Sẽ trừ từ ví khi hoàn tất đổi pin' 
+        };
+      }
+      
+      // Chưa có giá cụ thể
+      return { 
+        price: null, 
+        isFree: false, 
+        message: 'Sẽ trừ từ ví khi hoàn tất đổi pin' 
+      };
+    }
+    
+    // Fallback: Nếu không có use_subscription field (booking cũ)
+    // Dùng transaction amount nếu đã completed
+    if (booking.status === 'completed' && booking.transaction?.amount !== undefined) {
+      // Nếu transaction amount = 0 và có locked_subscription_id → đã dùng subscription
+      if (booking.transaction.amount === 0 && booking.locked_subscription_id) {
+        return { 
+          price: 0, 
+          isFree: true, 
+          message: 'Miễn phí - Đã sử dụng gói dịch vụ' 
+        };
+      }
+      
+      return { 
+        price: booking.transaction.amount, 
+        isFree: false 
+      };
+    }
+    
+    // Fallback: Dùng pricing_preview nếu có
     if (booking.pricing_preview) {
       const preview = booking.pricing_preview;
-      if (
-        preview.is_covered_by_subscription &&
-        preview.pricing_source === "subscription"
-      ) {
+      
+      // Chỉ coi là miễn phí nếu pricing_preview nói rõ là subscription
+      if (preview.is_covered_by_subscription && preview.pricing_source === 'subscription') {
         return { price: 0, isFree: true, message: preview.message };
       }
-      return {
-        price: preview.estimated_price,
-        isFree: false,
-        message: preview.message,
+      
+      return { 
+        price: preview.estimated_price, 
+        isFree: false, 
+        message: preview.message || 'Sẽ trừ từ ví khi hoàn tất đổi pin' 
       };
     }
-
-    // Fallback: Dùng transaction amount
-    if (
-      booking.status === "completed" &&
-      booking.transaction?.amount !== undefined
-    ) {
-      return {
-        price: booking.transaction.amount,
-        isFree: booking.transaction.amount === 0,
-      };
-    }
-
-    // Chưa có giá (chưa complete)
+    
+    // Chưa có giá
     return { price: null, isFree: false };
   };
 
@@ -872,26 +893,31 @@ const BookingHistory: React.FC = () => {
       ) : (
         <div className="space-y-4">
           {filteredBookings.map((booking) => (
-            <Card
-              key={booking.booking_id}
-              className="glass-card border-0 glow-hover"
-            >
-              <CardContent className="p-6">
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                  <div className="flex items-start space-x-4">
-                    <div className="p-3 gradient-primary rounded-lg shadow-lg">
-                      <MapPin className="h-6 w-6 text-white" />
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-2 flex-wrap gap-2">
-                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                          {booking.station?.name || "—"}
-                        </h3>
-                        <Badge className={getStatusColor(booking.status)}>
-                          {getStatusIcon(booking.status)}
-                          <span className="ml-1">
-                            {getStatusLabel(booking.status)}
-                          </span>
+          <Card key={booking.booking_id} className="glass-card border-0 glow-hover">
+            <CardContent className="p-6">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div className="flex items-start space-x-4">
+                  <div className="p-3 gradient-primary rounded-lg shadow-lg">
+                    <MapPin className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2 flex-wrap gap-2">
+                      <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{booking.station?.name || '—'}</h3>
+                      <Badge className={getStatusColor(booking.status)}>
+                        {getStatusIcon(booking.status)}
+                        <span className="ml-1">{getStatusLabel(booking.status)}</span>
+                      </Badge>
+                      {booking.is_instant && (
+                        <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 shadow-md">
+                          <Zap className="h-3 w-3 mr-1" />
+                          Đổi pin ngay
+                        </Badge>
+                      )}
+                      {isUsingSubscription(booking) && (
+                        <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 shadow-md">
+                          <Package className="h-3 w-3 mr-1" />
+                          <Zap className="h-3 w-3 mr-1" />
+                          Miễn phí - Gói dịch vụ
                         </Badge>
                         {isUsingSubscription(booking) && (
                           <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 shadow-md">
@@ -920,6 +946,59 @@ const BookingHistory: React.FC = () => {
                         </p>
                       )}
                     </div>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">{booking.station?.address || '—'}</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                      <Car className="inline h-4 w-4 mr-1" />
+                      {booking.vehicle?.license_plate} {booking.vehicle?.model ? `(${booking.vehicle.model})` : ''}
+                    </p>
+                    {/* Hiển thị thông tin hold_summary nếu có */}
+                    {booking.hold_summary && (booking.status === 'pending' || booking.status === 'confirmed') && (
+                      <div className="mt-2 p-2 bg-blue-50/50 dark:bg-blue-500/10 rounded-lg border border-blue-200/50 dark:border-blue-500/20">
+                        <p className="text-xs text-blue-800 dark:text-blue-300 font-medium mb-1">
+                          📌 Pin đã được giữ chỗ
+                        </p>
+                        {booking.hold_summary.battery_code && (
+                          <p className="text-xs text-blue-700 dark:text-blue-400">
+                            Mã pin: <span className="font-mono font-semibold">{booking.hold_summary.battery_code}</span>
+                          </p>
+                        )}
+                        {booking.hold_summary.hold_expires_at && (
+                          <p className="text-xs text-blue-700 dark:text-blue-400 mt-1">
+                            Hết hạn giữ chỗ: {new Date(booking.hold_summary.hold_expires_at).toLocaleString('vi-VN', { 
+                              day: '2-digit', 
+                              month: '2-digit', 
+                              hour: '2-digit', 
+                              minute: '2-digit' 
+                            })}
+                            {(() => {
+                              const expiresAt = new Date(booking.hold_summary.hold_expires_at);
+                              const now = new Date();
+                              const minutesLeft = (expiresAt.getTime() - now.getTime()) / (1000 * 60);
+                              if (minutesLeft > 0 && minutesLeft <= 15) {
+                                return <span className="text-amber-600 dark:text-amber-400 ml-1">⚠️ Còn {Math.round(minutesLeft)} phút</span>;
+                              }
+                              return null;
+                            })()}
+                          </p>
+                        )}
+                        {booking.hold_summary.use_subscription && booking.hold_summary.subscription_name && (
+                          <p className="text-xs text-green-700 dark:text-green-400 mt-1">
+                            ✓ Sử dụng gói: {booking.hold_summary.subscription_name}
+                            {booking.hold_summary.subscription_unlimited ? ' (Không giới hạn)' : 
+                             booking.hold_summary.subscription_remaining_after !== null ? 
+                             ` (Còn ${booking.hold_summary.subscription_remaining_after} lượt)` : ''}
+                          </p>
+                        )}
+                        {!booking.hold_summary.use_subscription && booking.hold_summary.wallet_amount_locked && (
+                          <p className="text-xs text-slate-700 dark:text-slate-300 mt-1">
+                            💰 Đã trừ: {Number(booking.hold_summary.wallet_amount_locked).toLocaleString('vi-VN')} đ
+                            {booking.hold_summary.wallet_balance_after !== null && (
+                              <span className="ml-2">(Số dư: {Number(booking.hold_summary.wallet_balance_after).toLocaleString('vi-VN')} đ)</span>
+                            )}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
