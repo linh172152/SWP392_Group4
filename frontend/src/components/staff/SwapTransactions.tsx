@@ -1549,8 +1549,25 @@ const SwapTransactions: React.FC = () => {
                   </div>
                 ) : availableBatteries.length === 0 ? (
                   <>
+                    <Select
+                      value={newBatteryCode}
+                      onValueChange={(value) => {
+                        setNewBatteryCode(value);
+                        if (completeError) setCompleteError(null);
+                      }}
+                      disabled={actionLoading === selectedBooking.booking_id}
+                    >
+                      <SelectTrigger className="font-mono">
+                        <SelectValue placeholder="Không có pin sẵn sàng..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="" disabled>
+                          Không có pin sẵn sàng
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
                     <Input
-                      id="newBatteryCode"
+                      id="newBatteryCodeManual"
                       type="text"
                       placeholder="VD: BAT-TD05, BAT-VF002, BAT-456"
                       value={newBatteryCode}
@@ -1559,11 +1576,11 @@ const SwapTransactions: React.FC = () => {
                         if (completeError) setCompleteError(null);
                       }}
                       disabled={actionLoading === selectedBooking.booking_id}
-                      className="font-mono"
+                      className="font-mono mt-2"
                     />
                     <p className="text-xs text-yellow-600 dark:text-yellow-400">
-                      ⚠️ Không có pin sẵn sàng. Vui lòng nhập mã pin mới thủ
-                      công.
+                      ⚠️ Không có pin sẵn sàng trong danh sách. Vui lòng nhập mã
+                      pin mới thủ công.
                     </p>
                   </>
                 ) : (

@@ -619,6 +619,71 @@ export const createBooking = asyncHandler(
     const allowChargingFallback =
       (scheduledTime.getTime() - now.getTime()) / (1000 * 60 * 60) >= 1;
 
+    // ✅ Check pin có sẵn TRƯỚC khi vào transaction (tránh race condition và cho user biết sớm)
+    const hoursUntilScheduled =
+      (scheduledTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+    // Count full batteries
+    const fullBatteries = await prisma.battery.count({
+      where: {
+        station_id,
+        model: {
+          equals: normalizedBatteryModel,
+          mode: "insensitive",
+        },
+        status: "full",
+      },
+    });
+
+    // Count charging batteries (chỉ nếu >= 1 giờ trước scheduled time)
+    const chargingBatteries =
+      allowChargingFallback && hoursUntilScheduled >= 1
+        ? await prisma.battery.count({
+            where: {
+              station_id,
+              model: {
+                equals: normalizedBatteryModel,
+                mode: "insensitive",
+              },
+              status: "charging",
+            },
+          })
+        : 0;
+
+    // Count bookings đã lock pin trong khoảng thời gian scheduled (30 phút trước/sau)
+    const confirmedBookingsAtTime = await prisma.booking.count({
+      where: {
+        station_id,
+        battery_model: {
+          equals: normalizedBatteryModel,
+          mode: "insensitive",
+        },
+        scheduled_at: {
+          gte: new Date(scheduledTime.getTime() - 30 * 60 * 1000), // 30 phút trước
+          lte: new Date(scheduledTime.getTime() + 30 * 60 * 1000), // 30 phút sau
+        },
+        status: { in: ["pending", "confirmed"] },
+      },
+    });
+
+    const totalAvailableBatteries = fullBatteries + chargingBatteries;
+    const availableBatteries =
+      totalAvailableBatteries - confirmedBookingsAtTime;
+
+    if (availableBatteries <= 0) {
+      const reason =
+        totalAvailableBatteries === 0
+          ? `Không có pin sẵn sàng cho model "${battery_model}" tại trạm này`
+          : allowChargingFallback
+            ? `Tất cả ${totalAvailableBatteries} pin sẵn sàng (${fullBatteries} full, ${chargingBatteries} charging) đã được giữ bởi ${confirmedBookingsAtTime} booking khác trong khoảng thời gian này`
+            : `Tất cả ${fullBatteries} pin sẵn sàng đã được giữ bởi ${confirmedBookingsAtTime} booking khác trong khoảng thời gian này`;
+
+      throw new CustomError(
+        `Không có pin sẵn sàng vào thời điểm đã chọn. ${reason}. Vui lòng chọn thời gian khác hoặc trạm khác.`,
+        400
+      );
+    }
+
     const timestamp = Date.now().toString().slice(-10);
     const random = Math.random().toString(36).substr(2, 2).toUpperCase();
     const bookingCode = `BK${timestamp}${random}`;
@@ -1148,8 +1213,8 @@ export const createInstantBooking = asyncHandler(
     if (availableBatteries <= 0) {
       const reason =
         fullBatteries === 0
-          ? `No full batteries available (${batteriesOfModel.length} total batteries of this model)`
-          : `All ${fullBatteries} full batteries are reserved by other instant bookings (${instantBookingsAtStation} bookings in next 15 min)`;
+          ? `Không có pin sẵn sàng (tổng ${batteriesOfModel.length} pin của model này)`
+          : `Tất cả ${fullBatteries} pin sẵn sàng đã được giữ bởi ${instantBookingsAtStation} booking khác (trong 15 phút tới)`;
 
       throw new CustomError(
         `Không có pin sẵn sàng ngay. ${reason}. Vui lòng đặt lịch hẹn cho thời gian khác.`,
@@ -1162,39 +1227,68 @@ export const createInstantBooking = asyncHandler(
     const random = Math.random().toString(36).substr(2, 2).toUpperCase();
     const bookingCode = `INST${timestamp}${random}`; // INST + 10 + 2 = 16 chars
 
-    const booking = await prisma.booking.create({
-      data: {
+    // ✅ Lock pin ngay khi tạo instant booking (giống createBooking)
+    // normalizedBatteryModel đã được khai báo ở trên (dòng 1155)
+    const booking = await prisma.$transaction(async (tx) => {
+      // Reserve battery for instant booking (chỉ lấy pin full, không lấy charging)
+      const reserveResult = await reserveBatteryForBooking(tx, {
+        stationId: station_id,
+        batteryModel: normalizedBatteryModel,
+        allowChargingFallback: false, // Instant booking chỉ lấy pin full
+      });
+
+      const bookingData = {
         booking_code: bookingCode,
         user_id: userId,
         vehicle_id,
         station_id,
-        battery_model,
+        battery_model: normalizedBatteryModel,
         scheduled_at: scheduledTime,
         is_instant: true, // ✅ Flag instant booking
         notes,
         status: "pending",
-      },
-      include: {
-        station: {
-          select: {
-            station_id: true,
-            name: true,
-            address: true,
-            latitude: true,
-            longitude: true,
+        locked_battery_id: reserveResult.battery.battery_id,
+        locked_battery_previous_status: reserveResult.previousStatus ?? null,
+      } as Prisma.BookingUncheckedCreateInput;
+
+      const createdBooking = await tx.booking.create({
+        data: bookingData,
+        include: {
+          station: {
+            select: {
+              station_id: true,
+              name: true,
+              address: true,
+              latitude: true,
+              longitude: true,
+            },
+          },
+          vehicle: {
+            select: {
+              vehicle_id: true,
+              license_plate: true,
+              vehicle_type: true,
+              make: true,
+              model: true,
+              year: true,
+            },
           },
         },
-        vehicle: {
-          select: {
-            vehicle_id: true,
-            license_plate: true,
-            vehicle_type: true,
-            make: true,
-            model: true,
-            year: true,
-          },
-        },
-      },
+      });
+
+      // Create battery history entry
+      await createBatteryHistoryEntry(tx, {
+        batteryId: reserveResult.battery.battery_id,
+        bookingId: createdBooking.booking_id,
+        stationId: station_id,
+        actorUserId: userId,
+        action: "reserved",
+        notes: reserveResult.previousStatus
+          ? `Giữ từ trạng thái ${reserveResult.previousStatus} (Instant booking)`
+          : "Giữ cho instant booking",
+      });
+
+      return createdBooking;
     });
 
     const pricing_preview = await calculateBookingPricingPreview({

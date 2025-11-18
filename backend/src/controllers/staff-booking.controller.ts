@@ -800,10 +800,12 @@ export const completeBooking = asyncHandler(
       include: { package: true };
     }>;
 
+    // ✅ Pin đã được lock từ lúc driver đặt booking
+    // Nếu không có locked_battery_id → có thể là booking cũ (trước khi implement lock) hoặc lỗi hệ thống
     if (!holdInfo.locked_battery_id) {
       throw new CustomError(
-        "Booking chưa giữ pin. Vui lòng yêu cầu driver đặt lại để hệ thống giữ pin trước khi hoàn tất.",
-        400
+        "Lỗi hệ thống: Booking không có pin đã giữ. Vui lòng liên hệ admin để kiểm tra.",
+        500
       );
     }
 
@@ -1470,23 +1472,25 @@ export const getAvailableBatteries = asyncHandler(
     }
 
     // Build where clause for available batteries
-    // Chỉ lấy pin: đúng hãng (model), đúng trạm, status "full" (sẵn sàng), và đầy pin (current_charge = 100%)
+    // Lấy pin: đúng hãng (model), đúng trạm, status "full" hoặc "reserved" (nếu là locked_battery)
+    // Cho phép charge >= 90% (không nhất thiết phải 100%)
     const whereClause: any = {
       station_id: booking.station_id,
       model: booking.battery_model,
-      status: "full", // Chỉ lấy pin sẵn sàng
-      current_charge: 100, // Pin phải đầy 100% mới đổi được
+      status: { in: ["full", "reserved"] }, // Lấy pin sẵn sàng hoặc đã giữ
+      current_charge: { gte: 90 }, // Pin phải >= 90% mới đổi được (không nhất thiết 100%)
     };
 
-    // Nếu có locked_battery, cũng include nó (kể cả nếu status là "reserved" hoặc charge < 100%)
+    // Nếu có locked_battery, cũng include nó (kể cả nếu status khác hoặc charge < 90%)
     if (booking.locked_battery_id) {
       whereClause.OR = [
         {
-          status: "full",
-          current_charge: 100,
+          station_id: booking.station_id,
+          model: booking.battery_model,
+          status: { in: ["full", "reserved"] },
+          current_charge: { gte: 90 },
         },
         {
-          status: "reserved",
           battery_id: booking.locked_battery_id,
         },
       ];
