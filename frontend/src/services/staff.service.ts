@@ -289,7 +289,7 @@ export interface Battery {
   current_charge: number;
   health_percentage?: number | null;
   cycle_count?: number | null;
-  status: "full" | "charging" | "in_use" | "maintenance" | "damaged";
+  status: "full" | "reserved" | "charging" | "in_use" | "maintenance" | "damaged";
   last_charged_at?: string | null;
   created_at: string;
   updated_at: string;

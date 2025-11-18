@@ -211,57 +211,52 @@ const BookingForm: React.FC = () => {
   };
 
   // Kiểm tra subscription có tương thích với battery model không
-  const doesSubscriptionCoverModel = (subscription: any, batteryModel: string): boolean => {
+  // Trả về { canApply: boolean, reason?: string }
+  const checkSubscriptionCoverage = (subscription: any, batteryModel: string): { canApply: boolean; reason?: string } => {
     if (!subscription || !subscription.package) {
-      console.log('❌ [SUBSCRIPTION CHECK] No subscription or package');
-      return false;
+      return { canApply: false, reason: 'Không có gói dịch vụ' };
     }
     const pkg = subscription.package;
     
-    console.log('🔍 [SUBSCRIPTION CHECK]', {
-      batteryModel,
-      packageName: pkg.name,
-      battery_models: pkg.battery_models,
-      battery_capacity_kwh: pkg.battery_capacity_kwh,
-      hasBatteryModels: !!pkg.battery_models && pkg.battery_models.length > 0
-    });
-    
-    // Nếu package không có battery_models hoặc battery_models rỗng → áp dụng cho tất cả
-    if (!pkg.battery_models || pkg.battery_models.length === 0) {
-      console.log('✅ [SUBSCRIPTION CHECK] No battery_models restriction → applies to all');
-      return true;
+    // Tìm battery info để lấy capacity
+    let batteryCapacity: number | null = null;
+    if (stationDetails?.batteries) {
+      const battery = stationDetails.batteries.find(b => b.model === batteryModel);
+      batteryCapacity = battery?.capacity_kwh ? Number(battery.capacity_kwh) : null;
     }
     
-    // Check battery_capacity_kwh nếu có
-    if (pkg.battery_capacity_kwh) {
-      // Tìm battery info từ stationDetails hoặc từ compatibleBatteryTypes
-      let batteryCapacity: number | null = null;
-      if (stationDetails?.batteries) {
-        const battery = stationDetails.batteries.find(b => b.model === batteryModel);
-        batteryCapacity = battery?.capacity_kwh ? Number(battery.capacity_kwh) : null;
-      }
-      
-      if (batteryCapacity !== null) {
-        const packageCapacity = Number(pkg.battery_capacity_kwh);
-        if (batteryCapacity !== packageCapacity) {
-          console.log('❌ [SUBSCRIPTION CHECK] Capacity mismatch:', {
-            batteryCapacity,
-            packageCapacity
-          });
-          return false;
-        }
+    // Nếu package có battery_capacity_kwh, kiểm tra capacity
+    // Gói áp dụng cho pin có capacity <= package capacity
+    if (pkg.battery_capacity_kwh && batteryCapacity !== null) {
+      const packageCapacity = Number(pkg.battery_capacity_kwh);
+      if (batteryCapacity > packageCapacity) {
+        return { 
+          canApply: false, 
+          reason: `Gói chỉ áp dụng cho dung lượng ${packageCapacity}kWh trở xuống` 
+        };
       }
     }
     
-    // Check battery_models
-    const matches = pkg.battery_models.some((model: string) => {
-      const result = matchBatteryModel(model, batteryModel);
-      console.log(`🔍 [SUBSCRIPTION CHECK] Comparing "${model}" with "${batteryModel}":`, result);
-      return result;
-    });
+    // Nếu package có battery_models array, check xem model có trong đó không
+    if (pkg.battery_models && Array.isArray(pkg.battery_models) && pkg.battery_models.length > 0) {
+      const matches = pkg.battery_models.some((model: string) => 
+        matchBatteryModel(model, batteryModel)
+      );
+      if (!matches) {
+        return { 
+          canApply: false, 
+          reason: `Gói không áp dụng cho loại pin "${batteryModel}"` 
+        };
+      }
+    }
     
-    console.log(matches ? '✅ [SUBSCRIPTION CHECK] Model matches' : '❌ [SUBSCRIPTION CHECK] Model does not match');
-    return matches;
+    // Nếu không có giới hạn rõ ràng hoặc đã pass các check → áp dụng được
+    return { canApply: true };
+  };
+  
+  // Wrapper function để tương thích với code cũ
+  const doesSubscriptionCoverModel = (subscription: any, batteryModel: string): boolean => {
+    return checkSubscriptionCoverage(subscription, batteryModel).canApply;
   };
 
   // Lấy thông tin các loại pin tương thích
@@ -350,17 +345,16 @@ const BookingForm: React.FC = () => {
     const slots = [];
     const now = new Date();
     
-    // "Ngay bây giờ" - instant booking
+    // "Ngay bây giờ" - instant booking (sẽ đặt với scheduled_at = now + 30 phút để đảm bảo BE validation)
     slots.push({
       label: 'Ngay bây giờ',
-      subLabel: 'Trong 15 phút',
+      subLabel: 'Trong 30 phút',
       value: 'instant',
       time: null,
     });
     
-    // Tính toán các time slots: 30 phút, 1 giờ, 2 giờ, 3 giờ
+    // Tính toán các time slots: 1 giờ, 2 giờ, 3 giờ (bỏ 30 phút)
     const timeSlotsConfig = [
-      { minutes: 30, label: '30 phút nữa' },
       { minutes: 60, label: '1 giờ nữa' },
       { minutes: 120, label: '2 giờ nữa' },
       { minutes: 180, label: '3 giờ nữa' },
@@ -426,8 +420,50 @@ const BookingForm: React.FC = () => {
       // Sử dụng state useSubscription mà driver đã chọn
       if (selectedTimeSlot === 'instant') {
         // Đặt chỗ đổi pin ngay
-        await bookingService.createInstantBooking(bookingData);
-        setSuccess('Đã đặt chỗ đổi pin ngay thành công! Pin đã được tạm giữ trong 15 phút.');
+        // Nếu KHÔNG dùng subscription → gọi createBooking với scheduled_at = now + 30 phút để trừ tiền ví
+        // BE yêu cầu scheduled_at phải > 30 phút từ bây giờ (strict <, không phải <=)
+        // QUAN TRỌNG: Tính lại thời gian ngay trước khi gọi API để đảm bảo chính xác (tránh độ trễ network)
+        // Thêm buffer để đảm bảo luôn > 30 phút ngay cả khi có độ trễ network
+        const now = new Date();
+        // Buffer 3 phút để đảm bảo luôn > 30 phút (33 phút) để tránh lỗi do timing/network delay
+        const bufferMinutes = 3;
+        const instantScheduledTime = new Date(now.getTime() + (30 + bufferMinutes) * 60 * 1000); // 33 phút từ bây giờ
+        
+        // Validate lại trước khi gửi - đảm bảo > 30 phút (không phải >=)
+        const minutesFromNow = (instantScheduledTime.getTime() - now.getTime()) / (1000 * 60);
+        if (minutesFromNow <= 30) {
+          // Nếu <= 30 phút, tăng lên 31 phút để đảm bảo > 30 phút
+          const safeScheduledTime = new Date(now.getTime() + 31 * 60 * 1000);
+          console.warn('⚠️ [INSTANT BOOKING] Thời gian <= 30 phút, điều chỉnh lên 31 phút');
+          instantScheduledTime.setTime(safeScheduledTime.getTime());
+        }
+        
+        console.log('🕐 [INSTANT BOOKING]', {
+          now: now.toISOString(),
+          scheduled_at: instantScheduledTime.toISOString(),
+          minutesFromNow: (instantScheduledTime.getTime() - now.getTime()) / (1000 * 60),
+          use_subscription: useSubscription
+        });
+        
+        const result = await bookingService.createBooking({
+          ...bookingData,
+          scheduled_at: instantScheduledTime.toISOString(),
+          use_subscription: useSubscription, // Driver đã chọn có dùng subscription hay không
+        });
+        
+        // Hiển thị thông tin hold_summary
+        if (result.hold_summary) {
+          const hold = result.hold_summary;
+          if (hold.use_subscription && hold.subscription_name) {
+            setSuccess(`Đã đặt chỗ đổi pin ngay thành công! Gói "${hold.subscription_name}" sẽ được sử dụng.${hold.subscription_remaining_after !== null ? ` Còn ${hold.subscription_remaining_after} lượt sau giao dịch này.` : ''}`);
+          } else if (hold.wallet_amount_locked && hold.wallet_amount_locked > 0) {
+            setSuccess(`Đã đặt chỗ đổi pin ngay thành công! Đã trừ ${hold.wallet_amount_locked.toLocaleString('vi-VN')}₫ từ ví. Số dư: ${hold.wallet_balance_after ? hold.wallet_balance_after.toLocaleString('vi-VN') + '₫' : 'N/A'}`);
+          } else {
+            setSuccess('Đã đặt chỗ đổi pin ngay thành công! Pin đã được tạm giữ. Vui lòng đến trạm trong vòng 30 phút.');
+          }
+        } else {
+          setSuccess('Đã đặt chỗ đổi pin ngay thành công! Pin đã được tạm giữ. Vui lòng đến trạm trong vòng 30 phút.');
+        }
       } else if (selectedTimeSlot && selectedTimeSlot !== 'instant') {
         // Đặt lịch hẹn với time slot
         const scheduledDate = new Date(selectedTimeSlot);
@@ -874,9 +910,29 @@ const BookingForm: React.FC = () => {
                           )}
                           {!useSubscription && (
                             <div className="mt-2 text-xs text-slate-600 dark:text-slate-400">
-                              ⚠️ Sẽ thanh toán từ ví: {batteryPrice > 0 ? `${batteryPrice.toLocaleString('vi-VN')}₫` : 'Liên hệ'}
+                              ⚠️ Sẽ trừ từ ví: {batteryPrice > 0 ? `${batteryPrice.toLocaleString('vi-VN')}₫` : 'Liên hệ'}
                             </div>
                           )}
+                        </div>
+                      )}
+                      
+                      {/* Hiển thị thông báo khi subscription không áp dụng được */}
+                      {currentSubscription && selectedBatteryType && !subscriptionCanApply && (
+                        <div className="mt-3 p-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10">
+                          <div className="flex items-start gap-2">
+                            <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                            <div className="text-xs text-amber-800 dark:text-amber-300">
+                              <p className="font-medium mb-1">
+                                Gói "{currentSubscription.package?.name || 'Gói dịch vụ'}" không áp dụng cho loại pin này
+                              </p>
+                              {(() => {
+                                const coverage = checkSubscriptionCoverage(currentSubscription, selectedBatteryType);
+                                return coverage.reason ? (
+                                  <p className="text-amber-700 dark:text-amber-400">{coverage.reason}</p>
+                                ) : null;
+                              })()}
+                            </div>
+                          </div>
                         </div>
                       )}
                       
@@ -913,7 +969,7 @@ const BookingForm: React.FC = () => {
                         <Calendar className="h-4 w-4" />
                         <span>
                           {selectedTimeSlot === 'instant'
-                            ? 'Trong 15 phút'
+                            ? 'Trong 30 phút'
                             : selectedTimeSlot
                               ? new Date(selectedTimeSlot).toLocaleString('vi-VN', {
                                   day: '2-digit',
