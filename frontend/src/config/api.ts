@@ -1,5 +1,6 @@
 // API Configuration
-export const API_BASE_URL = import.meta.env.VITE_API_URL || "https://ev-battery-backend.onrender.com/api";
+export const API_BASE_URL =
+  import.meta.env.VITE_API_URL || "https://ev-battery-backend.onrender.com/api";
 
 export const API_ENDPOINTS = {
   AUTH: {
@@ -69,8 +70,10 @@ export const API_ENDPOINTS = {
   RATINGS: {
     BASE: `${API_BASE_URL}/ratings`,
     BY_ID: (id: string) => `${API_BASE_URL}/ratings/${id}`,
-    STATION: (stationId: string) => `${API_BASE_URL}/ratings/stations/${stationId}`,
-    STATION_SUMMARY: (stationId: string) => `${API_BASE_URL}/ratings/stations/${stationId}/summary`,
+    STATION: (stationId: string) =>
+      `${API_BASE_URL}/ratings/stations/${stationId}`,
+    STATION_SUMMARY: (stationId: string) =>
+      `${API_BASE_URL}/ratings/stations/${stationId}/summary`,
   },
   // Code của bạn - Driver endpoints (giữ nguyên)
   DRIVER: {
@@ -89,7 +92,8 @@ export const API_ENDPOINTS = {
     PRICING: `${API_BASE_URL}/driver/pricing`, // Hoặc có thể là `${API_BASE_URL}/pricing/public` tùy BE
     NOTIFICATIONS: {
       BASE: `${API_BASE_URL}/driver/notifications`,
-      MARK_READ: (id: string) => `${API_BASE_URL}/driver/notifications/${id}/read`,
+      MARK_READ: (id: string) =>
+        `${API_BASE_URL}/driver/notifications/${id}/read`,
       MARK_ALL_READ: `${API_BASE_URL}/driver/notifications/read-all`,
     },
   },
@@ -97,8 +101,10 @@ export const API_ENDPOINTS = {
   SUBSCRIPTIONS: {
     BASE: `${API_BASE_URL}/driver/subscriptions`,
     BY_ID: (id: string) => `${API_BASE_URL}/driver/subscriptions/${id}`,
-    SUBSCRIBE: (packageId: string) => `${API_BASE_URL}/driver/subscriptions/packages/${packageId}/subscribe`,
-    CANCEL: (subscriptionId: string) => `${API_BASE_URL}/driver/subscriptions/${subscriptionId}/cancel`,
+    SUBSCRIBE: (packageId: string) =>
+      `${API_BASE_URL}/driver/subscriptions/packages/${packageId}/subscribe`,
+    CANCEL: (subscriptionId: string) =>
+      `${API_BASE_URL}/driver/subscriptions/${subscriptionId}/cancel`,
   },
   PACKAGES: {
     BASE: `${API_BASE_URL}/packages`,
@@ -106,8 +112,10 @@ export const API_ENDPOINTS = {
   },
   DRIVER_SUBSCRIPTIONS: {
     BASE: `${API_BASE_URL}/driver/subscriptions`,
-    SUBSCRIBE: (packageId: string) => `${API_BASE_URL}/driver/subscriptions/packages/${packageId}/subscribe`,
-    CANCEL: (subscriptionId: string) => `${API_BASE_URL}/driver/subscriptions/${subscriptionId}/cancel`,
+    SUBSCRIBE: (packageId: string) =>
+      `${API_BASE_URL}/driver/subscriptions/packages/${packageId}/subscribe`,
+    CANCEL: (subscriptionId: string) =>
+      `${API_BASE_URL}/driver/subscriptions/${subscriptionId}/cancel`,
   },
   PUBLIC: {
     STATIONS: `${API_BASE_URL}/stations/public`,
@@ -116,30 +124,41 @@ export const API_ENDPOINTS = {
   STAFF: {
     BOOKINGS: `${API_BASE_URL}/staff/bookings`,
     BOOKING_DETAILS: (id: string) => `${API_BASE_URL}/staff/bookings/${id}`,
-    CONFIRM_BOOKING: (id: string) => `${API_BASE_URL}/staff/bookings/${id}/confirm`,
-    COMPLETE_BOOKING: (id: string) => `${API_BASE_URL}/staff/bookings/${id}/complete`,
-    CANCEL_BOOKING: (id: string) => `${API_BASE_URL}/staff/bookings/${id}/cancel`,
-    
+    CONFIRM_BOOKING: (id: string) =>
+      `${API_BASE_URL}/staff/bookings/${id}/confirm`,
+    COMPLETE_BOOKING: (id: string) =>
+      `${API_BASE_URL}/staff/bookings/${id}/complete`,
+    CANCEL_BOOKING: (id: string) =>
+      `${API_BASE_URL}/staff/bookings/${id}/cancel`,
+    AVAILABLE_BATTERIES: (id: string) =>
+      `${API_BASE_URL}/staff/bookings/${id}/available-batteries`,
+
     // Battery endpoints
     BATTERIES: `${API_BASE_URL}/staff/batteries`,
     BATTERY_DETAILS: (id: string) => `${API_BASE_URL}/staff/batteries/${id}`,
-    BATTERY_HISTORY: (id: string) => `${API_BASE_URL}/staff/batteries/${id}/history`,
+    BATTERY_HISTORY: (id: string) =>
+      `${API_BASE_URL}/staff/batteries/${id}/history`,
     ADD_BATTERY: `${API_BASE_URL}/staff/batteries`,
     UPDATE_BATTERY: (id: string) => `${API_BASE_URL}/staff/batteries/${id}`,
     DELETE_BATTERY: (id: string) => `${API_BASE_URL}/staff/batteries/${id}`,
-    
+
     // Schedule endpoints
     SCHEDULES: `${API_BASE_URL}/staff/schedules`,
-    UPDATE_SCHEDULE_STATUS: (id: string) => `${API_BASE_URL}/staff/schedules/${id}/status`,
+    UPDATE_SCHEDULE_STATUS: (id: string) =>
+      `${API_BASE_URL}/staff/schedules/${id}/status`,
   },
   HEALTH: `${API_BASE_URL}/health`,
 };
 
-export async function fetchWithAuth(input: RequestInfo | URL, init: RequestInit = {}) {
+export async function fetchWithAuth(
+  input: RequestInfo | URL,
+  init: RequestInit = {}
+) {
   const accessToken = localStorage.getItem("accessToken");
   const headers: HeadersInit = {
     ...(init.headers || {}),
-    "Content-Type": (init.headers as any)?.["Content-Type"] || "application/json",
+    "Content-Type":
+      (init.headers as any)?.["Content-Type"] || "application/json",
   };
   if (accessToken) {
     (headers as any).Authorization = `Bearer ${accessToken}`;

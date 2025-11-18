@@ -175,6 +175,23 @@ export const getStationBookings = asyncHandler(
             vehicle_type: true,
             model: true,
             make: true,
+            current_battery: {
+              select: {
+                battery_id: true,
+                battery_code: true,
+                status: true,
+                current_charge: true,
+              },
+            },
+          },
+        },
+        locked_battery: {
+          select: {
+            battery_id: true,
+            battery_code: true,
+            model: true,
+            status: true,
+            current_charge: true,
           },
         },
         station: {
@@ -193,6 +210,22 @@ export const getStationBookings = asyncHandler(
             swap_at: true,
             swap_started_at: true,
             swap_completed_at: true,
+            old_battery: {
+              select: {
+                battery_id: true,
+                battery_code: true,
+                model: true,
+                current_charge: true,
+              },
+            },
+            new_battery: {
+              select: {
+                battery_id: true,
+                battery_code: true,
+                model: true,
+                current_charge: true,
+              },
+            },
           },
         },
         checked_in_by_staff: {
@@ -822,7 +855,7 @@ export const completeBooking = asyncHandler(
     }
 
     const trimmedOldBatteryCode = old_battery_code.trim();
-    
+
     // ✅ Tìm hoặc tạo pin cũ (nếu không tồn tại - trường hợp pin mới từ hãng chưa được tạo trong DB)
     let oldBattery = await prisma.battery.findUnique({
       where: { battery_code: trimmedOldBatteryCode },
@@ -839,23 +872,25 @@ export const completeBooking = asyncHandler(
           500
         );
       }
-      
+
       // Pin không tồn tại và không match với vehicle.current_battery → Tạo pin mới
       // (Trường hợp hiếm: pin từ hãng chưa được tạo khi đăng ký xe)
-      console.log(`[completeBooking] ⚠️ Old battery "${trimmedOldBatteryCode}" not found. Creating new battery...`);
-      
-      const defaultStation = await prisma.station.findFirst({ 
-        where: { status: "active" }, 
-        select: { station_id: true } 
+      console.log(
+        `[completeBooking] ⚠️ Old battery "${trimmedOldBatteryCode}" not found. Creating new battery...`
+      );
+
+      const defaultStation = await prisma.station.findFirst({
+        where: { status: "active" },
+        select: { station_id: true },
       });
-      
+
       if (!defaultStation) {
         throw new CustomError(
           "Không tìm thấy trạm nào để tạo pin. Vui lòng liên hệ quản trị viên.",
           500
         );
       }
-      
+
       oldBattery = await prisma.battery.create({
         data: {
           battery_code: trimmedOldBatteryCode,
@@ -865,15 +900,17 @@ export const completeBooking = asyncHandler(
           station_id: defaultStation.station_id, // Sẽ được update về trạm hiện tại sau khi swap
         },
       });
-      
-      console.log(`[completeBooking] ✅ Created old battery: ${oldBattery.battery_code} (ID: ${oldBattery.battery_id})`);
-      
+
+      console.log(
+        `[completeBooking] ✅ Created old battery: ${oldBattery.battery_code} (ID: ${oldBattery.battery_id})`
+      );
+
       // Update vehicle với pin mới được tạo
       await prisma.vehicle.update({
         where: { vehicle_id: vehicle.vehicle_id },
         data: { current_battery_id: oldBattery.battery_id } as any,
       });
-      
+
       // Reload vehicle để có current_battery mới
       const updatedVehicle = await prisma.vehicle.findUnique({
         where: { vehicle_id: vehicle.vehicle_id },
@@ -887,7 +924,7 @@ export const completeBooking = asyncHandler(
           } as any,
         } as any,
       });
-      
+
       if (updatedVehicle) {
         Object.assign(vehicle, updatedVehicle);
       }
@@ -896,16 +933,17 @@ export const completeBooking = asyncHandler(
     // ✅ Validate: Old battery code must match vehicle's current battery
     const vehicleCurrentBatteryId =
       vehicle.current_battery?.battery_id ?? vehicle.current_battery_id;
-    
+
     if (!vehicleCurrentBatteryId) {
       throw new CustomError(
         "Xe hiện không ghi nhận mã pin đang sử dụng. Vui lòng kiểm tra lại thông tin xe trước khi hoàn tất.",
         400
       );
     }
-    
+
     if (vehicleCurrentBatteryId !== oldBattery.battery_id) {
-      const vehicleCurrentBatteryCode = (vehicle as any).current_battery?.battery_code || 'chưa có';
+      const vehicleCurrentBatteryCode =
+        (vehicle as any).current_battery?.battery_code || "chưa có";
       throw new CustomError(
         `Mã pin cũ "${old_battery_code}" không khớp với pin hiện tại của xe. Pin hiện tại của xe là: ${vehicleCurrentBatteryCode}.`,
         400
@@ -1384,6 +1422,112 @@ export const cancelBooking = asyncHandler(
         booking: result.updatedBooking,
         wallet_refund_amount: result.release.walletRefundAmount,
         battery_released_id: result.release.batteryReleasedId,
+      },
+    });
+  }
+);
+
+/**
+ * Get available batteries for a booking
+ */
+export const getAvailableBatteries = asyncHandler(
+  async (req: Request, res: Response) => {
+    const staffId = req.user?.userId;
+    const { id } = req.params;
+
+    if (!staffId) {
+      throw new CustomError("Staff not authenticated", 401);
+    }
+
+    // Get staff's station
+    const staff = await prisma.user.findUnique({
+      where: { user_id: staffId },
+      select: { station_id: true },
+    });
+
+    if (!staff?.station_id) {
+      throw new CustomError("Staff not assigned to any station", 400);
+    }
+
+    // Get booking details
+    const booking = await prisma.booking.findUnique({
+      where: { booking_id: id },
+      select: {
+        booking_id: true,
+        station_id: true,
+        battery_model: true,
+        locked_battery_id: true,
+      },
+    });
+
+    if (!booking) {
+      throw new CustomError("Booking not found", 404);
+    }
+
+    // Check if booking belongs to staff's station
+    if (booking.station_id !== staff.station_id) {
+      throw new CustomError("Booking does not belong to your station", 403);
+    }
+
+    // Build where clause for available batteries
+    // Chỉ lấy pin: đúng hãng (model), đúng trạm, status "full" (sẵn sàng), và đầy pin (current_charge = 100%)
+    const whereClause: any = {
+      station_id: booking.station_id,
+      model: booking.battery_model,
+      status: "full", // Chỉ lấy pin sẵn sàng
+      current_charge: 100, // Pin phải đầy 100% mới đổi được
+    };
+
+    // Nếu có locked_battery, cũng include nó (kể cả nếu status là "reserved" hoặc charge < 100%)
+    if (booking.locked_battery_id) {
+      whereClause.OR = [
+        {
+          status: "full",
+          current_charge: 100,
+        },
+        {
+          status: "reserved",
+          battery_id: booking.locked_battery_id,
+        },
+      ];
+    }
+
+    // Get available batteries
+    const batteries = await prisma.battery.findMany({
+      where: whereClause,
+      select: {
+        battery_id: true,
+        battery_code: true,
+        model: true,
+        status: true,
+        current_charge: true,
+        capacity_kwh: true,
+        health_percentage: true,
+      },
+    });
+
+    // Sort batteries manually to ensure locked_battery is first
+    const sortedBatteries = batteries.sort((a, b) => {
+      // Locked battery first
+      if (a.battery_id === booking.locked_battery_id) return -1;
+      if (b.battery_id === booking.locked_battery_id) return 1;
+      // Then full status
+      if (a.status === "full" && b.status !== "full") return -1;
+      if (b.status === "full" && a.status !== "full") return 1;
+      // Then by charge
+      return b.current_charge - a.current_charge;
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Available batteries retrieved successfully",
+      data: {
+        batteries: sortedBatteries,
+        booking: {
+          booking_id: booking.booking_id,
+          battery_model: booking.battery_model,
+          locked_battery_id: booking.locked_battery_id,
+        },
       },
     });
   }

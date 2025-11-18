@@ -5,6 +5,7 @@ import {
   confirmBooking,
   completeBooking,
   cancelBooking,
+  getAvailableBatteries,
 } from "../controllers/staff-booking.controller";
 import {
   authenticateToken,
@@ -95,6 +96,48 @@ router.get("/", getStationBookings);
  *         description: Booking not found
  */
 router.get("/:id", getBookingDetails);
+
+/**
+ * @swagger
+ * /api/staff/bookings/{id}/available-batteries:
+ *   get:
+ *     summary: Get available batteries for a booking
+ *     tags: [Staff - Bookings]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Available batteries retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     batteries:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                     booking:
+ *                       type: object
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - Staff role required
+ *       404:
+ *         description: Booking not found
+ */
+router.get("/:id/available-batteries", getAvailableBatteries);
 
 /**
  * @swagger

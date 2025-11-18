@@ -17,10 +17,29 @@ export const getMySubscriptions = asyncHandler(
     const subscriptions = await prisma.userSubscription.findMany({
       where: { user_id: userId },
       include: {
-        package: true,
+        package: {
+          select: {
+            package_id: true,
+            name: true,
+            description: true,
+            price: true,
+            swap_limit: true,
+            duration_days: true,
+            battery_capacity_kwh: true,
+            is_active: true,
+          },
+        },
         payments: {
+          where: {
+            payment_type: PaymentType.SUBSCRIPTION,
+          },
           orderBy: { created_at: "desc" },
-          take: 5,
+          take: 1,
+          select: {
+            amount: true,
+            payment_status: true,
+            payment_type: true,
+          },
         },
       },
       orderBy: { created_at: "desc" },
@@ -170,37 +189,71 @@ export const cancelSubscription = asyncHandler(
       throw new CustomError("Subscription package information not found", 500);
     }
 
-    const packageSwapLimit = subscription.package.swap_limit;
-
-    let hasUsage = false;
-
-    if (packageSwapLimit === null) {
-      const statusEnumList = ["pending", "confirmed", "completed"].map(
-        (status) => Prisma.sql`${status}::"BookingStatus"`
+    // ✅ Check: Không cho hủy nếu gói đã hết hạn
+    const now = new Date();
+    if (subscription.end_date < now) {
+      throw new CustomError(
+        "Subscription has already expired and cannot be cancelled",
+        400
       );
-
-      const usageRows = await prisma.$queryRaw<{ usage: bigint }[]>(
-        Prisma.sql`
-          SELECT COUNT(*)::bigint AS usage
-          FROM bookings
-          WHERE user_id = CAST(${userId} AS uuid)
-            AND use_subscription = true
-            AND created_at >= ${subscription.start_date}
-            AND status IN (${Prisma.join(statusEnumList)})
-        `
-      );
-
-      const usageCount = usageRows.length ? Number(usageRows[0].usage) : 0;
-      hasUsage = usageCount > 0;
-    } else {
-      const remainingSwaps = subscription.remaining_swaps ?? 0;
-      hasUsage = remainingSwaps !== packageSwapLimit;
     }
 
-    if (hasUsage) {
+    const packageSwapLimit = subscription.package.swap_limit;
+
+    // ✅ Lấy original amount từ payment (không phải package price)
+    const originalPayment = await prisma.payment.findFirst({
+      where: {
+        subscription_id: subscriptionId,
+        payment_type: PaymentType.SUBSCRIPTION,
+        payment_status: PAYMENT_STATUS_COMPLETED,
+      },
+      orderBy: { created_at: "desc" },
+    });
+
+    if (!originalPayment) {
       throw new CustomError(
-        "Subscription has already been used and cannot be refunded",
+        "Original subscription payment not found. Contact support for assistance",
         400
+      );
+    }
+
+    const originalAmount = Number(originalPayment.amount);
+
+    // ✅ Tính refund theo tỷ lệ (bỏ check hasUsage)
+    let refundRatio = 0;
+
+    if (packageSwapLimit === null) {
+      // Gói không giới hạn: tính theo số ngày còn lại
+      const startDate = new Date(subscription.start_date);
+      const endDate = new Date(subscription.end_date);
+      const totalDays = Math.ceil(
+        (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      const daysRemaining = Math.ceil(
+        (endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      refundRatio = daysRemaining > 0 && totalDays > 0 ? daysRemaining / totalDays : 0;
+    } else {
+      // Gói có giới hạn: tính theo số lượt còn lại
+      const remainingSwaps = subscription.remaining_swaps ?? 0;
+      refundRatio =
+        packageSwapLimit > 0 ? Math.min(remainingSwaps / packageSwapLimit, 1.0) : 0;
+    }
+
+    // ✅ Áp dụng phí hủy 3%
+    let refundAmount = originalAmount * refundRatio * 0.97;
+
+    // ✅ Làm tròn xuống
+    refundAmount = Math.floor(refundAmount);
+
+    // ✅ Minimum refund: 10,000 VND
+    refundAmount = Math.max(refundAmount, 10000);
+
+    // ✅ Kiểm tra refund amount hợp lệ
+    if (refundAmount <= 0 || refundAmount > originalAmount) {
+      throw new CustomError(
+        `Invalid refund amount calculated: ${refundAmount} (original: ${originalAmount}, ratio: ${refundRatio}). Please contact support.`,
+        500
       );
     }
 
@@ -230,32 +283,17 @@ export const cancelSubscription = asyncHandler(
       );
     }
 
-    const originalPayment = await prisma.payment.findFirst({
-      where: {
-        subscription_id: subscriptionId,
-        payment_type: PaymentType.SUBSCRIPTION,
-      },
-      orderBy: { created_at: "desc" },
-    });
-
-    if (!originalPayment) {
-      throw new CustomError(
-        "Original subscription payment not found. Contact support for assistance",
-        400
-      );
-    }
-
+    // originalPayment đã được lấy ở trên
     if (originalPayment.payment_status === PAYMENT_STATUS_REFUNDED) {
       throw new CustomError("Subscription has already been refunded", 400);
     }
 
-    const refundAmount = originalPayment.amount;
+    // refundAmount đã được tính ở trên (theo tỷ lệ, phí hủy 3%, minimum 10k)
+    const refundAmountDecimal = new Prisma.Decimal(refundAmount);
 
-    if (refundAmount.lte(0)) {
+    if (refundAmountDecimal.lte(0)) {
       throw new CustomError("Invalid refund amount", 500);
     }
-
-    const now = new Date();
 
     const result = await prisma.$transaction(async (tx) => {
       let wallet = await tx.wallet.findUnique({ where: { user_id: userId } });
@@ -272,7 +310,7 @@ export const cancelSubscription = asyncHandler(
       const updatedWallet = await tx.wallet.update({
         where: { user_id: userId },
         data: {
-          balance: wallet.balance.plus(refundAmount),
+          balance: wallet.balance.plus(refundAmountDecimal),
           updated_at: now,
         },
       });
@@ -292,7 +330,7 @@ export const cancelSubscription = asyncHandler(
         data: {
           subscription_id: subscription.subscription_id,
           user_id: userId,
-          amount: refundAmount,
+          amount: refundAmountDecimal,
           payment_method: "wallet",
           payment_status: PAYMENT_STATUS_COMPLETED,
           payment_type: PaymentType.PACKAGE_REFUND,
@@ -300,6 +338,11 @@ export const cancelSubscription = asyncHandler(
           metadata: {
             refund_reason: reason ?? "user_requested_cancellation",
             refunded_payment_id: originalPayment.payment_id,
+            original_amount: originalAmount,
+            refund_ratio: refundRatio,
+            cancellation_fee_percent: 3,
+            cancellation_fee_amount: originalAmount * refundRatio * 0.03,
+            minimum_refund_applied: refundAmount === 10000 && refundAmount < originalAmount * refundRatio * 0.97,
           },
         },
       });
@@ -330,6 +373,11 @@ export const cancelSubscription = asyncHandler(
         refund: {
           payment_id: result.refundPayment.payment_id,
           amount: Number(result.refundPayment.amount),
+          original_amount: originalAmount,
+          refund_ratio: refundRatio,
+          cancellation_fee_percent: 3,
+          cancellation_fee_amount: Math.floor(originalAmount * refundRatio * 0.03),
+          minimum_refund_applied: refundAmount === 10000 && refundAmount < originalAmount * refundRatio * 0.97,
           payment_type: result.refundPayment.payment_type,
         },
         wallet_balance: Number(result.walletBalanceAfter),
