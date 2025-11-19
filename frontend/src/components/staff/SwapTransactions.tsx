@@ -432,7 +432,9 @@ const SwapTransactions: React.FC = () => {
     try {
       // Lấy thông tin chi tiết booking để có vehicle.current_battery
       setLoadingBatteries(true);
+      console.log('[handleOpenCompleteDialog] Calling getBookingDetails with booking_id:', booking.booking_id);
       const bookingDetails = await getBookingDetails(booking.booking_id);
+      console.log('[handleOpenCompleteDialog] Booking details response:', bookingDetails);
       
       if (bookingDetails.success && bookingDetails.data) {
         const fullBooking = bookingDetails.data as any;
