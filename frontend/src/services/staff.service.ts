@@ -391,13 +391,17 @@ export async function getMyStaffSchedules(params?: {
   if (params?.from) qs.set("from", params.from);
   if (params?.to) qs.set("to", params.to);
   if (params?.status) qs.set("status", params.status);
+  // Backend expects string "true" or "false", not boolean
   if (params?.include_past !== undefined)
-    qs.set("include_past", String(params.include_past));
+    qs.set("include_past", params.include_past ? "true" : "false");
 
   const url = `${API_ENDPOINTS.STAFF.SCHEDULES}${
     qs.toString() ? `?${qs.toString()}` : ""
   }`;
+  
+  console.log('Fetching schedules from:', url);
   const res = await authFetch(url);
+  console.log('API response:', res);
   return res; // { success, message, data: schedules[] }
 }
 
