@@ -179,6 +179,7 @@ export const getStationBookings = asyncHandler(
               select: {
                 battery_id: true,
                 battery_code: true,
+                model: true,
                 status: true,
                 current_charge: true,
               },
@@ -304,6 +305,16 @@ export const getBookingDetails = asyncHandler(
             make: true,
             year: true,
             battery_model: true,
+            current_battery_id: true,
+            current_battery: {
+              select: {
+                battery_id: true,
+                battery_code: true,
+                model: true,
+                status: true,
+                current_charge: true,
+              },
+            },
           },
         },
         station: {
@@ -407,67 +418,46 @@ export const confirmBooking = asyncHandler(
       throw new CustomError("Booking cannot be confirmed", 400);
     }
 
-    // ✅ Verify SĐT
-    if (booking.user.phone !== phone) {
+    // ✅ Verify SĐT - Simple comparison (remove spaces and compare)
+    const normalizePhone = (phoneNum: string | null | undefined): string => {
+      if (!phoneNum) return "";
+      return String(phoneNum).trim().replace(/\s/g, "");
+    };
+
+    const normalizedInput = normalizePhone(phone);
+    const normalizedUser = normalizePhone(booking.user.phone);
+
+    if (!normalizedInput || !normalizedUser) {
+      throw new CustomError("Phone number is required for verification", 400);
+    }
+
+    if (normalizedUser !== normalizedInput) {
       throw new CustomError(
-        "Phone number does not match. Please verify again.",
+        `Số điện thoại không khớp. Số điện thoại đăng ký: ${booking.user.phone || "N/A"}, Số bạn nhập: ${phone}. Vui lòng kiểm tra lại.`,
         400
       );
     }
 
-    // Check if scheduled time has passed (or is_instant = true allows immediate)
+    // Check if scheduled time has passed
+    // Allow confirmation within 3 hours after scheduled time (for late arrivals)
     const scheduledTime = new Date(booking.scheduled_at);
     const now = new Date();
-    if (!booking.is_instant && scheduledTime < now) {
-      throw new CustomError("Scheduled time has already passed", 400);
-    }
+    const hoursAfterScheduled =
+      (now.getTime() - scheduledTime.getTime()) / (1000 * 60 * 60);
 
-    // Re-check available batteries at scheduled time before confirming
-    const confirmedBookingsAtTime = await prisma.booking.count({
-      where: {
-        station_id: booking.station_id,
-        battery_model: booking.battery_model,
-        scheduled_at: {
-          gte: new Date(scheduledTime.getTime() - 30 * 60 * 1000),
-          lte: new Date(scheduledTime.getTime() + 30 * 60 * 1000),
-        },
-        status: { in: ["pending", "confirmed"] },
-        booking_id: { not: id },
-      },
-    });
-
-    const hoursUntilScheduled =
-      (scheduledTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-
-    const fullBatteries = await prisma.battery.count({
-      where: {
-        station_id: booking.station_id,
-        model: booking.battery_model,
-        status: "full",
-      },
-    });
-
-    const chargingBatteries =
-      hoursUntilScheduled >= 1
-        ? await prisma.battery.count({
-            where: {
-              station_id: booking.station_id,
-              model: booking.battery_model,
-              status: "charging",
-            },
-          })
-        : 0;
-
-    const totalAvailableBatteries = fullBatteries + chargingBatteries;
-    const availableBatteries =
-      totalAvailableBatteries - confirmedBookingsAtTime;
-
-    if (availableBatteries <= 0) {
+    // For instant bookings, allow anytime
+    // For scheduled bookings, allow up to 3 hours after scheduled time
+    if (!booking.is_instant && hoursAfterScheduled > 3) {
       throw new CustomError(
-        `No batteries available at scheduled time. Please ask user to reschedule.`,
+        `Scheduled time has already passed more than 3 hours. Please contact admin if customer arrived late.`,
         400
       );
     }
+
+    // ✅ Không cần check availability khi confirm
+    // - Nếu booking có locked_battery_id: pin đã được lock khi tạo booking
+    // - Nếu booking không có locked_battery_id: staff sẽ chọn pin khi complete
+    // Việc check availability đã được làm khi tạo booking rồi
 
     // ✅ Không tạo PIN code nữa
     const updatedBooking = await prisma.booking.update({

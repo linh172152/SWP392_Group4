@@ -25,7 +25,7 @@ import {
   XCircle,
   AlertCircle,
   Search,
-  Download,
+  RefreshCw,
   ChevronLeft,
   ChevronRight,
   FileText,
@@ -33,6 +33,16 @@ import {
   Zap,
   Battery,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
 import API_ENDPOINTS, { fetchWithAuth } from "../../config/api";
 import { BatterySpinner, BatteryLoading } from "../ui/battery-loading";
 import { ErrorDisplay } from "../ui/error-display";
@@ -118,6 +128,11 @@ const BookingHistory: React.FC = () => {
   const [activeSubscription, setActiveSubscription] = useState<any | null>(
     null
   );
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [bookingToCancel, setBookingToCancel] = useState<BookingItem | null>(
+    null
+  );
+  const [cancelConfirmMessage, setCancelConfirmMessage] = useState("");
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -428,7 +443,7 @@ const BookingHistory: React.FC = () => {
     return { canCancel: true, minutesUntilScheduled };
   };
 
-  const cancelBooking = async (id: string) => {
+  const handleOpenCancelDialog = (id: string) => {
     // Tìm booking để check thời gian
     const booking = bookings.find((b) => b.booking_id === id);
     if (!booking) {
@@ -443,7 +458,7 @@ const BookingHistory: React.FC = () => {
       return;
     }
 
-    // Xác nhận trước khi hủy
+    // Tạo message xác nhận
     const confirmMessage =
       cancelCheck.minutesUntilScheduled &&
       cancelCheck.minutesUntilScheduled < 30
@@ -452,15 +467,21 @@ const BookingHistory: React.FC = () => {
           )} phút nữa đến giờ hẹn.`
         : "Bạn có chắc muốn hủy đặt chỗ này?";
 
-    if (!window.confirm(confirmMessage)) {
-      return;
-    }
+    setBookingToCancel(booking);
+    setCancelConfirmMessage(confirmMessage);
+    setCancelDialogOpen(true);
+  };
+
+  const cancelBooking = async () => {
+    if (!bookingToCancel) return;
 
     setLoading(true);
     setError("");
+    setCancelDialogOpen(false);
+
     try {
       const res = await fetchWithAuth(
-        `${API_ENDPOINTS.DRIVER.BOOKINGS}/${id}/cancel`,
+        `${API_ENDPOINTS.DRIVER.BOOKINGS}/${bookingToCancel.booking_id}/cancel`,
         { method: "PUT" }
       );
       const data = await res.json();
@@ -493,7 +514,8 @@ const BookingHistory: React.FC = () => {
 
       // Success
       await loadBookings();
-      // Có thể thêm toast notification ở đây nếu cần
+      setBookingToCancel(null);
+      setCancelConfirmMessage("");
     } catch (e: any) {
       setError(e.message || "Có lỗi xảy ra khi hủy đặt chỗ");
     } finally {
@@ -808,7 +830,7 @@ const BookingHistory: React.FC = () => {
           {loading ? (
             <BatteryLoading size="sm" variant="rotate" className="mr-2" />
           ) : (
-            <Download className="mr-2 h-4 w-4" />
+            <RefreshCw className="mr-2 h-4 w-4" />
           )}
           <span>Làm mới</span>
         </Button>
@@ -1187,7 +1209,9 @@ const BookingHistory: React.FC = () => {
                                   ? "opacity-50 cursor-not-allowed"
                                   : ""
                               }`}
-                              onClick={() => cancelBooking(booking.booking_id)}
+                              onClick={() =>
+                                handleOpenCancelDialog(booking.booking_id)
+                              }
                               disabled={isDisabled}
                               title={cancelCheck.reason}
                             >
@@ -1287,6 +1311,31 @@ const BookingHistory: React.FC = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Cancel Booking Confirmation Dialog */}
+      <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-orange-600" />
+              Xác nhận hủy đặt chỗ
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {cancelConfirmMessage || "Bạn có chắc muốn hủy đặt chỗ này?"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loading}>Hủy</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={cancelBooking}
+              disabled={loading}
+              className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
+            >
+              {loading ? "Đang xử lý..." : "Xác nhận hủy"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

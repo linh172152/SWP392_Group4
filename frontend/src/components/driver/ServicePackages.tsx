@@ -188,8 +188,12 @@ const ServicePackages: React.FC = () => {
       await loadCurrentSubscription();
       await loadPackages();
       setError("");
-      // Hiển thị thông báo thành công (có thể dùng toast notification)
-      alert("Đăng ký gói dịch vụ thành công!");
+      // Hiển thị thông báo thành công
+      toast({
+        title: "Đăng ký thành công!",
+        description: "Bạn đã đăng ký gói dịch vụ thành công.",
+        variant: "default",
+      });
     } catch (e: any) {
       // Xử lý error "Insufficient wallet balance" từ catch block
       const errorMsg = e.message || "Có lỗi xảy ra";
@@ -620,7 +624,7 @@ const ServicePackages: React.FC = () => {
             </DialogDescription>
           </DialogHeader>
 
-          {refundInfo && (
+          {refundInfo ? (
             <div className="space-y-4 py-4">
               <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg space-y-3">
                 <h3 className="font-semibold flex items-center gap-2 text-blue-900 dark:text-blue-100">
@@ -677,9 +681,17 @@ const ServicePackages: React.FC = () => {
                 💡 Số tiền sẽ được hoàn vào ví của bạn sau khi hủy gói.
               </div>
             </div>
+          ) : (
+            <div className="py-4">
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                <p className="text-sm text-amber-800 dark:text-amber-200">
+                  ⚠️ Đang tính toán thông tin hoàn tiền...
+                </p>
+              </div>
+            </div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="flex flex-col sm:flex-row gap-2">
             <Button
               variant="outline"
               onClick={() => {
@@ -688,6 +700,7 @@ const ServicePackages: React.FC = () => {
                 setRefundInfo(null);
               }}
               disabled={cancelling}
+              className="w-full sm:w-auto"
             >
               Hủy
             </Button>
@@ -695,8 +708,16 @@ const ServicePackages: React.FC = () => {
               variant="destructive"
               onClick={cancelSubscription}
               disabled={cancelling || !refundInfo}
+              className="w-full sm:w-auto bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
             >
-              {cancelling ? "Đang xử lý..." : "Xác nhận hủy"}
+              {cancelling ? (
+                <>
+                  <span className="mr-2">⏳</span>
+                  Đang xử lý...
+                </>
+              ) : (
+                "Xác nhận hủy"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

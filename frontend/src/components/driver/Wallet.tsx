@@ -1,20 +1,31 @@
-import React, { useState, useEffect } from 'react';
-import { Button } from '../ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Badge } from '../ui/badge';
-import { 
-  Wallet as WalletIcon, 
-  Plus, 
-  ArrowUpRight, 
+import React, { useState, useEffect } from "react";
+import { Button } from "../ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../ui/card";
+import { Badge } from "../ui/badge";
+import {
+  Wallet as WalletIcon,
+  Plus,
+  ArrowUpRight,
   ArrowDownLeft,
   RefreshCw,
   History,
-  Loader2
-} from 'lucide-react';
-import walletService, { type WalletTransaction } from '../../services/wallet.service';
-import { getTopUpPackages, type TopUpPackage } from '../../services/topup-package.service';
-import TopUpModal from './TopUpModal';
-import { formatCurrency } from '../../utils/format';
+  Loader2,
+} from "lucide-react";
+import walletService, {
+  type WalletTransaction,
+} from "../../services/wallet.service";
+import {
+  getTopUpPackages,
+  type TopUpPackage,
+} from "../../services/topup-package.service";
+import TopUpModal from "./TopUpModal";
+import { formatCurrency } from "../../utils/format";
 
 const Wallet: React.FC = () => {
   const [balance, setBalance] = useState<number>(0);
@@ -32,7 +43,7 @@ const Wallet: React.FC = () => {
       const response = await walletService.getWalletBalance();
       setBalance(Number(response.data.balance));
     } catch (error) {
-      console.error('Error loading wallet balance:', error);
+      console.error("Error loading wallet balance:", error);
     } finally {
       setLoading(false);
     }
@@ -42,12 +53,15 @@ const Wallet: React.FC = () => {
   const loadTransactions = async (pageNum: number = 1) => {
     setTransactionsLoading(true);
     try {
-      const response = await walletService.getWalletTransactions({ page: pageNum, limit: 10 });
+      const response = await walletService.getWalletTransactions({
+        page: pageNum,
+        limit: 10,
+      });
       setTransactions(response.data.transactions);
       setTotalPages(response.data.pagination.pages);
       setPage(pageNum);
     } catch (error) {
-      console.error('Error loading transactions:', error);
+      console.error("Error loading transactions:", error);
     } finally {
       setTransactionsLoading(false);
     }
@@ -57,10 +71,14 @@ const Wallet: React.FC = () => {
   const loadTopUpPackages = async () => {
     try {
       // Use driver endpoint to get topup packages
-      const response = await getTopUpPackages({ is_active: true, limit: 100, forDriver: true });
+      const response = await getTopUpPackages({
+        is_active: true,
+        limit: 100,
+        forDriver: true,
+      });
       setTopUpPackages(response.data.packages);
     } catch (error) {
-      console.error('Error loading topup packages:', error);
+      console.error("Error loading topup packages:", error);
     }
   };
 
@@ -77,31 +95,43 @@ const Wallet: React.FC = () => {
   };
 
   const getTransactionType = (transaction: WalletTransaction) => {
+    // Hoàn tiền (refund) - tiền được cộng vào ví
+    if (
+      transaction.payment_type === "PACKAGE_REFUND" ||
+      transaction.payment_type === "package_refund" ||
+      transaction.payment_type?.toLowerCase().includes("refund")
+    ) {
+      return "refund";
+    }
+    // Nạp tiền - tiền được cộng vào ví
     if (transaction.topup_package_id) {
-      return 'topup';
+      return "topup";
     }
+    // Thanh toán - tiền bị trừ khỏi ví
     if (transaction.transaction_id) {
-      return 'payment';
+      return "payment";
     }
-    return 'other';
+    return "other";
   };
 
   const getTransactionIcon = (transaction: WalletTransaction) => {
     const type = getTransactionType(transaction);
-    if (type === 'topup') {
-      return <ArrowDownLeft className="h-4 w-4 text-green-600 dark:text-green-400" />;
+    if (type === "topup" || type === "refund") {
+      return (
+        <ArrowDownLeft className="h-4 w-4 text-green-600 dark:text-green-400" />
+      );
     }
     return <ArrowUpRight className="h-4 w-4 text-red-600 dark:text-red-400" />;
   };
 
   const getTransactionLabel = (transaction: WalletTransaction) => {
     const type = getTransactionType(transaction);
-    
+
     // Nạp tiền
-    if (type === 'topup') {
-      return `Nạp tiền: ${transaction.topup_package?.name || 'Nạp tiền'}`;
+    if (type === "topup") {
+      return `Nạp tiền: ${transaction.topup_package?.name || "Nạp tiền"}`;
     }
-    
+
     // Thanh toán đổi pin
     if (transaction.transaction_id) {
       // Có thông tin booking và station
@@ -113,38 +143,40 @@ const Wallet: React.FC = () => {
         return `Thanh toán đổi pin - ${transaction.transaction.transaction_code}`;
       }
       // Chỉ có transaction_id
-      return 'Thanh toán đổi pin';
+      return "Thanh toán đổi pin";
     }
-    
+
     // Thanh toán bằng gói subscription
     if (transaction.subscription_id) {
-      const packageName = transaction.subscription?.package?.name || 'Gói đăng ký';
+      const packageName =
+        transaction.subscription?.package?.name || "Gói đăng ký";
       return `Thanh toán bằng gói: ${packageName}`;
     }
-    
+
     // Trường hợp khác - hiển thị payment_type nếu có
     if (transaction.payment_type) {
       const paymentTypeLabels: Record<string, string> = {
-        'topup': 'Nạp tiền',
-        'wallet_topup': 'Nạp tiền',
-        'booking': 'Thanh toán đổi pin',
-        'battery_swap': 'Thanh toán đổi pin',
-        'swap': 'Thanh toán đổi pin',
-        'subscription': 'Thanh toán gói đăng ký',
-        'package_payment': 'Thanh toán gói đăng ký',
-        'refund': 'Hoàn tiền',
-        'wallet_refund': 'Hoàn tiền',
+        topup: "Nạp tiền",
+        wallet_topup: "Nạp tiền",
+        booking: "Thanh toán đổi pin",
+        battery_swap: "Thanh toán đổi pin",
+        swap: "Thanh toán đổi pin",
+        subscription: "Thanh toán gói đăng ký",
+        package_payment: "Thanh toán gói đăng ký",
+        refund: "Hoàn tiền",
+        wallet_refund: "Hoàn tiền",
       };
       // Luôn dịch sang tiếng Việt, không hiển thị thuật ngữ tiếng Anh
-      const translatedLabel = paymentTypeLabels[transaction.payment_type.toLowerCase()];
+      const translatedLabel =
+        paymentTypeLabels[transaction.payment_type.toLowerCase()];
       if (translatedLabel) {
         return translatedLabel;
       }
       // Nếu không tìm thấy trong danh sách, vẫn dịch chung chung
-      return 'Giao dịch';
+      return "Giao dịch";
     }
-    
-    return 'Giao dịch khác';
+
+    return "Giao dịch khác";
   };
 
   return (
@@ -226,9 +258,9 @@ const Wallet: React.FC = () => {
             <div className="space-y-4">
               {transactions.map((transaction) => {
                 const type = getTransactionType(transaction);
-                const isTopUp = type === 'topup';
+                const isIncome = type === "topup" || type === "refund"; // Nạp tiền hoặc hoàn tiền = tiền vào
                 const amount = Number(transaction.amount);
-                
+
                 return (
                   <div
                     key={transaction.payment_id}
@@ -243,33 +275,35 @@ const Wallet: React.FC = () => {
                           {getTransactionLabel(transaction)}
                         </div>
                         <div className="text-sm text-slate-500 dark:text-slate-400">
-                          {new Date(transaction.created_at).toLocaleString('vi-VN')}
+                          {new Date(transaction.created_at).toLocaleString(
+                            "vi-VN"
+                          )}
                         </div>
                         <div className="flex items-center gap-2 mt-1">
                           <Badge
                             variant={
-                              transaction.payment_status === 'completed'
-                                ? 'default'
-                                : transaction.payment_status === 'pending'
-                                ? 'secondary'
-                                : 'destructive'
+                              transaction.payment_status === "completed"
+                                ? "default"
+                                : transaction.payment_status === "pending"
+                                ? "secondary"
+                                : "destructive"
                             }
                             className="text-xs"
                           >
-                            {transaction.payment_status === 'completed'
-                              ? 'Hoàn thành'
-                              : transaction.payment_status === 'pending'
-                              ? 'Đang xử lý'
-                              : 'Thất bại'}
+                            {transaction.payment_status === "completed"
+                              ? "Hoàn thành"
+                              : transaction.payment_status === "pending"
+                              ? "Đang xử lý"
+                              : "Thất bại"}
                           </Badge>
                           {transaction.payment_method && (
                             <Badge variant="outline" className="text-xs">
-                              {transaction.payment_method === 'cash'
-                                ? 'Tiền mặt'
-                                : transaction.payment_method === 'vnpay'
-                                ? 'VNPay'
-                                : transaction.payment_method === 'momo'
-                                ? 'MoMo'
+                              {transaction.payment_method === "cash"
+                                ? "Tiền mặt"
+                                : transaction.payment_method === "vnpay"
+                                ? "VNPay"
+                                : transaction.payment_method === "momo"
+                                ? "MoMo"
                                 : transaction.payment_method}
                             </Badge>
                           )}
@@ -279,12 +313,12 @@ const Wallet: React.FC = () => {
                     <div className="text-right">
                       <div
                         className={`text-lg font-bold ${
-                          isTopUp
-                            ? 'text-green-600 dark:text-green-400'
-                            : 'text-red-600 dark:text-red-400'
+                          isIncome
+                            ? "text-green-600 dark:text-green-400"
+                            : "text-red-600 dark:text-red-400"
                         }`}
                       >
-                        {isTopUp ? '+' : '-'}
+                        {isIncome ? "+" : "-"}
                         {formatCurrency(amount)}
                       </div>
                     </div>
@@ -335,4 +369,3 @@ const Wallet: React.FC = () => {
 };
 
 export default Wallet;
-
