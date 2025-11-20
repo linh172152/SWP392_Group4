@@ -1,12 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '../ui/card';
-import { Button } from '../ui/button';
+} from "../ui/card";
+import { Button } from "../ui/button";
 import {
   Dialog,
   DialogContent,
@@ -14,7 +14,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '../ui/dialog';
+} from "../ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,26 +24,35 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '../ui/alert-dialog';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
+} from "../ui/alert-dialog";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../ui/select';
-import { toast } from 'sonner';
-import { TrashIcon, UserPlusIcon, Search, Filter, Users, UserCheck, UserX, Shield } from 'lucide-react';
+} from "../ui/select";
+import { toast } from "sonner";
+import {
+  TrashIcon,
+  UserPlusIcon,
+  Search,
+  Filter,
+  Users,
+  UserCheck,
+  UserX,
+  Shield,
+} from "lucide-react";
 import {
   getAllUsers,
   createUser,
   updateUserStatus,
   updateUserRole,
   deleteUser,
-} from '../../services/admin.service';
-import type { AdminUser } from '../../services/admin.service';
+} from "../../services/admin.service";
+import type { AdminUser } from "../../services/admin.service";
 
 interface CreateUserModalProps {
   isOpen: boolean;
@@ -62,123 +71,134 @@ const CreateUserModal = ({
   onClose,
   onSubmit,
 }: CreateUserModalProps) => {
-  const [email, setEmail] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [password, setPassword] = useState('');
-  const [phone, setPhone] = useState('');
-  const [role, setRole] = useState('STAFF');
+  const [email, setEmail] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
+  const [role, setRole] = useState("STAFF");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const emailValid = /\S+@\S+\.\S+/.test(email);
-    if (!emailValid) return toast.error('Email không hợp lệ');
+    if (!emailValid) return toast.error("Email không hợp lệ");
     if (password.length < 6)
-      return toast.error('Mật khẩu phải có ít nhất 6 ký tự');
+      return toast.error("Mật khẩu phải có ít nhất 6 ký tự");
     if (fullName.trim().length < 2)
-      return toast.error('Họ và tên phải có ít nhất 2 ký tự');
+      return toast.error("Họ và tên phải có ít nhất 2 ký tự");
 
-    const digits = phone.replace(/\D/g, '');
+    const digits = phone.replace(/\D/g, "");
     if (digits.length < 10 || digits.length > 15)
-      return toast.error('Số điện thoại phải có từ 10 đến 15 chữ số');
+      return toast.error("Số điện thoại phải có từ 10 đến 15 chữ số");
 
     onSubmit({ email, fullName, password, role, phone });
-    setEmail('');
-    setFullName('');
-    setPassword('');
-    setPhone('');
-    setRole('STAFF');
+    setEmail("");
+    setFullName("");
+    setPassword("");
+    setPhone("");
+    setRole("STAFF");
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-  <DialogContent className="sm:max-w-lg rounded-2xl shadow-2xl bg-white p-6">
-    <DialogHeader className="space-y-2 border-b pb-3">
-      <DialogTitle className="text-2xl font-semibold text-gray-900">
-        ✨ Thêm người dùng mới
-      </DialogTitle>
-      <DialogDescription className="text-gray-600">
-        Điền thông tin chi tiết để tạo người dùng mới trong hệ thống.
-      </DialogDescription>
-    </DialogHeader>
+      <DialogContent className="sm:max-w-lg rounded-2xl shadow-2xl bg-white p-6">
+        <DialogHeader className="space-y-2 border-b pb-3">
+          <DialogTitle className="text-2xl font-semibold text-gray-900">
+            ✨ Thêm người dùng mới
+          </DialogTitle>
+          <DialogDescription className="text-gray-600">
+            Điền thông tin chi tiết để tạo người dùng mới trong hệ thống.
+          </DialogDescription>
+        </DialogHeader>
 
-    <form onSubmit={handleSubmit} className="mt-5 space-y-5">
-      <div className="space-y-2">
-        <Label className="font-medium text-gray-700">Email</Label>
-        <Input
-          placeholder="example@gmail.com"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          className="border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label className="font-medium text-gray-700">Họ và tên</Label>
-        <Input
-          placeholder="Nguyễn Văn A"
-          value={fullName}
-          onChange={(e) => setFullName(e.target.value)}
-          required
-          className="border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label className="font-medium text-gray-700">Mật khẩu</Label>
-        <Input
-          placeholder="Tối thiểu 6 ký tự"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          className="border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label className="font-medium text-gray-700">Số điện thoại</Label>
-        <Input
-          placeholder="84901234567"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          required
-          className="border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-        />
-      </div>
-
-        <div className="space-y-2">
-        <Label className="font-medium text-gray-700">Vai trò</Label>
-        <Select value={role} onValueChange={setRole}>
-          <SelectTrigger className="border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
-            <SelectValue placeholder="Chọn vai trò" />
-          </SelectTrigger>
-          <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
-            <SelectItem value="ADMIN" className="hover:bg-red-50 cursor-pointer">Admin</SelectItem>
-            <SelectItem value="STAFF" className="hover:bg-blue-50 cursor-pointer">Nhân viên</SelectItem>
-            <SelectItem value="DRIVER" className="hover:bg-green-50 cursor-pointer">Tài xế</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>      <DialogFooter className="mt-6 flex justify-end space-x-3 pt-4 border-t">
-        <Button
-          variant="outline"
-          onClick={onClose}
-          className="border-gray-300 hover:bg-gray-100 text-gray-700"
-        >
-          Hủy
-        </Button>
-        <Button
-          type="submit"
-          className="bg-blue-600 hover:bg-blue-700 text-white px-5"
-        >
-          Tạo người dùng
-        </Button>
-      </DialogFooter>
-    </form>
-  </DialogContent>
-</Dialog>
-
+        <form onSubmit={handleSubmit} className="mt-5 space-y-5">
+          <div className="space-y-2">
+            <Label className="font-medium text-gray-700">Email</Label>
+            <Input
+              placeholder="example@gmail.com"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="font-medium text-gray-700">Họ và tên</Label>
+            <Input
+              placeholder="Nguyễn Văn A"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              required
+              className="border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="font-medium text-gray-700">Mật khẩu</Label>
+            <Input
+              placeholder="Tối thiểu 6 ký tự"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="font-medium text-gray-700">Số điện thoại</Label>
+            <Input
+              placeholder="84901234567"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              required
+              className="border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="font-medium text-gray-700">Vai trò</Label>
+            <Select value={role} onValueChange={setRole}>
+              <SelectTrigger className="border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                <SelectValue placeholder="Chọn vai trò" />
+              </SelectTrigger>
+              <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
+                <SelectItem
+                  value="ADMIN"
+                  className="hover:bg-red-50 cursor-pointer"
+                >
+                  Admin
+                </SelectItem>
+                <SelectItem
+                  value="STAFF"
+                  className="hover:bg-blue-50 cursor-pointer"
+                >
+                  Nhân viên
+                </SelectItem>
+                <SelectItem
+                  value="DRIVER"
+                  className="hover:bg-green-50 cursor-pointer"
+                >
+                  Tài xế
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>{" "}
+          <DialogFooter className="mt-6 flex justify-end space-x-3 pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={onClose}
+              className="border-gray-300 hover:bg-gray-100 text-gray-700"
+            >
+              Hủy
+            </Button>
+            <Button
+              type="submit"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-5"
+            >
+              Tạo người dùng
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 };
 
@@ -188,20 +208,20 @@ const UserManagement: React.FC = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
-  
+
   // Filter states
-  const [searchTerm, setSearchTerm] = useState('');
-  const [roleFilter, setRoleFilter] = useState('ALL');
-  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [roleFilter, setRoleFilter] = useState("ALL");
+  const [statusFilter, setStatusFilter] = useState("ALL");
 
   const fetchUsers = async () => {
     setLoading(true);
     try {
       const res = await getAllUsers({ page: 1, limit: 50 });
       if (res.success) setUsers(res.data?.users || []);
-      else throw new Error(res.message || 'Không thể tải danh sách người dùng');
+      else throw new Error(res.message || "Không thể tải danh sách người dùng");
     } catch (err: any) {
-      toast.error(err.message || 'Lỗi khi tải người dùng');
+      toast.error(err.message || "Lỗi khi tải người dùng");
     } finally {
       setLoading(false);
     }
@@ -212,14 +232,16 @@ const UserManagement: React.FC = () => {
   }, []);
 
   // Filter users based on search term, role, and status
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = !searchTerm || 
+  const filteredUsers = users.filter((user) => {
+    const matchesSearch =
+      !searchTerm ||
       user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesRole = roleFilter === 'ALL' || user.role === roleFilter;
-    const matchesStatus = statusFilter === 'ALL' || user.status === statusFilter;
-    
+
+    const matchesRole = roleFilter === "ALL" || user.role === roleFilter;
+    const matchesStatus =
+      statusFilter === "ALL" || user.status === statusFilter;
+
     return matchesSearch && matchesRole && matchesStatus;
   });
 
@@ -240,14 +262,14 @@ const UserManagement: React.FC = () => {
       };
       const res = await createUser(payload);
       if (res.success) {
-        toast.success('Tạo người dùng thành công');
+        toast.success("Tạo người dùng thành công");
         setIsCreateModalOpen(false);
         fetchUsers();
       } else {
-        throw new Error(res.message || 'Tạo người dùng thất bại');
+        throw new Error(res.message || "Tạo người dùng thất bại");
       }
     } catch (error: any) {
-      toast.error(error.message || 'Lỗi khi tạo người dùng');
+      toast.error(error.message || "Lỗi khi tạo người dùng");
     }
   };
 
@@ -255,11 +277,11 @@ const UserManagement: React.FC = () => {
     try {
       const res = await updateUserStatus(userId, status);
       if (res.success) {
-        toast.success('Cập nhật trạng thái thành công');
+        toast.success("Cập nhật trạng thái thành công");
         fetchUsers();
-      } else throw new Error(res.message || 'Cập nhật thất bại');
+      } else throw new Error(res.message || "Cập nhật thất bại");
     } catch (err: any) {
-      toast.error(err.message || 'Lỗi khi cập nhật trạng thái');
+      toast.error(err.message || "Lỗi khi cập nhật trạng thái");
     }
   };
 
@@ -267,11 +289,11 @@ const UserManagement: React.FC = () => {
     try {
       const res = await updateUserRole(userId, role);
       if (res.success) {
-        toast.success('Cập nhật vai trò thành công');
+        toast.success("Cập nhật vai trò thành công");
         fetchUsers();
-      } else throw new Error(res.message || 'Cập nhật vai trò thất bại');
+      } else throw new Error(res.message || "Cập nhật vai trò thất bại");
     } catch (err: any) {
-      toast.error(err.message || 'Lỗi khi cập nhật vai trò');
+      toast.error(err.message || "Lỗi khi cập nhật vai trò");
     }
   };
 
@@ -282,17 +304,17 @@ const UserManagement: React.FC = () => {
 
   const handleDeleteUser = async () => {
     if (!userToDelete) return;
-    
+
     setLoading(true);
     try {
       const res = await deleteUser(userToDelete);
       if (res.success) {
-        toast.success('Xóa người dùng thành công');
+        toast.success("Xóa người dùng thành công");
         fetchUsers();
         setUserToDelete(null);
-      } else throw new Error(res.message || 'Xóa thất bại');
+      } else throw new Error(res.message || "Xóa thất bại");
     } catch (err: any) {
-      toast.error(err.message || 'Lỗi khi xóa người dùng');
+      toast.error(err.message || "Lỗi khi xóa người dùng");
     } finally {
       setLoading(false);
       setDeleteDialogOpen(false);
@@ -304,7 +326,9 @@ const UserManagement: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Quản lý người dùng</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Quản lý người dùng
+          </h1>
           <p className="text-muted-foreground">
             Quản lý danh sách và quyền của người dùng trong hệ thống.
           </p>
@@ -321,46 +345,58 @@ const UserManagement: React.FC = () => {
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-blue-700">
               Tổng người dùng
-              {(searchTerm || roleFilter !== 'ALL' || statusFilter !== 'ALL') && (
-                <span className="text-xs text-blue-600 block">({filteredUsers.length} kết quả)</span>
+              {(searchTerm ||
+                roleFilter !== "ALL" ||
+                statusFilter !== "ALL") && (
+                <span className="text-xs text-blue-600 block">
+                  ({filteredUsers.length} kết quả)
+                </span>
               )}
             </CardTitle>
             <Users className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-800">{users.length}</div>
+            <div className="text-2xl font-bold text-blue-800">
+              {users.length}
+            </div>
           </CardContent>
         </Card>
         <Card className="bg-gradient-to-r from-green-50 to-emerald-100 border-green-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-green-700">Đang hoạt động</CardTitle>
+            <CardTitle className="text-sm font-medium text-green-700">
+              Đang hoạt động
+            </CardTitle>
             <UserCheck className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-700">
-              {users.filter(u => u.status === 'ACTIVE').length}
+              {users.filter((u) => u.status === "ACTIVE").length}
             </div>
           </CardContent>
         </Card>
         <Card className="bg-gradient-to-r from-amber-50 to-yellow-100 border-amber-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-amber-700">Admin</CardTitle>
+            <CardTitle className="text-sm font-medium text-amber-700">
+              Admin
+            </CardTitle>
             <Shield className="h-4 w-4 text-amber-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-amber-800">
-              {users.filter(u => u.role === 'ADMIN').length}
+              {users.filter((u) => u.role === "ADMIN").length}
             </div>
           </CardContent>
         </Card>
         <Card className="bg-gradient-to-r from-red-50 to-rose-100 border-red-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-red-700">Không hoạt động</CardTitle>
+            <CardTitle className="text-sm font-medium text-red-700">
+              Không hoạt động
+            </CardTitle>
             <UserX className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-700">
-              {users.filter(u => u.status === 'INACTIVE').length}
+              {users.filter((u) => u.status === "INACTIVE").length}
             </div>
           </CardContent>
         </Card>
@@ -398,10 +434,30 @@ const UserManagement: React.FC = () => {
                   <SelectValue placeholder="Chọn vai trò" />
                 </SelectTrigger>
                 <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
-                  <SelectItem value="ALL" className="hover:bg-gray-50 cursor-pointer">Tất cả vai trò</SelectItem>
-                  <SelectItem value="ADMIN" className="hover:bg-red-50 cursor-pointer">Admin</SelectItem>
-                  <SelectItem value="STAFF" className="hover:bg-blue-50 cursor-pointer">Nhân viên</SelectItem>
-                  <SelectItem value="DRIVER" className="hover:bg-green-50 cursor-pointer">Tài xế</SelectItem>
+                  <SelectItem
+                    value="ALL"
+                    className="hover:bg-gray-50 cursor-pointer"
+                  >
+                    Tất cả vai trò
+                  </SelectItem>
+                  <SelectItem
+                    value="ADMIN"
+                    className="hover:bg-red-50 cursor-pointer"
+                  >
+                    Admin
+                  </SelectItem>
+                  <SelectItem
+                    value="STAFF"
+                    className="hover:bg-blue-50 cursor-pointer"
+                  >
+                    Nhân viên
+                  </SelectItem>
+                  <SelectItem
+                    value="DRIVER"
+                    className="hover:bg-green-50 cursor-pointer"
+                  >
+                    Tài xế
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -414,14 +470,25 @@ const UserManagement: React.FC = () => {
                   <SelectValue placeholder="Chọn trạng thái" />
                 </SelectTrigger>
                 <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
-                  <SelectItem value="ALL" className="hover:bg-gray-50 cursor-pointer">Tất cả trạng thái</SelectItem>
-                  <SelectItem value="ACTIVE" className="hover:bg-green-50 cursor-pointer">
+                  <SelectItem
+                    value="ALL"
+                    className="hover:bg-gray-50 cursor-pointer"
+                  >
+                    Tất cả trạng thái
+                  </SelectItem>
+                  <SelectItem
+                    value="ACTIVE"
+                    className="hover:bg-green-50 cursor-pointer"
+                  >
                     <div className="flex items-center gap-2">
                       <UserCheck className="h-4 w-4 text-green-600" />
                       Đang hoạt động
                     </div>
                   </SelectItem>
-                  <SelectItem value="INACTIVE" className="hover:bg-red-50 cursor-pointer">
+                  <SelectItem
+                    value="INACTIVE"
+                    className="hover:bg-red-50 cursor-pointer"
+                  >
                     <div className="flex items-center gap-2">
                       <UserX className="h-4 w-4 text-red-600" />
                       Không hoạt động
@@ -444,7 +511,9 @@ const UserManagement: React.FC = () => {
           {loading ? (
             <div className="flex flex-col justify-center items-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600 mb-4"></div>
-              <p className="text-gray-600 animate-pulse">Đang tải danh sách người dùng...</p>
+              <p className="text-gray-600 animate-pulse">
+                Đang tải danh sách người dùng...
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -467,7 +536,7 @@ const UserManagement: React.FC = () => {
                     >
                       <td className="p-3">{u.full_name}</td>
                       <td className="p-3">{u.email}</td>
-                      <td className="p-3">{u.phone || '—'}</td>
+                      <td className="p-3">{u.phone || "—"}</td>
                       <td className="p-3">
                         <Select
                           value={u.role}
@@ -505,7 +574,7 @@ const UserManagement: React.FC = () => {
                       </td>
                       <td className="p-3">
                         <Select
-                          value={u.status || 'INACTIVE'}
+                          value={u.status || "INACTIVE"}
                           onValueChange={(newStatus) =>
                             handleUpdateStatus(u.user_id, newStatus)
                           }
@@ -569,7 +638,8 @@ const UserManagement: React.FC = () => {
               Xác nhận xóa người dùng
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Bạn có chắc chắn muốn xóa người dùng này? Hành động này không thể hoàn tác.
+              Bạn có chắc chắn muốn xóa người dùng này? Hành động này không thể
+              hoàn tác.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
