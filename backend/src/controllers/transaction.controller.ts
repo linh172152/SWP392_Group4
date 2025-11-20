@@ -19,7 +19,7 @@ export const getUserTransactions = asyncHandler(
     }
 
     const whereClause: any = { user_id: userId };
-    if (status) {
+    if (status && status !== "all" && status !== "undefined") {
       whereClause.payment_status = status;
     }
 
@@ -85,7 +85,7 @@ export const getUserTransactions = asyncHandler(
           },
         },
       },
-      orderBy: { created_at: "desc" },
+      orderBy: { swap_at: "desc" },
       skip,
       take: parseInt(limit as string),
     });
