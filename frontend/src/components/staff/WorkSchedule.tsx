@@ -15,16 +15,19 @@ import {
   RefreshCw,
   Loader2,
   Filter,
-  X
+  X,
+  Edit2
 } from 'lucide-react';
-import { getMyStaffSchedules, StaffSchedule } from '../../services/staff.service';
+import { getMyStaffSchedules, updateScheduleStatus, StaffSchedule } from '../../services/staff.service';
 import { useToast } from '../../hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Textarea } from '../ui/textarea';
 
 const WorkSchedule: React.FC = () => {
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [schedules, setSchedules] = useState<StaffSchedule[]>([]);
   const [allSchedules, setAllSchedules] = useState<StaffSchedule[]>([]); // Store all schedules for calendar highlighting
   const [loading, setLoading] = useState(true);
@@ -34,7 +37,14 @@ const WorkSchedule: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
-  const [includePast, setIncludePast] = useState(false);
+  const [includePast, setIncludePast] = useState(true); // Mặc định hiển thị cả lịch quá khứ
+  
+  // Update status dialog states
+  const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
+  const [selectedSchedule, setSelectedSchedule] = useState<StaffSchedule | null>(null);
+  const [newStatus, setNewStatus] = useState<'completed' | 'absent' | 'cancelled'>('completed');
+  const [updateNotes, setUpdateNotes] = useState<string>('');
+  const [updating, setUpdating] = useState(false);
   
   const { toast } = useToast();
 
@@ -98,12 +108,12 @@ const WorkSchedule: React.FC = () => {
   useEffect(() => {
     loadSchedules();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [includePast]);
+  }, []); // Load once on mount, always load all schedules
 
   useEffect(() => {
     applyFilters();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter, dateFrom, dateTo, allSchedules]);
+  }, [statusFilter, dateFrom, dateTo, allSchedules, selectedDate]);
 
   const loadSchedules = async () => {
     try {
@@ -112,28 +122,57 @@ const WorkSchedule: React.FC = () => {
       
       // Load all schedules for calendar highlighting
       // We load all and filter client-side to ensure calendar highlighting works correctly
+      // Mặc định load tất cả lịch (cả quá khứ) để hiển thị ngay
       const params: {
         include_past?: boolean;
       } = {
-        include_past: includePast,
+        include_past: true, // Luôn load tất cả lịch để hiển thị ngay
       };
       
+      console.log('Loading schedules with params:', params);
       const response = await getMyStaffSchedules(params);
+      console.log('Schedule response:', response);
       
-      if (response.success && response.data) {
-        setAllSchedules(response.data);
-        applyFiltersToSchedules(response.data);
+      if (response && response.success) {
+        // Handle both array and non-array responses
+        const schedulesData = Array.isArray(response.data) ? response.data : (response.data || []);
+        console.log('Schedules data received:', schedulesData.length, 'schedules');
+        
+        if (schedulesData.length > 0) {
+          console.log('Sample schedule:', schedulesData[0]);
+          console.log('All schedules:', schedulesData);
+        } else {
+          console.warn('⚠️ No schedules found. Possible reasons:');
+          console.warn('  1. Staff has no schedules assigned');
+          console.warn('  2. All schedules have ended (shift_end < now)');
+          console.warn('  3. Try enabling "Bao gồm quá khứ" to see past schedules');
+          console.warn('  4. Admin needs to create schedules for this staff');
+        }
+        
+        // Always set allSchedules, even if empty
+        setAllSchedules(schedulesData);
+        
+        if (schedulesData.length > 0) {
+          // Apply filters to show schedules
+          applyFiltersToSchedules(schedulesData);
+        } else {
+          // No schedules found - this is not an error, just empty data
+          setSchedules([]);
+        }
       } else {
-        setError(response.message || 'Không thể tải lịch làm việc');
+        const errorMsg = response?.message || 'Không thể tải lịch làm việc';
+        setError(errorMsg);
+        console.error('Error loading schedules:', errorMsg, response);
         toast({
           title: 'Lỗi',
-          description: response.message || 'Không thể tải lịch làm việc',
+          description: errorMsg,
           variant: 'destructive',
         });
       }
     } catch (err: any) {
       const errorMessage = err.message || 'Đã xảy ra lỗi khi tải lịch làm việc';
       setError(errorMessage);
+      console.error('Exception loading schedules:', err);
       toast({
         title: 'Lỗi',
         description: errorMessage,
@@ -152,27 +191,40 @@ const WorkSchedule: React.FC = () => {
       filtered = filtered.filter(s => s.status === statusFilter);
     }
     
-    // Filter by date range (client-side)
-    if (dateFrom) {
-      const fromDate = new Date(dateFrom);
-      fromDate.setHours(0, 0, 0, 0);
+    // Filter by date range (client-side) - priority over selected date
+    if (dateFrom || dateTo) {
+      if (dateFrom) {
+        const fromDate = new Date(dateFrom);
+        fromDate.setHours(0, 0, 0, 0);
+        filtered = filtered.filter(s => {
+          const shiftDate = new Date(s.shift_start);
+          shiftDate.setHours(0, 0, 0, 0);
+          return shiftDate >= fromDate;
+        });
+      }
+      
+      if (dateTo) {
+        const toDate = new Date(dateTo);
+        toDate.setHours(23, 59, 59, 999);
+        filtered = filtered.filter(s => {
+          const shiftDate = new Date(s.shift_start);
+          shiftDate.setHours(0, 0, 0, 0);
+          return shiftDate <= toDate;
+        });
+      }
+    } else if (selectedDate) {
+      // Only filter by selected date if no date range is set AND a date is actually selected
+      const selected = new Date(selectedDate);
+      selected.setHours(0, 0, 0, 0);
       filtered = filtered.filter(s => {
-        const shiftDate = new Date(s.shift_start);
+        const shiftDate = new Date(s.shift_date || s.shift_start);
         shiftDate.setHours(0, 0, 0, 0);
-        return shiftDate >= fromDate;
+        return shiftDate.getTime() === selected.getTime();
       });
     }
+    // If no filters are applied, show all schedules
     
-    if (dateTo) {
-      const toDate = new Date(dateTo);
-      toDate.setHours(23, 59, 59, 999);
-      filtered = filtered.filter(s => {
-        const shiftDate = new Date(s.shift_start);
-        shiftDate.setHours(0, 0, 0, 0);
-        return shiftDate <= toDate;
-      });
-    }
-    
+    console.log('Applied filters - Total:', schedulesToFilter.length, 'Filtered:', filtered.length);
     setSchedules(filtered);
   };
 
@@ -186,7 +238,12 @@ const WorkSchedule: React.FC = () => {
     setStatusFilter('all');
     setDateFrom('');
     setDateTo('');
+    setSelectedDate(undefined);
     // Don't reset includePast here, let user control it
+    // Reapply filters after clearing
+    if (allSchedules.length > 0) {
+      applyFiltersToSchedules(allSchedules);
+    }
   };
 
   // Quick filter functions
@@ -242,6 +299,56 @@ const WorkSchedule: React.FC = () => {
         date.setHours(0, 0, 0, 0);
         return date;
       });
+  };
+
+  const handleOpenUpdateDialog = (schedule: StaffSchedule) => {
+    if (schedule.status !== 'scheduled') {
+      toast({
+        title: 'Thông báo',
+        description: 'Chỉ có thể cập nhật trạng thái cho các ca đã lên lịch',
+        variant: 'default',
+      });
+      return;
+    }
+    setSelectedSchedule(schedule);
+    setNewStatus('completed');
+    setUpdateNotes(schedule.notes || '');
+    setUpdateDialogOpen(true);
+  };
+
+  const handleUpdateStatus = async () => {
+    if (!selectedSchedule) return;
+
+    try {
+      setUpdating(true);
+      const response = await updateScheduleStatus(selectedSchedule.schedule_id, {
+        status: newStatus,
+        notes: updateNotes.trim() || undefined,
+      });
+
+      if (response.success) {
+        toast({
+          title: 'Thành công',
+          description: 'Đã cập nhật trạng thái lịch làm việc',
+          variant: 'default',
+        });
+        setUpdateDialogOpen(false);
+        setSelectedSchedule(null);
+        setUpdateNotes('');
+        // Reload schedules
+        await loadSchedules();
+      } else {
+        throw new Error(response.message || 'Không thể cập nhật trạng thái');
+      }
+    } catch (err: any) {
+      toast({
+        title: 'Lỗi',
+        description: err.message || 'Đã xảy ra lỗi khi cập nhật trạng thái',
+        variant: 'destructive',
+      });
+    } finally {
+      setUpdating(false);
+    }
   };
 
   const totalScheduled = schedules.filter(s => s.status === 'scheduled').length;
@@ -418,8 +525,8 @@ const WorkSchedule: React.FC = () => {
               />
             </div>
 
-            {/* Include Past */}
-            <div className="flex items-end">
+            {/* Include Past - Hidden since we always load all schedules now */}
+            {/* <div className="flex items-end">
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
@@ -435,7 +542,7 @@ const WorkSchedule: React.FC = () => {
                   Bao gồm quá khứ
                 </Label>
               </div>
-            </div>
+            </div> */}
 
             {/* Clear Filters */}
             {(statusFilter !== 'all' || dateFrom || dateTo) && (
@@ -477,7 +584,15 @@ const WorkSchedule: React.FC = () => {
             <Calendar
               mode="single"
               selected={selectedDate}
-              onSelect={setSelectedDate}
+              onSelect={(date) => {
+                setSelectedDate(date);
+                // Apply filter immediately when date is selected or deselected
+                if (allSchedules.length > 0) {
+                  setTimeout(() => {
+                    applyFiltersToSchedules(allSchedules);
+                  }, 100);
+                }
+              }}
               className="rounded-md border-0"
               modifiers={{
                 hasScheduled: getDatesByStatus('scheduled'),
@@ -518,7 +633,34 @@ const WorkSchedule: React.FC = () => {
             ) : schedules.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <CalendarIcon className="h-12 w-12 text-slate-400 mb-4" />
-                <p className="text-slate-600 dark:text-slate-400">Chưa có lịch làm việc nào</p>
+                {allSchedules.length === 0 ? (
+                  <>
+                    <p className="text-slate-600 dark:text-slate-400 mb-2 font-medium">
+                      Chưa có lịch làm việc nào
+                    </p>
+                    <p className="text-sm text-slate-500 dark:text-slate-500 mb-4">
+                      Vui lòng liên hệ quản trị viên để được phân ca làm việc.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-slate-600 dark:text-slate-400 mb-2 font-medium">
+                      Không tìm thấy lịch làm việc phù hợp với bộ lọc hiện tại
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        clearFilters();
+                        setSelectedDate(undefined);
+                      }}
+                      className="mt-4"
+                    >
+                      <X className="mr-2 h-4 w-4" />
+                      Xóa bộ lọc
+                    </Button>
+                  </>
+                )}
               </div>
             ) : (
               <div className="space-y-4">
@@ -539,6 +681,17 @@ const WorkSchedule: React.FC = () => {
                           <span className="ml-1">{getStatusLabel(schedule.status)}</span>
                         </Badge>
                       </div>
+                      {schedule.status === 'scheduled' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenUpdateDialog(schedule)}
+                          className="glass border-slate-200/50 dark:border-slate-700/50"
+                        >
+                          <Edit2 className="h-4 w-4 mr-2" />
+                          Cập nhật
+                        </Button>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
@@ -571,6 +724,114 @@ const WorkSchedule: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Update Status Dialog */}
+      <Dialog open={updateDialogOpen} onOpenChange={setUpdateDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Cập nhật trạng thái lịch làm việc</DialogTitle>
+            <DialogDescription>
+              Cập nhật trạng thái cho ca làm việc của bạn
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedSchedule && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Thông tin ca làm việc</Label>
+                <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-md">
+                  <p className="text-sm font-medium text-slate-900 dark:text-white">
+                    {new Date(selectedSchedule.shift_start).toLocaleDateString('vi-VN', {
+                      weekday: 'long',
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric'
+                    })}
+                  </p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                    {formatShiftTime(selectedSchedule.shift_start, selectedSchedule.shift_end)}
+                  </p>
+                  {selectedSchedule.station && (
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                      <MapPin className="h-3 w-3 inline mr-1" />
+                      {selectedSchedule.station.name}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="status">Trạng thái mới *</Label>
+                <Select value={newStatus} onValueChange={(value) => setNewStatus(value as 'completed' | 'absent' | 'cancelled')}>
+                  <SelectTrigger id="status" className="glass border-slate-200/50 dark:border-slate-700/50">
+                    <SelectValue placeholder="Chọn trạng thái" />
+                  </SelectTrigger>
+                  <SelectContent className="glass-card border-0">
+                    <SelectItem value="completed">
+                      <div className="flex items-center space-x-2">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        <span>Đã hoàn thành</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="absent">
+                      <div className="flex items-center space-x-2">
+                        <XCircle className="h-4 w-4 text-red-600" />
+                        <span>Vắng mặt</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="cancelled">
+                      <div className="flex items-center space-x-2">
+                        <XCircle className="h-4 w-4 text-slate-600" />
+                        <span>Đã hủy</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="notes">Ghi chú (tùy chọn)</Label>
+                <Textarea
+                  id="notes"
+                  value={updateNotes}
+                  onChange={(e) => setUpdateNotes(e.target.value)}
+                  placeholder="Nhập ghi chú về ca làm việc..."
+                  className="glass border-slate-200/50 dark:border-slate-700/50 min-h-[100px]"
+                  rows={4}
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setUpdateDialogOpen(false);
+                setSelectedSchedule(null);
+                setUpdateNotes('');
+              }}
+              disabled={updating}
+            >
+              Hủy
+            </Button>
+            <Button
+              onClick={handleUpdateStatus}
+              disabled={updating}
+              className="bg-gradient-to-r from-green-500 to-emerald-500 text-white"
+            >
+              {updating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Đang cập nhật...
+                </>
+              ) : (
+                'Cập nhật'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
