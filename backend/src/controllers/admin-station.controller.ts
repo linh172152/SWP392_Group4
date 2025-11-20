@@ -60,24 +60,94 @@ export const getAllStations = asyncHandler(
       take: parseInt(limit as string),
     });
 
-    const stationsWithStats = stations.map((station) => {
-      const batteryStatusCount = station.batteries.reduce(
-        (acc, battery) => {
-          acc[battery.status] = (acc[battery.status] || 0) + 1;
-          return acc;
-        },
-        {} as Record<string, number>
-      );
+    // Get today's date range for calculating daily stats
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
 
-      return {
-        ...station,
-        battery_stats: batteryStatusCount,
-        total_batteries: station.batteries.length,
-        total_bookings: station._count.bookings,
-        total_transactions: station._count.transactions,
-        staff_count: station.staff.length,
-      };
-    });
+    const stationsWithStats = await Promise.all(
+      stations.map(async (station) => {
+        const batteryStatusCount = station.batteries.reduce(
+          (acc, battery) => {
+            acc[battery.status] = (acc[battery.status] || 0) + 1;
+            return acc;
+          },
+          {} as Record<string, number>
+        );
+
+        // Calculate daily swaps (completed transactions today)
+        // Use swap_completed_at if available, otherwise use swap_at
+        const dailySwaps = await prisma.transaction.count({
+          where: {
+            station_id: station.station_id,
+            payment_status: "completed",
+            OR: [
+              {
+                swap_completed_at: {
+                  gte: today,
+                  lt: tomorrow,
+                },
+              },
+              {
+                AND: [
+                  { swap_completed_at: null },
+                  {
+                    swap_at: {
+                      gte: today,
+                      lt: tomorrow,
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        });
+
+        // Calculate daily revenue (sum of completed transactions today)
+        const dailyRevenueResult = await prisma.transaction.aggregate({
+          where: {
+            station_id: station.station_id,
+            payment_status: "completed",
+            OR: [
+              {
+                swap_completed_at: {
+                  gte: today,
+                  lt: tomorrow,
+                },
+              },
+              {
+                AND: [
+                  { swap_completed_at: null },
+                  {
+                    swap_at: {
+                      gte: today,
+                      lt: tomorrow,
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+          _sum: {
+            amount: true,
+          },
+        });
+
+        const dailyRevenue = dailyRevenueResult._sum.amount || 0;
+
+        return {
+          ...station,
+          battery_stats: batteryStatusCount,
+          total_batteries: station.batteries.length,
+          total_bookings: station._count.bookings,
+          total_transactions: station._count.transactions,
+          staff_count: station.staff.length,
+          daily_swaps: dailySwaps,
+          daily_revenue: Number(dailyRevenue),
+        };
+      })
+    );
 
     const total = await prisma.station.count({ where: whereClause });
 
@@ -165,6 +235,70 @@ export const getStationDetails = asyncHandler(
           station.station_ratings.length
         : 0;
 
+    // Calculate daily swaps and revenue
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Use swap_completed_at if available, otherwise use swap_at
+    const dailySwaps = await prisma.transaction.count({
+      where: {
+        station_id: station.station_id,
+        payment_status: "completed",
+        OR: [
+          {
+            swap_completed_at: {
+              gte: today,
+              lt: tomorrow,
+            },
+          },
+          {
+            AND: [
+              { swap_completed_at: null },
+              {
+                swap_at: {
+                  gte: today,
+                  lt: tomorrow,
+                },
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    const dailyRevenueResult = await prisma.transaction.aggregate({
+      where: {
+        station_id: station.station_id,
+        payment_status: "completed",
+        OR: [
+          {
+            swap_completed_at: {
+              gte: today,
+              lt: tomorrow,
+            },
+          },
+          {
+            AND: [
+              { swap_completed_at: null },
+              {
+                swap_at: {
+                  gte: today,
+                  lt: tomorrow,
+                },
+              },
+            ],
+          },
+        ],
+      },
+      _sum: {
+        amount: true,
+      },
+    });
+
+    const dailyRevenue = dailyRevenueResult._sum.amount || 0;
+
     res.status(200).json({
       success: true,
       message: "Station details retrieved successfully",
@@ -177,6 +311,8 @@ export const getStationDetails = asyncHandler(
         total_bookings: station._count.bookings,
         total_transactions: station._count.transactions,
         staff_count: station.staff.length,
+        daily_swaps: dailySwaps,
+        daily_revenue: Number(dailyRevenue),
       },
     });
   }

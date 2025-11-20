@@ -12,6 +12,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
 import { 
   Car, 
   Plus, 
@@ -48,6 +58,8 @@ const VehicleManagement: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [vehicleToDelete, setVehicleToDelete] = useState<VehicleItem | null>(null);
   const navigate = useNavigate();
   const [editingId, setEditingId] = useState<string | null>(null);
   
@@ -166,19 +178,28 @@ const VehicleManagement: React.FC = () => {
     }
   };
 
-  const deleteVehicle = async (vehicleId: string) => {
-    if (!confirm("Bạn có chắc muốn xóa xe này?")) return;
+  const handleOpenDeleteDialog = (vehicle: VehicleItem) => {
+    setVehicleToDelete(vehicle);
+    setDeleteDialogOpen(true);
+  };
+
+  const deleteVehicle = async () => {
+    if (!vehicleToDelete) return;
+    
     setLoading(true);
     setError("");
+    setDeleteDialogOpen(false);
+    
     try {
       const res = await fetchWithAuth(
-        `${API_ENDPOINTS.DRIVER.VEHICLES}/${vehicleId}`,
+        `${API_ENDPOINTS.DRIVER.VEHICLES}/${vehicleToDelete.vehicle_id}`,
         { method: "DELETE" }
       );
       const data = await res.json();
       if (!res.ok || !data.success)
         throw new Error(data.message || "Xóa xe thất bại");
       await loadVehicles();
+      setVehicleToDelete(null);
     } catch (e: any) {
       const msg = e.message || "Có lỗi xảy ra";
       setError(msg);
@@ -609,7 +630,7 @@ const VehicleManagement: React.FC = () => {
                         variant="outline"
                         size="sm"
                         className="glass border-red-200/50 dark:border-red-400/30 hover:bg-red-50/50 dark:hover:bg-red-500/10"
-                        onClick={() => deleteVehicle(vehicle.vehicle_id)}
+                        onClick={() => handleOpenDeleteDialog(vehicle)}
                         disabled={loading}
                       >
                         Xóa
@@ -763,6 +784,35 @@ const VehicleManagement: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Vehicle Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-red-600" />
+              Xác nhận xóa xe
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Bạn có chắc muốn xóa xe{" "}
+              <span className="font-semibold">
+                {vehicleToDelete?.license_plate}
+              </span>
+              ? Hành động này không thể hoàn tác.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loading}>Hủy</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={deleteVehicle}
+              disabled={loading}
+              className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
+            >
+              {loading ? "Đang xử lý..." : "Xác nhận xóa"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

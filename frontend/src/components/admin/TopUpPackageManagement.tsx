@@ -7,6 +7,16 @@ import {
   Wallet, Edit2, Trash2, Plus, Check, X, Search, 
   DollarSign, Gift, Zap, TrendingUp, Package 
 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
 
 const TopUpPackageManagement: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -21,6 +31,8 @@ const TopUpPackageManagement: React.FC = () => {
     bonus_amount: '',
     is_active: true,
   });
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [packageToDelete, setPackageToDelete] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     fetchPackages();
@@ -78,21 +90,28 @@ const TopUpPackageManagement: React.FC = () => {
     }
   };
 
-  const handleDelete = async (packageId: string, packageName: string) => {
-    if (!confirm(`Delete package "${packageName}"?\n\nThis action cannot be undone.`)) return;
+  const handleOpenDeleteDialog = (packageId: string, packageName: string) => {
+    setPackageToDelete({ id: packageId, name: packageName });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!packageToDelete) return;
     
     try {
       setLoading(true);
-      const res = await topUpPackageService.deleteTopUpPackage(packageId);
+      const res = await topUpPackageService.deleteTopUpPackage(packageToDelete.id);
       if (res && res.success) {
-        setPackages((prev) => prev.filter((p) => p.package_id !== packageId));
+        setPackages((prev) => prev.filter((p) => p.package_id !== packageToDelete.id));
         toast.success('🗑️ Package deleted successfully');
+        setPackageToDelete(null);
       } else toast.error(res?.message || 'Failed to delete package');
     } catch (err: any) {
       console.error('Delete package error', err);
       toast.error(err?.message || 'Delete error');
     } finally {
       setLoading(false);
+      setDeleteDialogOpen(false);
     }
   };
 
@@ -441,7 +460,7 @@ const TopUpPackageManagement: React.FC = () => {
                           Edit
                         </button>
                         <button
-                          onClick={() => handleDelete(pkg.package_id, pkg.name)}
+                          onClick={() => handleOpenDeleteDialog(pkg.package_id, pkg.name)}
                           className="flex-1 px-4 py-2.5 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white rounded-xl text-sm font-semibold transition-all shadow-md hover:shadow-lg hover:scale-105 flex items-center justify-center gap-2"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -514,6 +533,30 @@ const TopUpPackageManagement: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+      {/* Delete Package Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-red-600" />
+              Xác nhận xóa gói nạp tiền
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Bạn có chắc muốn xóa gói "{packageToDelete?.name}"? Hành động này không thể hoàn tác.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loading}>Hủy</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={loading}
+              className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
+            >
+              {loading ? "Đang xử lý..." : "Xác nhận xóa"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

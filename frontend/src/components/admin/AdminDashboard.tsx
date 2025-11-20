@@ -2,7 +2,6 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import type { User } from '../../App';
 import AdminLayout from './AdminLayout';
-import AdminHome from './AdminHome';
 import StationManagement from './StationManagement';
 import BatteryPricingManagement from './BatteryPricingManagement';
 import AdminServicePackageManagement from './AdminServicePackageManagement';
@@ -22,8 +21,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
   return (
     <AdminLayout user={user} onLogout={onLogout}>
       <Routes>
-        <Route path="/" element={<Navigate to="/admin/home" replace />} />
-        <Route path="/home" element={<AdminHome />} />
+        <Route path="/" element={<Navigate to="/admin/reports" replace />} />
+        <Route path="/reports" element={<ReportsAnalytics />} />
         <Route path="/stations" element={<StationManagement />} />
         <Route path="/battery-pricing" element={<BatteryPricingManagement />} />
         <Route path="/service-packages" element={<AdminServicePackageManagement />} />
@@ -32,7 +31,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
         <Route path="/employees" element={<StaffManagement />} />
         <Route path="/schedules" element={<AdminStaffScheduleManagement />} />
         <Route path="/support" element={<AdminSupportManagement />} />
-        <Route path="/reports" element={<ReportsAnalytics />} />
       </Routes>
     </AdminLayout>
   );

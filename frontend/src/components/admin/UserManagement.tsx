@@ -15,6 +15,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import {
@@ -176,6 +186,8 @@ const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<string | null>(null);
   
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -263,17 +275,27 @@ const UserManagement: React.FC = () => {
     }
   };
 
-  const handleDeleteUser = async (userId: string) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa người dùng này?')) {
-      try {
-        const res = await deleteUser(userId);
-        if (res.success) {
-          toast.success('Xóa người dùng thành công');
-          fetchUsers();
-        } else throw new Error(res.message || 'Xóa thất bại');
-      } catch (err: any) {
-        toast.error(err.message || 'Lỗi khi xóa người dùng');
-      }
+  const handleOpenDeleteDialog = (userId: string) => {
+    setUserToDelete(userId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return;
+    
+    setLoading(true);
+    try {
+      const res = await deleteUser(userToDelete);
+      if (res.success) {
+        toast.success('Xóa người dùng thành công');
+        fetchUsers();
+        setUserToDelete(null);
+      } else throw new Error(res.message || 'Xóa thất bại');
+    } catch (err: any) {
+      toast.error(err.message || 'Lỗi khi xóa người dùng');
+    } finally {
+      setLoading(false);
+      setDeleteDialogOpen(false);
     }
   };
 
@@ -511,7 +533,7 @@ const UserManagement: React.FC = () => {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDeleteUser(u.user_id)}
+                          onClick={() => handleOpenDeleteDialog(u.user_id)}
                           className="text-red-500 hover:text-red-600"
                         >
                           <TrashIcon className="h-4 w-4" />
@@ -537,6 +559,30 @@ const UserManagement: React.FC = () => {
         onClose={() => setIsCreateModalOpen(false)}
         onSubmit={handleCreateUser}
       />
+
+      {/* Delete User Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <TrashIcon className="h-5 w-5 text-red-600" />
+              Xác nhận xóa người dùng
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Bạn có chắc chắn muốn xóa người dùng này? Hành động này không thể hoàn tác.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Hủy</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteUser}
+              className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
+            >
+              Xác nhận xóa
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

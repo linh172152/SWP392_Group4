@@ -1,28 +1,33 @@
-import React, { useState, useEffect } from 'react';
-import { toast } from 'sonner';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '../ui/card';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Badge } from '../ui/badge';
+import React, { useState, useEffect } from "react";
+import { toast } from "sonner";
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Badge } from "../ui/badge";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '../ui/dialog';
+} from "../ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../ui/select';
+} from "../ui/select";
 import {
   Calendar,
   Clock,
@@ -37,63 +42,68 @@ import {
   CalendarDays,
   UserCheck,
   UserX,
-} from 'lucide-react';
+} from "lucide-react";
 import {
   adminGetStaffSchedules,
   adminCreateStaffSchedule,
   adminUpdateStaffSchedule,
   adminDeleteStaffSchedule,
-} from '../../services/admin-staff-schedule.service';
+} from "../../services/admin-staff-schedule.service";
 import type {
   AdminStaffSchedule,
   CreateStaffScheduleRequest,
-} from '../../services/admin-staff-schedule.service';
-import { getAllStaff } from '../../services/staff.service';
-import { getAllStations } from '../../services/station.service';
-import type { Staff } from '../../services/staff.service';
-import type { Station } from '../../services/station.service';
+} from "../../services/admin-staff-schedule.service";
+import { getAllStaff } from "../../services/staff.service";
+import { getAllStations } from "../../services/station.service";
+import type { Staff } from "../../services/staff.service";
+import type { Station } from "../../services/station.service";
 
-type StatusFilter = 'all' | 'scheduled' | 'completed' | 'absent' | 'cancelled';
-type ViewMode = 'list' | 'calendar';
+type StatusFilter = "all" | "scheduled" | "completed" | "absent" | "cancelled";
+type ViewMode = "list" | "calendar";
 
 // Helper functions (moved outside components for shared access)
 const formatTime = (timeString: string) => {
   try {
-    if (!timeString) return '';
-    
+    if (!timeString) return "";
+
     // If it's already a time string (HH:MM format)
-    if (timeString.includes(':') && timeString.length <= 8) {
+    if (timeString.includes(":") && timeString.length <= 8) {
       return timeString.substring(0, 5); // Return HH:MM
     }
-    
+
     // If it's a full DateTime string
     const date = new Date(timeString);
     if (isNaN(date.getTime())) {
-      console.error('Invalid date:', timeString);
-      return timeString.substring(0, 5) || '';
+      console.error("Invalid date:", timeString);
+      return timeString.substring(0, 5) || "";
     }
-    
+
     // Use UTC methods to avoid timezone issues
-    const hours = date.getUTCHours().toString().padStart(2, '0');
-    const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+    const hours = date.getUTCHours().toString().padStart(2, "0");
+    const minutes = date.getUTCMinutes().toString().padStart(2, "0");
     return `${hours}:${minutes}`;
   } catch (error) {
-    console.error('Error formatting time:', error);
-    return '';
+    console.error("Error formatting time:", error);
+    return "";
   }
 };
 
 const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleDateString('vi-VN');
+  return new Date(dateString).toLocaleDateString("vi-VN");
 };
 
 const getStatusColor = (status: string) => {
   switch (status) {
-    case 'scheduled': return 'bg-blue-100 text-blue-800 border-blue-200';
-    case 'completed': return 'bg-green-100 text-green-800 border-green-200';
-    case 'absent': return 'bg-red-100 text-red-800 border-red-200';
-    case 'cancelled': return 'bg-gray-100 text-gray-800 border-gray-200';
-    default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    case "scheduled":
+      return "bg-blue-100 text-blue-800 border-blue-200";
+    case "completed":
+      return "bg-green-100 text-green-800 border-green-200";
+    case "absent":
+      return "bg-red-100 text-red-800 border-red-200";
+    case "cancelled":
+      return "bg-gray-100 text-gray-800 border-gray-200";
+    default:
+      return "bg-gray-100 text-gray-800 border-gray-200";
   }
 };
 
@@ -101,21 +111,23 @@ const getStatusColor = (status: string) => {
 const formatShiftTime = (schedule: AdminStaffSchedule) => {
   const startTime = formatTime(schedule.shift_start);
   const endTime = formatTime(schedule.shift_end);
-  
+
   // Check if it's an overnight shift by comparing dates in UTC
   const startDate = new Date(schedule.shift_start);
   const endDate = new Date(schedule.shift_end);
-  
+
   // More reliable overnight detection using date parts
   const startUTCDate = startDate.getUTCDate();
   const endUTCDate = endDate.getUTCDate();
-  
+
   // Also check if end time is earlier than start time (indicating overnight)
-  const startTimeMinutes = startDate.getUTCHours() * 60 + startDate.getUTCMinutes();
+  const startTimeMinutes =
+    startDate.getUTCHours() * 60 + startDate.getUTCMinutes();
   const endTimeMinutes = endDate.getUTCHours() * 60 + endDate.getUTCMinutes();
-  
-  const isOvernightShift = endUTCDate !== startUTCDate || endTimeMinutes < startTimeMinutes;
-  
+
+  const isOvernightShift =
+    endUTCDate !== startUTCDate || endTimeMinutes < startTimeMinutes;
+
   if (isOvernightShift) {
     return `${startTime} - ${endTime} (+1)`;
   } else {
@@ -131,16 +143,25 @@ interface CalendarViewProps {
   onDeleteSchedule: (scheduleId: string) => void;
 }
 
-const CalendarView: React.FC<CalendarViewProps> = ({ schedules, onViewSchedule }) => {
+const CalendarView: React.FC<CalendarViewProps> = ({
+  schedules,
+  onViewSchedule,
+}) => {
   const [currentDate, setCurrentDate] = useState(new Date());
-  
+
   // Get first day of current month
-  const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-  
+  const firstDayOfMonth = new Date(
+    currentDate.getFullYear(),
+    currentDate.getMonth(),
+    1
+  );
+
   // Get first day of calendar (might be from previous month)
   const firstDayOfCalendar = new Date(firstDayOfMonth);
-  firstDayOfCalendar.setDate(firstDayOfCalendar.getDate() - firstDayOfMonth.getDay());
-  
+  firstDayOfCalendar.setDate(
+    firstDayOfCalendar.getDate() - firstDayOfMonth.getDay()
+  );
+
   // Generate calendar days (6 weeks = 42 days)
   const calendarDays: Date[] = [];
   for (let i = 0; i < 42; i++) {
@@ -148,10 +169,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ schedules, onViewSchedule }
     day.setDate(day.getDate() + i);
     calendarDays.push(day);
   }
-  
+
   // Group schedules by date
   const schedulesByDate = schedules.reduce((acc, schedule) => {
-    const dateKey = new Date(schedule.shift_date).toISOString().split('T')[0];
+    const dateKey = new Date(schedule.shift_date).toISOString().split("T")[0];
     if (!acc[dateKey]) {
       acc[dateKey] = [];
     }
@@ -159,19 +180,27 @@ const CalendarView: React.FC<CalendarViewProps> = ({ schedules, onViewSchedule }
     return acc;
   }, {} as Record<string, AdminStaffSchedule[]>);
 
-
-  
   const monthNames = [
-    'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
-    'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'
+    "Tháng 1",
+    "Tháng 2",
+    "Tháng 3",
+    "Tháng 4",
+    "Tháng 5",
+    "Tháng 6",
+    "Tháng 7",
+    "Tháng 8",
+    "Tháng 9",
+    "Tháng 10",
+    "Tháng 11",
+    "Tháng 12",
   ];
-  
-  const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
-  
-  const navigateMonth = (direction: 'prev' | 'next') => {
-    setCurrentDate(prev => {
+
+  const dayNames = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+
+  const navigateMonth = (direction: "prev" | "next") => {
+    setCurrentDate((prev) => {
       const newDate = new Date(prev);
-      if (direction === 'prev') {
+      if (direction === "prev") {
         newDate.setMonth(newDate.getMonth() - 1);
       } else {
         newDate.setMonth(newDate.getMonth() + 1);
@@ -179,7 +208,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ schedules, onViewSchedule }
       return newDate;
     });
   };
-  
+
   return (
     <Card>
       <CardHeader className="pb-4">
@@ -188,13 +217,25 @@ const CalendarView: React.FC<CalendarViewProps> = ({ schedules, onViewSchedule }
             {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
           </CardTitle>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => navigateMonth('prev')}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigateMonth("prev")}
+            >
               ←
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentDate(new Date())}
+            >
               Hôm nay
             </Button>
-            <Button variant="outline" size="sm" onClick={() => navigateMonth('next')}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigateMonth("next")}
+            >
               →
             </Button>
           </div>
@@ -204,35 +245,46 @@ const CalendarView: React.FC<CalendarViewProps> = ({ schedules, onViewSchedule }
         {/* Calendar Grid */}
         <div className="grid grid-cols-7 gap-1">
           {/* Day Headers */}
-          {dayNames.map(day => (
-            <div key={day} className="p-2 text-center font-medium text-gray-600 bg-gray-50">
+          {dayNames.map((day) => (
+            <div
+              key={day}
+              className="p-2 text-center font-medium text-gray-600 bg-gray-50"
+            >
               {day}
             </div>
           ))}
-          
+
           {/* Calendar Days */}
           {calendarDays.map((day, index) => {
-            const dateKey = day.toISOString().split('T')[0];
+            const dateKey = day.toISOString().split("T")[0];
             const daySchedules = schedulesByDate[dateKey] || [];
             const isCurrentMonth = day.getMonth() === currentDate.getMonth();
             const isToday = day.toDateString() === new Date().toDateString();
-            
+
             return (
-              <div 
-                key={index} 
+              <div
+                key={index}
                 className={`
                   min-h-[120px] p-1 border border-gray-200 
-                  ${!isCurrentMonth ? 'bg-gray-50 text-gray-400' : 'bg-white'}
-                  ${isToday ? 'ring-2 ring-blue-500' : ''}
+                  ${!isCurrentMonth ? "bg-gray-50 text-gray-400" : "bg-white"}
+                  ${isToday ? "ring-2 ring-blue-500" : ""}
                 `}
               >
-                <div className={`
+                <div
+                  className={`
                   text-sm font-medium mb-1 
-                  ${isToday ? 'text-blue-600' : isCurrentMonth ? 'text-gray-900' : 'text-gray-400'}
-                `}>
+                  ${
+                    isToday
+                      ? "text-blue-600"
+                      : isCurrentMonth
+                      ? "text-gray-900"
+                      : "text-gray-400"
+                  }
+                `}
+                >
                   {day.getDate()}
                 </div>
-                
+
                 {/* Schedules for this day */}
                 <div className="space-y-1">
                   {daySchedules.slice(0, 3).map((schedule) => (
@@ -244,7 +296,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ schedules, onViewSchedule }
                         ${getStatusColor(schedule.status)}
                       `}
                       onClick={() => onViewSchedule(schedule)}
-                      title={`${schedule.staff?.full_name} - ${formatShiftTime(schedule)}`}
+                      title={`${schedule.staff?.full_name} - ${formatShiftTime(
+                        schedule
+                      )}`}
                     >
                       <div className="font-medium truncate">
                         {schedule.staff?.full_name}
@@ -254,7 +308,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ schedules, onViewSchedule }
                       </div>
                     </div>
                   ))}
-                  
+
                   {/* Show "+X more" if there are more schedules */}
                   {daySchedules.length > 3 && (
                     <div className="text-xs text-gray-500 font-medium">
@@ -272,13 +326,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({ schedules, onViewSchedule }
 };
 
 const initialFormData: CreateStaffScheduleRequest = {
-  staff_id: '',
+  staff_id: "",
   station_id: null,
-  shift_date: '',
-  shift_start: '09:00',
-  shift_end: '17:00',
-  status: 'scheduled',
-  notes: '',
+  shift_date: "",
+  shift_start: "09:00",
+  shift_end: "17:00",
+  status: "scheduled",
+  notes: "",
 };
 
 const AdminStaffScheduleManagement: React.FC = () => {
@@ -289,33 +343,32 @@ const AdminStaffScheduleManagement: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
-  const [viewingSchedule, setViewingSchedule] = useState<AdminStaffSchedule | null>(null);
-  const [editingSchedule, setEditingSchedule] = useState<AdminStaffSchedule | null>(null);
-  const [formData, setFormData] = useState<CreateStaffScheduleRequest>(initialFormData);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [staffFilter, setStaffFilter] = useState('');
-  const [stationFilter, setStationFilter] = useState('');
-  const [dateFilter, setDateFilter] = useState('');
-  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [scheduleToDelete, setScheduleToDelete] = useState<string | null>(null);
+  const [viewingSchedule, setViewingSchedule] =
+    useState<AdminStaffSchedule | null>(null);
+  const [editingSchedule, setEditingSchedule] =
+    useState<AdminStaffSchedule | null>(null);
+  const [formData, setFormData] =
+    useState<CreateStaffScheduleRequest>(initialFormData);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [staffFilter, setStaffFilter] = useState("");
+  const [stationFilter, setStationFilter] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
 
   useEffect(() => {
     fetchInitialData();
   }, []);
 
-
-
   const fetchInitialData = async () => {
     try {
       setLoading(true);
-      await Promise.all([
-        fetchSchedules(),
-        fetchStaff(),
-        fetchStations(),
-      ]);
+      await Promise.all([fetchSchedules(), fetchStaff(), fetchStations()]);
     } catch (error) {
-      console.error('Error fetching initial data:', error);
-      toast.error('Lỗi khi tải dữ liệu');
+      console.error("Error fetching initial data:", error);
+      toast.error("Lỗi khi tải dữ liệu");
     } finally {
       setLoading(false);
     }
@@ -327,28 +380,28 @@ const AdminStaffScheduleManagement: React.FC = () => {
         staff_id: staffFilter || undefined,
         station_id: stationFilter || undefined,
         shift_date: dateFilter || undefined,
-        status: statusFilter !== 'all' ? statusFilter : undefined,
+        status: statusFilter !== "all" ? statusFilter : undefined,
         limit: 100, // Get more items to ensure we see new ones
-        page: 1
+        page: 1,
       });
-      
+
       // API returns schedules in response.data.schedules with pagination
       const fetchedSchedules = response.data.schedules || [];
-      
+
       // Debug logging to see what backend returns
       if (fetchedSchedules.length > 0) {
-        console.log('Sample schedule from backend:', {
+        console.log("Sample schedule from backend:", {
           shift_start: fetchedSchedules[0].shift_start,
           shift_end: fetchedSchedules[0].shift_end,
           formatted_start: formatTime(fetchedSchedules[0].shift_start),
-          formatted_end: formatTime(fetchedSchedules[0].shift_end)
+          formatted_end: formatTime(fetchedSchedules[0].shift_end),
         });
       }
-      
+
       setSchedules(fetchedSchedules);
     } catch (error) {
-      console.error('Error fetching schedules:', error);
-      toast.error('Lỗi khi tải danh sách lịch làm việc');
+      console.error("Error fetching schedules:", error);
+      toast.error("Lỗi khi tải danh sách lịch làm việc");
       setSchedules([]);
     }
   };
@@ -358,8 +411,8 @@ const AdminStaffScheduleManagement: React.FC = () => {
       const response = await getAllStaff();
       setStaff(response.data || []);
     } catch (error) {
-      console.error('Error fetching staff:', error);
-      toast.error('Lỗi khi tải danh sách nhân viên');
+      console.error("Error fetching staff:", error);
+      toast.error("Lỗi khi tải danh sách nhân viên");
       setStaff([]);
     }
   };
@@ -369,8 +422,8 @@ const AdminStaffScheduleManagement: React.FC = () => {
       const response = await getAllStations();
       setStations(response.data || []);
     } catch (error) {
-      console.error('Error fetching stations:', error);
-      toast.error('Lỗi khi tải danh sách trạm');
+      console.error("Error fetching stations:", error);
+      toast.error("Lỗi khi tải danh sách trạm");
       setStations([]);
     }
   };
@@ -380,36 +433,41 @@ const AdminStaffScheduleManagement: React.FC = () => {
     try {
       // Validate required fields
       if (!formData.staff_id) {
-        toast.error('Vui lòng chọn nhân viên');
+        toast.error("Vui lòng chọn nhân viên");
         return;
       }
       if (!formData.shift_date) {
-        toast.error('Vui lòng chọn ngày làm việc');
+        toast.error("Vui lòng chọn ngày làm việc");
         return;
       }
       if (!formData.shift_start || !formData.shift_end) {
-        toast.error('Vui lòng nhập giờ bắt đầu và kết thúc');
+        toast.error("Vui lòng nhập giờ bắt đầu và kết thúc");
         return;
       }
 
       // Validate time logic and handle overnight shifts
-      const startTime = new Date(`${formData.shift_date}T${formData.shift_start}`);
+      const startTime = new Date(
+        `${formData.shift_date}T${formData.shift_start}`
+      );
       let endTime = new Date(`${formData.shift_date}T${formData.shift_end}`);
-      
+
       // If end time is before start time, it's an overnight shift (next day)
       const isOvernightShift = formData.shift_end <= formData.shift_start;
-      
+
       if (isOvernightShift) {
         // For overnight shifts, add 1 day to end time
         endTime = new Date(endTime.getTime() + 24 * 60 * 60 * 1000);
       }
-      
+
       // Calculate shift duration in hours
-      const durationHours = (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60);
-      
+      const durationHours =
+        (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60);
+
       // Validate reasonable shift duration (max 16 hours)
       if (durationHours <= 0 || durationHours > 16) {
-        toast.error('Ca làm việc phải từ 1-16 tiếng. Vui lòng kiểm tra lại thời gian.');
+        toast.error(
+          "Ca làm việc phải từ 1-16 tiếng. Vui lòng kiểm tra lại thời gian."
+        );
         return;
       }
 
@@ -418,113 +476,150 @@ const AdminStaffScheduleManagement: React.FC = () => {
       const createCorrectDateTime = (date: string, time: string) => {
         // Create date in local timezone (Vietnam)
         const localDateTime = new Date(`${date}T${time}:00`);
-        
+
         // Get timezone offset (Vietnam is UTC+7, so offset will be -420 minutes)
         const offsetMinutes = localDateTime.getTimezoneOffset();
-        
+
         // Subtract the offset to get the time that, when interpreted as UTC by backend,
         // will give us the correct local time when displayed
-        const adjustedDateTime = new Date(localDateTime.getTime() - (offsetMinutes * 60 * 1000));
-        
+        const adjustedDateTime = new Date(
+          localDateTime.getTime() - offsetMinutes * 60 * 1000
+        );
+
         // Return as ISO string (which is UTC format)
         return adjustedDateTime.toISOString();
       };
-      
-      const shiftStartDateTime = createCorrectDateTime(formData.shift_date, formData.shift_start);
-      
+
+      const shiftStartDateTime = createCorrectDateTime(
+        formData.shift_date,
+        formData.shift_start
+      );
+
       // For overnight shifts, calculate the correct end date
       let shiftEndDateTime;
       if (isOvernightShift) {
         const nextDay = new Date(formData.shift_date);
         nextDay.setDate(nextDay.getDate() + 1);
-        const nextDayStr = nextDay.toISOString().split('T')[0];
-        shiftEndDateTime = createCorrectDateTime(nextDayStr, formData.shift_end);
+        const nextDayStr = nextDay.toISOString().split("T")[0];
+        shiftEndDateTime = createCorrectDateTime(
+          nextDayStr,
+          formData.shift_end
+        );
       } else {
-        shiftEndDateTime = createCorrectDateTime(formData.shift_date, formData.shift_end);
+        shiftEndDateTime = createCorrectDateTime(
+          formData.shift_date,
+          formData.shift_end
+        );
       }
-      
+
       const apiData = {
         ...formData,
         shift_start: shiftStartDateTime,
         shift_end: shiftEndDateTime,
         station_id: formData.station_id || null,
-        status: formData.status || 'scheduled',
-        notes: formData.notes || ''
+        status: formData.status || "scheduled",
+        notes: formData.notes || "",
       };
-      
+
       // Debug logging
-      console.log('Sending API data:', {
+      console.log("Sending API data:", {
         originalInput: `${formData.shift_start} - ${formData.shift_end}`,
         sentToAPI: `${shiftStartDateTime} - ${shiftEndDateTime}`,
-        isOvernight: isOvernightShift
+        isOvernight: isOvernightShift,
       });
-      
+
       if (editingSchedule) {
         await adminUpdateStaffSchedule(editingSchedule.schedule_id, apiData);
-        toast.success('Cập nhật lịch làm việc thành công!');
+        toast.success("Cập nhật lịch làm việc thành công!");
       } else {
         await adminCreateStaffSchedule(apiData);
-        toast.success('Tạo lịch làm việc thành công!');
+        toast.success("Tạo lịch làm việc thành công!");
       }
 
       await fetchSchedules();
-      setRefreshKey(prev => prev + 1); // Force re-render
+      setRefreshKey((prev) => prev + 1); // Force re-render
       handleCloseModal();
     } catch (error: any) {
-      console.error('Error saving schedule:', error);
-      
+      console.error("Error saving schedule:", error);
+
       // Handle specific error messages from the backend
-      if (error.message.includes('shift_end must be greater than shift_start')) {
-        toast.error('Thời gian kết thúc phải lớn hơn thời gian bắt đầu. Vui lòng kiểm tra lại.');
-      } else if (error.message.includes('overlapping this time')) {
-        toast.error('Nhân viên đã có lịch làm việc trùng thời gian này. Vui lòng chọn thời gian khác.');
-      } else if (error.message.includes('Invalid')) {
-        toast.error('Dữ liệu không hợp lệ. Vui lòng kiểm tra lại thông tin.');
+      if (
+        error.message.includes("shift_end must be greater than shift_start")
+      ) {
+        toast.error(
+          "Thời gian kết thúc phải lớn hơn thời gian bắt đầu. Vui lòng kiểm tra lại."
+        );
+      } else if (error.message.includes("overlapping this time")) {
+        toast.error(
+          "Nhân viên đã có lịch làm việc trùng thời gian này. Vui lòng chọn thời gian khác."
+        );
+      } else if (error.message.includes("Invalid")) {
+        toast.error("Dữ liệu không hợp lệ. Vui lòng kiểm tra lại thông tin.");
       } else {
-        toast.error('Lỗi khi lưu lịch làm việc. Vui lòng thử lại.');
+        toast.error("Lỗi khi lưu lịch làm việc. Vui lòng thử lại.");
       }
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
+  ) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: name === 'station_id' && value === '' ? null : value,
+      [name]: name === "station_id" && value === "" ? null : value,
     }));
   };
 
   // Check for potential schedule conflicts
-  const checkScheduleConflict = (staffId: string, date: string, startTime: string, endTime: string) => {
+  const checkScheduleConflict = (
+    staffId: string,
+    date: string,
+    startTime: string,
+    endTime: string
+  ) => {
     if (!staffId || !date || !startTime || !endTime) return false;
-    
-    const conflictingSchedules = schedules.filter(schedule => {
+
+    const conflictingSchedules = schedules.filter((schedule) => {
       if (schedule.staff_id !== staffId) return false;
-      if (schedule.shift_date.split('T')[0] !== date) return false;
-      if (editingSchedule && schedule.schedule_id === editingSchedule.schedule_id) return false;
-      
+      if (schedule.shift_date.split("T")[0] !== date) return false;
+      if (
+        editingSchedule &&
+        schedule.schedule_id === editingSchedule.schedule_id
+      )
+        return false;
+
       // Check time overlap - extract time from datetime strings
       try {
-        const existingStart = new Date(schedule.shift_start).toTimeString().slice(0, 5);
-        const existingEnd = new Date(schedule.shift_end).toTimeString().slice(0, 5);
-        
+        const existingStart = new Date(schedule.shift_start)
+          .toTimeString()
+          .slice(0, 5);
+        const existingEnd = new Date(schedule.shift_end)
+          .toTimeString()
+          .slice(0, 5);
+
         const existingStartMinutes = timeToMinutes(existingStart);
         const existingEndMinutes = timeToMinutes(existingEnd);
         const newStartMinutes = timeToMinutes(startTime);
         const newEndMinutes = timeToMinutes(endTime);
-        
-        return (newStartMinutes < existingEndMinutes && newEndMinutes > existingStartMinutes);
+
+        return (
+          newStartMinutes < existingEndMinutes &&
+          newEndMinutes > existingStartMinutes
+        );
       } catch (error) {
         return false;
       }
     });
-    
+
     return conflictingSchedules.length > 0;
   };
 
   // Helper function to convert time string to minutes
   const timeToMinutes = (timeString: string) => {
-    const [hours, minutes] = timeString.split(':').map(Number);
+    const [hours, minutes] = timeString.split(":").map(Number);
     return hours * 60 + minutes;
   };
 
@@ -540,26 +635,26 @@ const AdminStaffScheduleManagement: React.FC = () => {
   useEffect(() => {
     const applyFilters = async () => {
       try {
-        console.log('Applying filters:', {
+        console.log("Applying filters:", {
           staff_id: staffFilter,
-          station_id: stationFilter, 
+          station_id: stationFilter,
           shift_date: dateFilter,
-          status: statusFilter !== 'all' ? statusFilter : undefined
+          status: statusFilter !== "all" ? statusFilter : undefined,
         });
-        
+
         const response = await adminGetStaffSchedules({
           staff_id: staffFilter || undefined,
           station_id: stationFilter || undefined,
           shift_date: dateFilter || undefined,
-          status: statusFilter !== 'all' ? statusFilter : undefined,
+          status: statusFilter !== "all" ? statusFilter : undefined,
           limit: 100,
-          page: 1
+          page: 1,
         });
         setSchedules(response.data.schedules || []);
-        setRefreshKey(prev => prev + 1); // Force re-render
+        setRefreshKey((prev) => prev + 1); // Force re-render
       } catch (error) {
-        console.error('Error applying filters:', error);
-        toast.error('Lỗi khi áp dụng bộ lọc');
+        console.error("Error applying filters:", error);
+        toast.error("Lỗi khi áp dụng bộ lọc");
         setSchedules([]);
       }
     };
@@ -569,12 +664,12 @@ const AdminStaffScheduleManagement: React.FC = () => {
   }, [statusFilter, staffFilter, stationFilter, dateFilter]);
 
   const resetFilters = async () => {
-    setSearchTerm('');
-    setStatusFilter('all');
-    setStaffFilter('');
-    setStationFilter('');
-    setDateFilter('');
-    toast.success('Đã reset bộ lọc');
+    setSearchTerm("");
+    setStatusFilter("all");
+    setStaffFilter("");
+    setStationFilter("");
+    setDateFilter("");
+    toast.success("Đã reset bộ lọc");
   };
 
   const handleViewSchedule = (schedule: AdminStaffSchedule) => {
@@ -584,7 +679,7 @@ const AdminStaffScheduleManagement: React.FC = () => {
 
   const handleEditSchedule = (schedule: AdminStaffSchedule) => {
     setEditingSchedule(schedule);
-    
+
     // Extract time from DateTime string for the form
     const extractTime = (dateTimeString: string) => {
       try {
@@ -592,46 +687,54 @@ const AdminStaffScheduleManagement: React.FC = () => {
         if (/^\d{2}:\d{2}$/.test(dateTimeString)) {
           return dateTimeString;
         }
-        
+
         // Parse as DateTime and extract time
         const date = new Date(dateTimeString);
         if (isNaN(date.getTime())) {
           return dateTimeString; // Fallback if invalid date
         }
-        
+
         // Use UTC time extraction to match formatTime logic
         // Backend stores adjusted UTC time that represents our local time
-        const hours = date.getUTCHours().toString().padStart(2, '0');
-        const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+        const hours = date.getUTCHours().toString().padStart(2, "0");
+        const minutes = date.getUTCMinutes().toString().padStart(2, "0");
         return `${hours}:${minutes}`;
       } catch (error) {
-        console.error('Error extracting time:', error, 'from:', dateTimeString);
-        return '09:00'; // Safe fallback
+        console.error("Error extracting time:", error, "from:", dateTimeString);
+        return "09:00"; // Safe fallback
       }
     };
-    
+
     setFormData({
       staff_id: schedule.staff_id,
       station_id: schedule.station_id,
-      shift_date: schedule.shift_date.split('T')[0], // Extract date part
+      shift_date: schedule.shift_date.split("T")[0], // Extract date part
       shift_start: extractTime(schedule.shift_start),
       shift_end: extractTime(schedule.shift_end),
       status: schedule.status,
-      notes: schedule.notes || '',
+      notes: schedule.notes || "",
     });
     setShowCreateModal(true);
   };
 
-  const handleDeleteSchedule = async (scheduleId: string) => {
-    if (!confirm('Bạn có chắc chắn muốn xóa lịch làm việc này?')) return;
+  const handleOpenDeleteDialog = (scheduleId: string) => {
+    setScheduleToDelete(scheduleId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteSchedule = async () => {
+    if (!scheduleToDelete) return;
 
     try {
-      await adminDeleteStaffSchedule(scheduleId);
-      toast.success('Xóa lịch làm việc thành công!');
+      await adminDeleteStaffSchedule(scheduleToDelete);
+      toast.success("Xóa lịch làm việc thành công!");
       await fetchSchedules();
+      setScheduleToDelete(null);
     } catch (error) {
-      console.error('Error deleting schedule:', error);
-      toast.error('Lỗi khi xóa lịch làm việc');
+      console.error("Error deleting schedule:", error);
+      toast.error("Lỗi khi xóa lịch làm việc");
+    } finally {
+      setDeleteDialogOpen(false);
     }
   };
 
@@ -645,20 +748,28 @@ const AdminStaffScheduleManagement: React.FC = () => {
 
   // Ensure schedules is always an array for filtering
   const safeSchedules = Array.isArray(schedules) ? schedules : [];
-  
+
   // Apply all filters including search term (client-side filtering for search)
   const filteredSchedules = safeSchedules
-    .filter(schedule => {
+    .filter((schedule) => {
       // Search term filter (client-side)
-      if (searchTerm && !schedule.staff?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-      
+      if (
+        searchTerm &&
+        !schedule.staff?.full_name
+          ?.toLowerCase()
+          .includes(searchTerm.toLowerCase())
+      )
+        return false;
+
       // Note: statusFilter, staffFilter, stationFilter, dateFilter are already applied server-side via useEffect
       // But we keep them here for consistency and immediate filtering of search results
-      if (statusFilter !== 'all' && schedule.status !== statusFilter) return false;
+      if (statusFilter !== "all" && schedule.status !== statusFilter)
+        return false;
       if (staffFilter && schedule.staff_id !== staffFilter) return false;
       if (stationFilter && schedule.station_id !== stationFilter) return false;
-      if (dateFilter && !schedule.shift_date.startsWith(dateFilter)) return false;
-      
+      if (dateFilter && !schedule.shift_date.startsWith(dateFilter))
+        return false;
+
       return true;
     })
     .sort((a, b) => {
@@ -670,21 +781,31 @@ const AdminStaffScheduleManagement: React.FC = () => {
 
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
-      case 'scheduled': return 'default';
-      case 'completed': return 'default';
-      case 'absent': return 'destructive';
-      case 'cancelled': return 'secondary';
-      default: return 'secondary';
+      case "scheduled":
+        return "default";
+      case "completed":
+        return "default";
+      case "absent":
+        return "destructive";
+      case "cancelled":
+        return "secondary";
+      default:
+        return "secondary";
     }
   };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'scheduled': return 'Đã lên lịch';
-      case 'completed': return 'Hoàn thành';
-      case 'absent': return 'Vắng mặt';
-      case 'cancelled': return 'Đã hủy';
-      default: return status;
+      case "scheduled":
+        return "Đã lên lịch";
+      case "completed":
+        return "Hoàn thành";
+      case "absent":
+        return "Vắng mặt";
+      case "cancelled":
+        return "Đã hủy";
+      default:
+        return status;
     }
   };
 
@@ -693,22 +814,24 @@ const AdminStaffScheduleManagement: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Quản lí lịch làm việc nhân viên</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Quản lí lịch làm việc nhân viên
+          </h1>
           <p className="text-muted-foreground">
             Quản lý lịch làm việc của nhân viên tại các trạm.
           </p>
         </div>
         <div className="flex gap-2">
-          <Button 
-            variant={viewMode === 'list' ? 'default' : 'outline'}
-            onClick={() => setViewMode('list')}
+          <Button
+            variant={viewMode === "list" ? "default" : "outline"}
+            onClick={() => setViewMode("list")}
             size="sm"
           >
             Xem danh sách
           </Button>
-          <Button 
-            variant={viewMode === 'calendar' ? 'default' : 'outline'}
-            onClick={() => setViewMode('calendar')}
+          <Button
+            variant={viewMode === "calendar" ? "default" : "outline"}
+            onClick={() => setViewMode("calendar")}
             size="sm"
           >
             Xem lịch
@@ -724,43 +847,59 @@ const AdminStaffScheduleManagement: React.FC = () => {
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-blue-700">Tổng lịch</CardTitle>
+            <CardTitle className="text-sm font-medium text-blue-700">
+              Tổng lịch
+            </CardTitle>
             <CalendarDays className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-800">{Array.isArray(schedules) ? schedules.length : 0}</div>
+            <div className="text-2xl font-bold text-blue-800">
+              {Array.isArray(schedules) ? schedules.length : 0}
+            </div>
           </CardContent>
         </Card>
         <Card className="bg-gradient-to-r from-green-50 to-emerald-100 border-green-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-green-700">Đã lên lịch</CardTitle>
+            <CardTitle className="text-sm font-medium text-green-700">
+              Đã lên lịch
+            </CardTitle>
             <UserCheck className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-700">
-              {Array.isArray(schedules) ? schedules.filter(s => s.status === 'scheduled').length : 0}
+              {Array.isArray(schedules)
+                ? schedules.filter((s) => s.status === "scheduled").length
+                : 0}
             </div>
           </CardContent>
         </Card>
         <Card className="bg-gradient-to-r from-amber-50 to-yellow-100 border-amber-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-amber-700">Hoàn thành</CardTitle>
+            <CardTitle className="text-sm font-medium text-amber-700">
+              Hoàn thành
+            </CardTitle>
             <Clock className="h-4 w-4 text-amber-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-amber-800">
-              {Array.isArray(schedules) ? schedules.filter(s => s.status === 'completed').length : 0}
+              {Array.isArray(schedules)
+                ? schedules.filter((s) => s.status === "completed").length
+                : 0}
             </div>
           </CardContent>
         </Card>
         <Card className="bg-gradient-to-r from-red-50 to-rose-100 border-red-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-red-700">Vắng mặt</CardTitle>
+            <CardTitle className="text-sm font-medium text-red-700">
+              Vắng mặt
+            </CardTitle>
             <UserX className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-700">
-              {Array.isArray(schedules) ? schedules.filter(s => s.status === 'absent').length : 0}
+              {Array.isArray(schedules)
+                ? schedules.filter((s) => s.status === "absent").length
+                : 0}
             </div>
           </CardContent>
         </Card>
@@ -788,36 +927,54 @@ const AdminStaffScheduleManagement: React.FC = () => {
               </div>
             </div>
             <div className="min-w-[140px]">
-              <Select value={statusFilter} onValueChange={(value: StatusFilter) => setStatusFilter(value)}>
+              <Select
+                value={statusFilter}
+                onValueChange={(value: StatusFilter) => setStatusFilter(value)}
+              >
                 <SelectTrigger className="h-10">
                   <SelectValue placeholder="Trạng thái" />
                 </SelectTrigger>
                 <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
-                  <SelectItem value="all" className="hover:bg-gray-50 cursor-pointer">
+                  <SelectItem
+                    value="all"
+                    className="hover:bg-gray-50 cursor-pointer"
+                  >
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-gray-400"></div>
                       Tất cả trạng thái
                     </div>
                   </SelectItem>
-                  <SelectItem value="scheduled" className="hover:bg-blue-50 cursor-pointer">
+                  <SelectItem
+                    value="scheduled"
+                    className="hover:bg-blue-50 cursor-pointer"
+                  >
                     <div className="flex items-center gap-2">
                       <CalendarDays className="h-4 w-4 text-blue-600" />
                       Đã lên lịch
                     </div>
                   </SelectItem>
-                  <SelectItem value="completed" className="hover:bg-green-50 cursor-pointer">
+                  <SelectItem
+                    value="completed"
+                    className="hover:bg-green-50 cursor-pointer"
+                  >
                     <div className="flex items-center gap-2">
                       <UserCheck className="h-4 w-4 text-green-600" />
                       Hoàn thành
                     </div>
                   </SelectItem>
-                  <SelectItem value="absent" className="hover:bg-red-50 cursor-pointer">
+                  <SelectItem
+                    value="absent"
+                    className="hover:bg-red-50 cursor-pointer"
+                  >
                     <div className="flex items-center gap-2">
                       <UserX className="h-4 w-4 text-red-600" />
                       Vắng mặt
                     </div>
                   </SelectItem>
-                  <SelectItem value="cancelled" className="hover:bg-gray-50 cursor-pointer">
+                  <SelectItem
+                    value="cancelled"
+                    className="hover:bg-gray-50 cursor-pointer"
+                  >
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-gray-600" />
                       Đã hủy
@@ -832,14 +989,21 @@ const AdminStaffScheduleManagement: React.FC = () => {
                   <SelectValue placeholder="Nhân viên" />
                 </SelectTrigger>
                 <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
-                  <SelectItem value="" className="hover:bg-gray-50 cursor-pointer">
+                  <SelectItem
+                    value=""
+                    className="hover:bg-gray-50 cursor-pointer"
+                  >
                     <div className="flex items-center gap-2">
                       <Users className="h-4 w-4 text-gray-500" />
                       Tất cả nhân viên
                     </div>
                   </SelectItem>
                   {staff.map((s) => (
-                    <SelectItem key={s.user_id} value={s.user_id} className="hover:bg-blue-50 cursor-pointer">
+                    <SelectItem
+                      key={s.user_id}
+                      value={s.user_id}
+                      className="hover:bg-blue-50 cursor-pointer"
+                    >
                       <div className="flex items-center gap-2">
                         <UserCheck className="h-4 w-4 text-blue-500" />
                         {s.full_name}
@@ -855,14 +1019,21 @@ const AdminStaffScheduleManagement: React.FC = () => {
                   <SelectValue placeholder="Trạm" />
                 </SelectTrigger>
                 <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
-                  <SelectItem value="" className="hover:bg-gray-50 cursor-pointer">
+                  <SelectItem
+                    value=""
+                    className="hover:bg-gray-50 cursor-pointer"
+                  >
                     <div className="flex items-center gap-2">
                       <Building className="h-4 w-4 text-gray-500" />
                       Tất cả trạm
                     </div>
                   </SelectItem>
                   {stations.map((station) => (
-                    <SelectItem key={station.station_id} value={station.station_id} className="hover:bg-green-50 cursor-pointer">
+                    <SelectItem
+                      key={station.station_id}
+                      value={station.station_id}
+                      className="hover:bg-green-50 cursor-pointer"
+                    >
                       <div className="flex items-center gap-2">
                         <Building className="h-4 w-4 text-green-500" />
                         {station.name}
@@ -893,21 +1064,30 @@ const AdminStaffScheduleManagement: React.FC = () => {
         {loading ? (
           <div className="flex flex-col justify-center items-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600 mb-4"></div>
-            <p className="text-gray-600 animate-pulse">Đang tải lịch làm việc...</p>
+            <p className="text-gray-600 animate-pulse">
+              Đang tải lịch làm việc...
+            </p>
           </div>
         ) : filteredSchedules.length === 0 ? (
           <Card>
             <CardContent className="text-center py-12">
               <Calendar className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500 text-lg font-medium">Không tìm thấy lịch làm việc nào</p>
-              <p className="text-gray-400 text-sm mt-2">Hãy thử thay đổi bộ lọc hoặc tạo lịch mới</p>
+              <p className="text-gray-500 text-lg font-medium">
+                Không tìm thấy lịch làm việc nào
+              </p>
+              <p className="text-gray-400 text-sm mt-2">
+                Hãy thử thay đổi bộ lọc hoặc tạo lịch mới
+              </p>
             </CardContent>
           </Card>
-        ) : viewMode === 'list' ? (
+        ) : viewMode === "list" ? (
           // List View
           <div className="space-y-4">
             {filteredSchedules.map((schedule) => (
-              <Card key={schedule.schedule_id} className="transition-all duration-200 hover:shadow-lg">
+              <Card
+                key={schedule.schedule_id}
+                className="transition-all duration-200 hover:shadow-lg"
+              >
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
@@ -915,7 +1095,9 @@ const AdminStaffScheduleManagement: React.FC = () => {
                         <Users className="h-6 w-6 text-blue-600" />
                       </div>
                       <div className="space-y-1">
-                        <h3 className="font-semibold text-lg">{schedule.staff?.full_name}</h3>
+                        <h3 className="font-semibold text-lg">
+                          {schedule.staff?.full_name}
+                        </h3>
                         <div className="flex items-center space-x-4 text-sm text-gray-600">
                           <div className="flex items-center gap-1">
                             <Calendar className="h-4 w-4" />
@@ -960,7 +1142,9 @@ const AdminStaffScheduleManagement: React.FC = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleDeleteSchedule(schedule.schedule_id)}
+                          onClick={() =>
+                            handleOpenDeleteDialog(schedule.schedule_id)
+                          }
                           className="gap-1 text-red-600 hover:text-red-700"
                         >
                           <Trash2 className="h-3 w-3" />
@@ -982,7 +1166,7 @@ const AdminStaffScheduleManagement: React.FC = () => {
           </div>
         ) : (
           // Calendar View
-          <CalendarView 
+          <CalendarView
             schedules={filteredSchedules}
             onViewSchedule={handleViewSchedule}
             onEditSchedule={handleEditSchedule}
@@ -996,34 +1180,43 @@ const AdminStaffScheduleManagement: React.FC = () => {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
-              {editingSchedule ? 'Chỉnh sửa lịch làm việc' : 'Tạo lịch làm việc mới'}
+              {editingSchedule
+                ? "Chỉnh sửa lịch làm việc"
+                : "Tạo lịch làm việc mới"}
             </DialogTitle>
             <DialogDescription>
-              {editingSchedule 
-                ? 'Cập nhật thông tin lịch làm việc' 
-                : 'Điền thông tin để tạo lịch làm việc mới'
-              }
+              {editingSchedule
+                ? "Cập nhật thông tin lịch làm việc"
+                : "Điền thông tin để tạo lịch làm việc mới"}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Nhân viên *</label>
-                <Select 
-                  value={formData.staff_id} 
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, staff_id: value }))}
+                <Select
+                  value={formData.staff_id}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({ ...prev, staff_id: value }))
+                  }
                 >
                   <SelectTrigger className="w-full h-11 border border-input rounded-md">
                     <SelectValue placeholder="Chọn nhân viên" />
                   </SelectTrigger>
                   <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
                     {staff.map((s) => (
-                      <SelectItem key={s.user_id} value={s.user_id} className="hover:bg-blue-50 cursor-pointer">
+                      <SelectItem
+                        key={s.user_id}
+                        value={s.user_id}
+                        className="hover:bg-blue-50 cursor-pointer"
+                      >
                         <div className="flex items-center gap-3">
                           <UserCheck className="h-4 w-4 text-blue-500" />
                           <div>
                             <div className="font-medium">{s.full_name}</div>
-                            <div className="text-xs text-slate-500">{s.email}</div>
+                            <div className="text-xs text-slate-500">
+                              {s.email}
+                            </div>
                           </div>
                         </div>
                       </SelectItem>
@@ -1033,22 +1226,34 @@ const AdminStaffScheduleManagement: React.FC = () => {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Trạm</label>
-                <Select 
-                  value={formData.station_id || ''} 
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, station_id: value || null }))}
+                <Select
+                  value={formData.station_id || ""}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      station_id: value || null,
+                    }))
+                  }
                 >
                   <SelectTrigger className="w-full h-11 border border-input rounded-md">
                     <SelectValue placeholder="Chọn trạm (tuỳ chọn)" />
                   </SelectTrigger>
                   <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
-                    <SelectItem value="" className="hover:bg-gray-50 cursor-pointer">
+                    <SelectItem
+                      value=""
+                      className="hover:bg-gray-50 cursor-pointer"
+                    >
                       <div className="flex items-center gap-2">
                         <Building className="h-4 w-4 text-gray-500" />
                         Không chỉ định trạm
                       </div>
                     </SelectItem>
                     {stations.map((station) => (
-                      <SelectItem key={station.station_id} value={station.station_id} className="hover:bg-green-50 cursor-pointer">
+                      <SelectItem
+                        key={station.station_id}
+                        value={station.station_id}
+                        className="hover:bg-green-50 cursor-pointer"
+                      >
                         <div className="flex items-center gap-2">
                           <Building className="h-4 w-4 text-green-500" />
                           {station.name}
@@ -1105,43 +1310,60 @@ const AdminStaffScheduleManagement: React.FC = () => {
                   onChange={handleInputChange}
                   required
                 />
-                {formData.shift_start && formData.shift_end && formData.shift_end <= formData.shift_start && (
-                  <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded">
-                    ℹ️ Ca làm việc qua đêm: Kết thúc vào sáng hôm sau ({formData.shift_end})
-                  </div>
-                )}
+                {formData.shift_start &&
+                  formData.shift_end &&
+                  formData.shift_end <= formData.shift_start && (
+                    <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded">
+                      ℹ️ Ca làm việc qua đêm: Kết thúc vào sáng hôm sau (
+                      {formData.shift_end})
+                    </div>
+                  )}
               </div>
             </div>
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Trạng thái</label>
-              <Select 
-                value={formData.status} 
-                onValueChange={(value: 'scheduled' | 'completed' | 'absent' | 'cancelled') => setFormData(prev => ({ ...prev, status: value }))}
+              <Select
+                value={formData.status}
+                onValueChange={(
+                  value: "scheduled" | "completed" | "absent" | "cancelled"
+                ) => setFormData((prev) => ({ ...prev, status: value }))}
               >
                 <SelectTrigger className="w-full h-11 border border-input rounded-md">
                   <SelectValue placeholder="Chọn trạng thái" />
                 </SelectTrigger>
                 <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md">
-                  <SelectItem value="scheduled" className="hover:bg-blue-50 cursor-pointer">
+                  <SelectItem
+                    value="scheduled"
+                    className="hover:bg-blue-50 cursor-pointer"
+                  >
                     <div className="flex items-center gap-2">
                       <CalendarDays className="h-4 w-4 text-blue-600" />
                       Đã lên lịch
                     </div>
                   </SelectItem>
-                  <SelectItem value="completed" className="hover:bg-green-50 cursor-pointer">
+                  <SelectItem
+                    value="completed"
+                    className="hover:bg-green-50 cursor-pointer"
+                  >
                     <div className="flex items-center gap-2">
                       <UserCheck className="h-4 w-4 text-green-600" />
                       Hoàn thành
                     </div>
                   </SelectItem>
-                  <SelectItem value="absent" className="hover:bg-red-50 cursor-pointer">
+                  <SelectItem
+                    value="absent"
+                    className="hover:bg-red-50 cursor-pointer"
+                  >
                     <div className="flex items-center gap-2">
                       <UserX className="h-4 w-4 text-red-600" />
                       Vắng mặt
                     </div>
                   </SelectItem>
-                  <SelectItem value="cancelled" className="hover:bg-gray-50 cursor-pointer">
+                  <SelectItem
+                    value="cancelled"
+                    className="hover:bg-gray-50 cursor-pointer"
+                  >
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-gray-600" />
                       Đã hủy
@@ -1164,16 +1386,25 @@ const AdminStaffScheduleManagement: React.FC = () => {
             </div>
 
             <div className="flex gap-3 pt-4">
-              <Button type="button" variant="outline" onClick={handleCloseModal} className="flex-1">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCloseModal}
+                className="flex-1"
+              >
                 Hủy
               </Button>
-              <Button 
-                type="submit" 
-                className="flex-1" 
+              <Button
+                type="submit"
+                className="flex-1"
                 disabled={hasConflict}
-                title={hasConflict ? "Không thể tạo lịch vì có xung đột thời gian" : ""}
+                title={
+                  hasConflict
+                    ? "Không thể tạo lịch vì có xung đột thời gian"
+                    : ""
+                }
               >
-                {editingSchedule ? 'Cập nhật' : 'Tạo lịch'}
+                {editingSchedule ? "Cập nhật" : "Tạo lịch"}
               </Button>
             </div>
           </form>
@@ -1194,16 +1425,28 @@ const AdminStaffScheduleManagement: React.FC = () => {
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div>
-                    <h3 className="font-medium text-sm text-muted-foreground mb-1">Nhân viên</h3>
-                    <p className="font-semibold">{viewingSchedule.staff?.full_name}</p>
-                    <p className="text-sm text-gray-600">{viewingSchedule.staff?.email}</p>
+                    <h3 className="font-medium text-sm text-muted-foreground mb-1">
+                      Nhân viên
+                    </h3>
+                    <p className="font-semibold">
+                      {viewingSchedule.staff?.full_name}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      {viewingSchedule.staff?.email}
+                    </p>
                   </div>
                   <div>
-                    <h3 className="font-medium text-sm text-muted-foreground mb-1">Ngày làm việc</h3>
-                    <p className="font-semibold">{formatDate(viewingSchedule.shift_date)}</p>
+                    <h3 className="font-medium text-sm text-muted-foreground mb-1">
+                      Ngày làm việc
+                    </h3>
+                    <p className="font-semibold">
+                      {formatDate(viewingSchedule.shift_date)}
+                    </p>
                   </div>
                   <div>
-                    <h3 className="font-medium text-sm text-muted-foreground mb-1">Giờ làm việc</h3>
+                    <h3 className="font-medium text-sm text-muted-foreground mb-1">
+                      Giờ làm việc
+                    </h3>
                     <p className="font-semibold">
                       {formatShiftTime(viewingSchedule)}
                     </p>
@@ -1211,42 +1454,67 @@ const AdminStaffScheduleManagement: React.FC = () => {
                 </div>
                 <div className="space-y-4">
                   <div>
-                    <h3 className="font-medium text-sm text-muted-foreground mb-1">Trạm làm việc</h3>
+                    <h3 className="font-medium text-sm text-muted-foreground mb-1">
+                      Trạm làm việc
+                    </h3>
                     <p className="font-semibold">
-                      {viewingSchedule.station?.name || 'Chưa chỉ định'}
+                      {viewingSchedule.station?.name || "Chưa chỉ định"}
                     </p>
                     {viewingSchedule.station && (
-                      <p className="text-sm text-gray-600">{viewingSchedule.station.address}</p>
+                      <p className="text-sm text-gray-600">
+                        {viewingSchedule.station.address}
+                      </p>
                     )}
                   </div>
                   <div>
-                    <h3 className="font-medium text-sm text-muted-foreground mb-1">Trạng thái</h3>
-                    <Badge variant={getStatusBadgeVariant(viewingSchedule.status)}>
+                    <h3 className="font-medium text-sm text-muted-foreground mb-1">
+                      Trạng thái
+                    </h3>
+                    <Badge
+                      variant={getStatusBadgeVariant(viewingSchedule.status)}
+                    >
                       {getStatusLabel(viewingSchedule.status)}
                     </Badge>
                   </div>
                   <div>
-                    <h3 className="font-medium text-sm text-muted-foreground mb-1">Ngày tạo</h3>
-                    <p className="text-sm">{new Date(viewingSchedule.created_at).toLocaleDateString('vi-VN')}</p>
+                    <h3 className="font-medium text-sm text-muted-foreground mb-1">
+                      Ngày tạo
+                    </h3>
+                    <p className="text-sm">
+                      {new Date(viewingSchedule.created_at).toLocaleDateString(
+                        "vi-VN"
+                      )}
+                    </p>
                   </div>
                 </div>
               </div>
 
               {viewingSchedule.notes && (
                 <div>
-                  <h3 className="font-medium text-sm text-muted-foreground mb-2">Ghi chú</h3>
-                  <p className="text-sm leading-relaxed bg-gray-50 p-3 rounded-md">{viewingSchedule.notes}</p>
+                  <h3 className="font-medium text-sm text-muted-foreground mb-2">
+                    Ghi chú
+                  </h3>
+                  <p className="text-sm leading-relaxed bg-gray-50 p-3 rounded-md">
+                    {viewingSchedule.notes}
+                  </p>
                 </div>
               )}
 
               <div className="flex gap-3 pt-4">
-                <Button variant="outline" onClick={handleCloseModal} className="flex-1">
+                <Button
+                  variant="outline"
+                  onClick={handleCloseModal}
+                  className="flex-1"
+                >
                   Đóng
                 </Button>
-                <Button onClick={() => {
-                  handleCloseModal();
-                  handleEditSchedule(viewingSchedule);
-                }} className="flex-1 gap-2">
+                <Button
+                  onClick={() => {
+                    handleCloseModal();
+                    handleEditSchedule(viewingSchedule);
+                  }}
+                  className="flex-1 gap-2"
+                >
                   <Edit3 className="h-4 w-4" />
                   Chỉnh sửa
                 </Button>
@@ -1255,6 +1523,31 @@ const AdminStaffScheduleManagement: React.FC = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Schedule Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-red-600" />
+              Xác nhận xóa lịch làm việc
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Bạn có chắc chắn muốn xóa lịch làm việc này? Hành động này không
+              thể hoàn tác.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Hủy</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteSchedule}
+              className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
+            >
+              Xác nhận xóa
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

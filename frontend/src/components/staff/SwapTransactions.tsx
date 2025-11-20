@@ -100,23 +100,26 @@ const SwapTransactions: React.FC = () => {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
 
   // Form states
-  const [phoneInput, setPhoneInput] = useState('');
-  const [oldBatteryCode, setOldBatteryCode] = useState('');
-  const [newBatteryCode, setNewBatteryCode] = useState('');
-  const [batteryModel, setBatteryModel] = useState('');
-  const [currentBatteryModel, setCurrentBatteryModel] = useState('');
-  const [oldBatteryStatus, setOldBatteryStatus] = useState<'good' | 'damaged' | 'maintenance'>('good');
+  const [phoneInput, setPhoneInput] = useState("");
+  const [oldBatteryCode, setOldBatteryCode] = useState("");
+  const [newBatteryCode, setNewBatteryCode] = useState("");
+  const [batteryModel, setBatteryModel] = useState("");
+  const [currentBatteryModel, setCurrentBatteryModel] = useState("");
+  const [oldBatteryStatus, setOldBatteryStatus] = useState<
+    "good" | "damaged" | "maintenance"
+  >("good");
   const [oldBatteryCharge, setOldBatteryCharge] = useState<number>(0);
   const [newBatteryCharge, setNewBatteryCharge] = useState<number>(100);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelConfirmed, setCancelConfirmed] = useState(false);
   const [completeError, setCompleteError] = useState<string | null>(null);
-  
+
   // Available batteries for dropdown
   const [availableBatteries, setAvailableBatteries] = useState<Battery[]>([]);
   const [loadingBatteries, setLoadingBatteries] = useState(false);
-  const [isOldBatteryCodeAutoLoaded, setIsOldBatteryCodeAutoLoaded] = useState(false);
-  
+  const [isOldBatteryCodeAutoLoaded, setIsOldBatteryCodeAutoLoaded] =
+    useState(false);
+
   const { toast } = useToast();
 
   // Fetch all bookings (for client-side filtering, searching, sorting)
@@ -392,7 +395,7 @@ const SwapTransactions: React.FC = () => {
     try {
       setActionLoading(selectedBooking.booking_id);
       const response = await confirmBooking(selectedBooking.booking_id, {
-        phone: phoneInput,
+        phone: phoneInput.trim(),
       });
 
       if (response.success) {
@@ -417,119 +420,174 @@ const SwapTransactions: React.FC = () => {
   // Open complete dialog
   const handleOpenCompleteDialog = async (booking: StaffBooking) => {
     setSelectedBooking(booking);
-    setBatteryModel(booking.battery_model || '');
-    setCurrentBatteryModel('');
-    setOldBatteryStatus('good');
+    setBatteryModel(booking.battery_model || "");
+    setCurrentBatteryModel("");
+    setOldBatteryStatus("good");
     setOldBatteryCharge(0);
     setNewBatteryCharge(100);
     setCompleteError(null); // Reset error
     setAvailableBatteries([]);
-    setIsOldBatteryCodeAutoLoaded(false);
-    
+
     // Hiển thị mã pin hiện tại ngay lập tức nếu đã có sẵn trong booking object
-    const existingBatteryCode = booking.vehicle?.current_battery?.battery_code || '';
-    if (existingBatteryCode && existingBatteryCode.trim() !== '') {
+    const existingBatteryCode =
+      booking.vehicle?.current_battery?.battery_code || "";
+    if (existingBatteryCode && existingBatteryCode.trim() !== "") {
       setOldBatteryCode(existingBatteryCode);
       setIsOldBatteryCodeAutoLoaded(true);
+      console.log(
+        "[handleOpenCompleteDialog] ✅ Set old battery code from booking object:",
+        existingBatteryCode
+      );
     } else {
-      setOldBatteryCode('');
+      setOldBatteryCode("");
+      setIsOldBatteryCodeAutoLoaded(false);
     }
-    
+
     // Hiển thị mã pin mới ngay lập tức nếu đã có pin được reserved (giữ) cho booking này
-    const reservedBatteryCode = booking.locked_battery?.battery_code || '';
-    if (reservedBatteryCode && reservedBatteryCode.trim() !== '') {
+    const reservedBatteryCode = booking.locked_battery?.battery_code || "";
+    if (reservedBatteryCode && reservedBatteryCode.trim() !== "") {
       setNewBatteryCode(reservedBatteryCode);
+      console.log(
+        "[handleOpenCompleteDialog] ✅ Set new battery code from booking object:",
+        reservedBatteryCode
+      );
     } else {
-      setNewBatteryCode('');
+      setNewBatteryCode("");
     }
-    
+
     setCompleteDialogOpen(true);
-    
+
     try {
       // Lấy thông tin chi tiết booking để có vehicle.current_battery (đảm bảo dữ liệu mới nhất)
       setLoadingBatteries(true);
-      console.log('[handleOpenCompleteDialog] Calling getBookingDetails with booking_id:', booking.booking_id);
+      console.log(
+        "[handleOpenCompleteDialog] Calling getBookingDetails with booking_id:",
+        booking.booking_id
+      );
       const bookingDetails = await getBookingDetails(booking.booking_id);
-      console.log('[handleOpenCompleteDialog] Booking details response:', bookingDetails);
-      
+
       if (bookingDetails.success && bookingDetails.data) {
         const fullBooking = bookingDetails.data as any;
-        
+
         // Debug: Log để kiểm tra dữ liệu
-        console.log('[handleOpenCompleteDialog] Full booking data:', fullBooking);
-        console.log('[handleOpenCompleteDialog] Vehicle:', fullBooking.vehicle);
-        console.log('[handleOpenCompleteDialog] Vehicle current_battery_id:', fullBooking.vehicle?.current_battery_id);
-        console.log('[handleOpenCompleteDialog] Current battery:', fullBooking.vehicle?.current_battery);
-        console.log('[handleOpenCompleteDialog] Current battery type:', typeof fullBooking.vehicle?.current_battery);
-        console.log('[handleOpenCompleteDialog] Current battery is null?', fullBooking.vehicle?.current_battery === null);
-        console.log('[handleOpenCompleteDialog] Current battery is undefined?', fullBooking.vehicle?.current_battery === undefined);
-        
-        // Lấy mã pin hiện tại từ vehicle.current_battery (cập nhật từ API)
+        console.log(
+          "[handleOpenCompleteDialog] Full booking data:",
+          fullBooking
+        );
+        console.log("[handleOpenCompleteDialog] Vehicle:", fullBooking.vehicle);
+        console.log(
+          "[handleOpenCompleteDialog] Vehicle current_battery_id:",
+          fullBooking.vehicle?.current_battery_id
+        );
+        console.log(
+          "[handleOpenCompleteDialog] Current battery:",
+          fullBooking.vehicle?.current_battery
+        );
+        console.log(
+          "[handleOpenCompleteDialog] Current battery type:",
+          typeof fullBooking.vehicle?.current_battery
+        );
+        console.log(
+          "[handleOpenCompleteDialog] Current battery is null?",
+          fullBooking.vehicle?.current_battery === null
+        );
+        console.log(
+          "[handleOpenCompleteDialog] Current battery is undefined?",
+          fullBooking.vehicle?.current_battery === undefined
+        );
+
+        // Lấy mã pin hiện tại từ vehicle.current_battery (từ API response - đảm bảo dữ liệu mới nhất)
         const currentBattery = fullBooking.vehicle?.current_battery;
-        const currentBatteryCode = currentBattery?.battery_code || '';
-        
-        console.log('[handleOpenCompleteDialog] Current battery object:', currentBattery);
-        console.log('[handleOpenCompleteDialog] Current battery code:', currentBatteryCode);
-        console.log('[handleOpenCompleteDialog] Current battery code type:', typeof currentBatteryCode);
-        
-        if (currentBatteryCode && currentBatteryCode.trim() !== '') {
+        const currentBatteryCode = currentBattery?.battery_code || "";
+
+        console.log(
+          "[handleOpenCompleteDialog] Current battery object:",
+          currentBattery
+        );
+        console.log(
+          "[handleOpenCompleteDialog] Current battery code:",
+          currentBatteryCode
+        );
+        console.log(
+          "[handleOpenCompleteDialog] Current battery code type:",
+          typeof currentBatteryCode
+        );
+
+        // Luôn cập nhật mã pin hiện tại từ API response (đảm bảo dữ liệu mới nhất)
+        if (currentBatteryCode && currentBatteryCode.trim() !== "") {
           setOldBatteryCode(currentBatteryCode);
           setIsOldBatteryCodeAutoLoaded(true); // Đánh dấu là đã load tự động
-          console.log('[handleOpenCompleteDialog] ✅ Set old battery code:', currentBatteryCode);
+          console.log(
+            "[handleOpenCompleteDialog] ✅ Set old battery code from API:",
+            currentBatteryCode
+          );
         } else {
-          if (!currentBattery) {
-            console.warn('[handleOpenCompleteDialog] ⚠️ Vehicle has no current_battery (current_battery is null/undefined)');
-            console.warn('[handleOpenCompleteDialog] ⚠️ Vehicle current_battery_id:', fullBooking.vehicle?.current_battery_id);
-          } else if (!currentBattery.battery_code) {
-            console.warn('[handleOpenCompleteDialog] ⚠️ Current battery exists but has no battery_code');
-            console.warn('[handleOpenCompleteDialog] ⚠️ Current battery object:', currentBattery);
+          // Nếu API không trả về current_battery, giữ nguyên giá trị từ booking object (nếu có)
+          if (!oldBatteryCode || oldBatteryCode.trim() === "") {
+            if (!currentBattery) {
+              console.warn(
+                "[handleOpenCompleteDialog] ⚠️ Vehicle has no current_battery (current_battery is null/undefined)"
+              );
+              console.warn(
+                "[handleOpenCompleteDialog] ⚠️ Vehicle current_battery_id:",
+                fullBooking.vehicle?.current_battery_id
+              );
+            } else if (!currentBattery.battery_code) {
+              console.warn(
+                "[handleOpenCompleteDialog] ⚠️ Current battery exists but has no battery_code"
+              );
+              console.warn(
+                "[handleOpenCompleteDialog] ⚠️ Current battery object:",
+                currentBattery
+              );
+            } else {
+              console.warn(
+                "[handleOpenCompleteDialog] ⚠️ Current battery code is empty string"
+              );
+            }
           } else {
-            console.warn('[handleOpenCompleteDialog] ⚠️ Current battery code is empty string');
+            console.log(
+              "[handleOpenCompleteDialog] ℹ️ Keeping existing old battery code from booking object:",
+              oldBatteryCode
+            );
           }
         }
-        
+
         // Lấy model pin hiện tại từ vehicle.current_battery
-        const currentBatteryModelValue = fullBooking.vehicle?.current_battery?.model || '';
+        const currentBatteryModelValue =
+          fullBooking.vehicle?.current_battery?.model || "";
         if (currentBatteryModelValue) {
           setCurrentBatteryModel(currentBatteryModelValue);
-          console.log('[handleOpenCompleteDialog] ✅ Set current battery model:', currentBatteryModelValue);
+          console.log(
+            "[handleOpenCompleteDialog] ✅ Set current battery model:",
+            currentBatteryModelValue
+          );
         }
-        
-        // Cập nhật mã pin mới từ locked_battery nếu có (từ API response)
-        const reservedBatteryFromAPI = fullBooking.locked_battery;
-        if (reservedBatteryFromAPI?.battery_code && reservedBatteryFromAPI.battery_code.trim() !== '') {
-          setNewBatteryCode(reservedBatteryFromAPI.battery_code);
-          // Cập nhật selectedBooking với locked_battery từ API để UI hiển thị đúng
-          setSelectedBooking({
-            ...selectedBooking!,
-            locked_battery: reservedBatteryFromAPI
-          });
-          console.log('[handleOpenCompleteDialog] ✅ Set new battery code from locked_battery:', reservedBatteryFromAPI.battery_code);
-        }
-        
+
         // Lấy danh sách pin mới có trong kho (status: full hoặc reserved, cùng model)
-        const batteryModel = booking.battery_model || fullBooking.battery_model || '';
+        const batteryModel =
+          booking.battery_model || fullBooking.battery_model || "";
         if (batteryModel) {
           const batteriesResponse = await getStationBatteries({
             model: batteryModel,
             // Không filter status ở đây, sẽ lọc ở frontend
           });
-          
+
           if (batteriesResponse.success && batteriesResponse.data) {
             // Lọc pin có status full hoặc reserved (pin có sẵn để đổi)
             const available = (batteriesResponse.data as Battery[]).filter(
-              (b: Battery) => b.status === 'full' || b.status === 'reserved'
+              (b: Battery) => b.status === "full" || b.status === "reserved"
             );
             setAvailableBatteries(available);
           }
         }
       }
     } catch (error: any) {
-      console.error('Error loading booking details or batteries:', error);
+      console.error("Error loading booking details or batteries:", error);
       toast({
-        title: 'Cảnh báo',
-        description: 'Không thể tải thông tin pin. Vui lòng thử lại.',
-        variant: 'destructive',
+        title: "Cảnh báo",
+        description: "Không thể tải thông tin pin. Vui lòng thử lại.",
+        variant: "destructive",
       });
     } finally {
       setLoadingBatteries(false);
@@ -545,9 +603,10 @@ const SwapTransactions: React.FC = () => {
       !batteryModel.trim()
     ) {
       toast({
-        title: 'Lỗi',
-        description: 'Vui lòng điền đầy đủ thông tin (mã pin hiện tại, mã pin mới, và model pin)',
-        variant: 'destructive',
+        title: "Lỗi",
+        description:
+          "Vui lòng điền đầy đủ thông tin (mã pin hiện tại, mã pin mới, và model pin)",
+        variant: "destructive",
       });
       return;
     }
@@ -1378,6 +1437,11 @@ const SwapTransactions: React.FC = () => {
                 <p className="text-sm">
                   <strong>Mã booking:</strong> {selectedBooking.booking_code}
                 </p>
+                {selectedBooking.user?.phone && (
+                  <p className="text-sm mt-1">
+                    <strong>SĐT đăng ký:</strong> {selectedBooking.user.phone}
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">
@@ -1392,7 +1456,7 @@ const SwapTransactions: React.FC = () => {
                   disabled={actionLoading === selectedBooking.booking_id}
                 />
                 <p className="text-xs text-gray-500">
-                  Số điện thoại phải khớp với thông tin đăng ký của khách hàng
+                  Số điện thoại phải khớp với thông tin đăng ký của khách hàng.
                 </p>
               </div>
             </div>
@@ -1462,7 +1526,7 @@ const SwapTransactions: React.FC = () => {
                       </p>
                       {completeError.includes("not found") && (
                         <p className="text-xs text-red-600 dark:text-red-400 mt-2">
-                          💡 Kiểm tra lại mã pin hiện tại. Mã pin phải tồn tại trong hệ thống kho pin.
+                          Mã pin không tồn tại trong hệ thống.
                         </p>
                       )}
                       {completeError.includes("không khớp với pin đã giữ") &&
@@ -1473,21 +1537,15 @@ const SwapTransactions: React.FC = () => {
                           );
                           const reservedBatteryCode = match ? match[1] : null;
                           return (
-                            <div className="text-xs text-red-600 dark:text-red-400 mt-2 space-y-1">
-                              <p className="font-semibold">💡 Hướng dẫn:</p>
+                            <div className="text-xs text-red-600 dark:text-red-400 mt-2">
                               {reservedBatteryCode && (
-                                <p className="bg-red-100 dark:bg-red-900/30 px-2 py-1 rounded font-mono font-bold">
+                                <p className="font-mono font-semibold mb-1">
                                   Mã pin đã giữ: {reservedBatteryCode}
                                 </p>
                               )}
                               <p>
-                                • Mã pin mới phải khớp với pin đã được giữ cho
-                                booking này
-                              </p>
-                              <p>• Kiểm tra lại mã pin trên nhãn pin thực tế</p>
-                              <p>
-                                • Nếu pin đã bị thay đổi/điều phối, vui lòng yêu
-                                cầu driver đặt lại booking
+                                Mã pin mới phải khớp với pin đã được giữ cho
+                                booking này.
                               </p>
                             </div>
                           );
@@ -1496,7 +1554,8 @@ const SwapTransactions: React.FC = () => {
                         "không khớp với pin hiện tại của xe"
                       ) && (
                         <p className="text-xs text-red-600 dark:text-red-400 mt-2">
-                          💡 Mã pin hiện tại phải khớp với pin đang được sử dụng trên xe của khách hàng. Vui lòng kiểm tra lại.
+                          Mã pin hiện tại không khớp với pin đang sử dụng trên
+                          xe.
                         </p>
                       )}
                     </div>
@@ -1505,60 +1564,92 @@ const SwapTransactions: React.FC = () => {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="oldBatteryCode" className="flex items-center gap-2">
+                <Label
+                  htmlFor="oldBatteryCode"
+                  className="flex items-center gap-2"
+                >
                   <BatteryIcon className="h-4 w-4 text-orange-600" />
                   Mã pin hiện tại <span className="text-red-500">*</span>
                 </Label>
                 {loadingBatteries ? (
                   <div className="flex items-center gap-2 p-3 border rounded-md bg-gray-50 dark:bg-slate-800">
                     <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-                    <span className="text-sm text-gray-500">Đang tải thông tin pin hiện tại...</span>
-                  </div>
-                ) : oldBatteryCode && oldBatteryCode.trim() !== '' ? (
-                  // Hiển thị pin hiện tại với UI đẹp
-                  <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-md p-3">
-                    <div className="flex items-center gap-2 mb-1">
-                      <BatteryIcon className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-                      <span className="text-sm font-semibold text-orange-800 dark:text-orange-200">
-                        Pin hiện tại đang sử dụng trên xe
-                      </span>
-                    </div>
-                    <div className="text-xs text-orange-700 dark:text-orange-300 space-y-1">
-                      <p className="font-mono font-semibold text-base text-orange-900 dark:text-orange-100">
-                        {oldBatteryCode}
-                      </p>
-                      {currentBatteryModel && (
-                        <p>
-                          Model: <span className="font-semibold">{currentBatteryModel}</span>
-                        </p>
-                      )}
-                    </div>
+                    <span className="text-sm text-gray-500">
+                      Đang tải thông tin pin hiện tại...
+                    </span>
                   </div>
                 ) : (
-                  <Input
-                    id="oldBatteryCode"
-                    type="text"
-                    placeholder="VD: BAT-TD03, BAT-VF001, BAT-123"
-                    value={oldBatteryCode || ''}
-                    onChange={(e) => {
-                      setOldBatteryCode(e.target.value);
-                      if (completeError) setCompleteError(null); // Clear error khi user nhập lại
-                    }}
-                    disabled={actionLoading === selectedBooking.booking_id}
-                    className={`font-mono ${completeError && completeError.includes('not found') ? 'border-red-500 focus:border-red-500' : ''}`}
-                  />
+                  <>
+                    <div className="relative">
+                      <Input
+                        id="oldBatteryCode"
+                        type="text"
+                        placeholder="VD: BAT-TD03, BAT-VF001, BAT-123"
+                        value={oldBatteryCode || ""}
+                        onChange={(e) => {
+                          // Chỉ cho phép chỉnh sửa nếu không phải là mã pin tự động load từ xe
+                          if (!isOldBatteryCodeAutoLoaded) {
+                            setOldBatteryCode(e.target.value);
+                            if (completeError) setCompleteError(null); // Clear error khi user nhập lại
+                          }
+                        }}
+                        disabled={
+                          actionLoading === selectedBooking.booking_id ||
+                          isOldBatteryCodeAutoLoaded
+                        }
+                        readOnly={isOldBatteryCodeAutoLoaded}
+                        className={`font-mono pr-20 ${
+                          completeError && completeError.includes("not found")
+                            ? "border-red-500 focus:border-red-500"
+                            : ""
+                        } ${
+                          oldBatteryCode && !loadingBatteries
+                            ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
+                            : ""
+                        } ${
+                          isOldBatteryCodeAutoLoaded
+                            ? "cursor-not-allowed bg-gray-100 dark:bg-gray-800"
+                            : ""
+                        }`}
+                      />
+                      {oldBatteryCode &&
+                        !loadingBatteries &&
+                        isOldBatteryCodeAutoLoaded && (
+                          <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                            <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">
+                              Tự động
+                            </Badge>
+                          </div>
+                        )}
+                    </div>
+                    {currentBatteryModel && (
+                      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-2">
+                        <p className="text-xs text-blue-800 dark:text-blue-200">
+                          <span className="font-semibold">
+                            Model pin hiện tại:
+                          </span>{" "}
+                          {currentBatteryModel}
+                        </p>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="newBatteryCode" className="flex items-center gap-2">
+                <Label
+                  htmlFor="newBatteryCode"
+                  className="flex items-center gap-2"
+                >
                   <BatteryIcon className="h-4 w-4 text-green-600" />
                   Mã pin mới <span className="text-red-500">*</span>
                 </Label>
                 {loadingBatteries ? (
                   <div className="flex items-center gap-2 p-3 border rounded-md bg-gray-50 dark:bg-slate-800">
                     <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-                    <span className="text-sm text-gray-500">Đang tải danh sách pin...</span>
+                    <span className="text-sm text-gray-500">
+                      Đang tải danh sách pin...
+                    </span>
                   </div>
                 ) : selectedBooking?.locked_battery?.battery_code ? (
                   // Hiển thị pin đã được giữ với UI đẹp, không cho phép chọn
@@ -1574,14 +1665,21 @@ const SwapTransactions: React.FC = () => {
                         <p className="font-mono font-semibold text-base text-green-900 dark:text-green-100">
                           {selectedBooking.locked_battery.battery_code}
                         </p>
-                        {selectedBooking.locked_battery.current_charge !== undefined && (
+                        {selectedBooking.locked_battery.current_charge !==
+                          undefined && (
                           <p>
-                            Mức sạc: <span className="font-semibold">{selectedBooking.locked_battery.current_charge}%</span>
+                            Mức sạc:{" "}
+                            <span className="font-semibold">
+                              {selectedBooking.locked_battery.current_charge}%
+                            </span>
                           </p>
                         )}
                         {selectedBooking.locked_battery.model && (
                           <p>
-                            Model: <span className="font-semibold">{selectedBooking.locked_battery.model}</span>
+                            Model:{" "}
+                            <span className="font-semibold">
+                              {selectedBooking.locked_battery.model}
+                            </span>
                           </p>
                         )}
                       </div>
@@ -1602,7 +1700,8 @@ const SwapTransactions: React.FC = () => {
                       className="font-mono"
                     />
                     <p className="text-xs text-yellow-600 dark:text-yellow-400">
-                      ⚠️ Không có pin sẵn sàng trong danh sách. Vui lòng nhập mã pin mới thủ công.
+                      ⚠️ Không có pin sẵn sàng trong danh sách. Vui lòng nhập mã
+                      pin mới thủ công.
                     </p>
                   </>
                 ) : (
@@ -1611,6 +1710,13 @@ const SwapTransactions: React.FC = () => {
                       value={newBatteryCode}
                       onValueChange={(value) => {
                         setNewBatteryCode(value);
+                        // Tự động điền mức sạc pin mới nếu có
+                        const selectedBattery = availableBatteries.find(
+                          (b) => b.battery_code === value
+                        );
+                        if (selectedBattery) {
+                          setNewBatteryCharge(selectedBattery.current_charge);
+                        }
                         if (completeError) setCompleteError(null);
                       }}
                       disabled={actionLoading === selectedBooking.booking_id}
@@ -1621,19 +1727,21 @@ const SwapTransactions: React.FC = () => {
                       <SelectContent className="max-h-[400px] w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-lg">
                         {availableBatteries.map((battery) => {
                           return (
-                            <SelectItem 
-                              key={battery.battery_id} 
+                            <SelectItem
+                              key={battery.battery_id}
                               value={battery.battery_code}
                               className="py-3 px-3 cursor-pointer bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 focus:bg-slate-50 dark:focus:bg-slate-800"
                             >
-                              <span className="sr-only">{battery.battery_code}</span>
+                              <span className="sr-only">
+                                {battery.battery_code}
+                              </span>
                               <div className="flex flex-col gap-1.5 w-full">
                                 <div className="flex items-center justify-between gap-3">
                                   <span className="font-mono font-semibold text-base text-slate-900 dark:text-white">
                                     {battery.battery_code}
                                   </span>
                                   <div className="flex items-center gap-2">
-                                    {battery.status === 'full' ? (
+                                    {battery.status === "full" ? (
                                       <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs px-2 py-0.5 flex items-center gap-1">
                                         <CheckCircle className="h-3 w-3" />
                                         Đầy
@@ -1649,15 +1757,18 @@ const SwapTransactions: React.FC = () => {
                                 <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
                                   <BatteryIcon className="h-3.5 w-3.5" />
                                   <span>
-                                    Mức sạc: <span className="font-semibold text-slate-900 dark:text-white">{battery.current_charge}%</span>
+                                    Mức sạc:{" "}
+                                    <span className="font-semibold text-slate-900 dark:text-white">
+                                      {battery.current_charge}%
+                                    </span>
                                   </span>
                                 </div>
                               </div>
                             </SelectItem>
                           );
                         })}
-                    </SelectContent>
-                  </Select>
+                      </SelectContent>
+                    </Select>
                     <p className="text-xs text-green-600 dark:text-green-400 mt-2">
                       ✅ Chọn pin mới từ danh sách pin có sẵn tại trạm
                     </p>
@@ -1681,9 +1792,6 @@ const SwapTransactions: React.FC = () => {
                   onChange={(e) => setBatteryModel(e.target.value)}
                   disabled={actionLoading === selectedBooking.booking_id}
                 />
-                <p className="text-xs text-gray-500">
-                  💡 Nhập loại/dòng pin mới sẽ thay thế
-                </p>
               </div>
 
               <div className="space-y-2">
@@ -1704,7 +1812,10 @@ const SwapTransactions: React.FC = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="oldBatteryCharge" className="flex items-center gap-2">
+                <Label
+                  htmlFor="oldBatteryCharge"
+                  className="flex items-center gap-2"
+                >
                   <BatteryIcon className="h-4 w-4 text-orange-600" />
                   Mức sạc pin cũ (%) <span className="text-red-500">*</span>
                 </Label>
@@ -1738,13 +1849,13 @@ const SwapTransactions: React.FC = () => {
                   disabled={actionLoading === selectedBooking.booking_id}
                   className="font-mono"
                 />
-                <p className="text-xs text-gray-500">
-                  💡 Nhập mức sạc của pin hiện tại (0-100%)
-                </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="newBatteryCharge" className="flex items-center gap-2">
+                <Label
+                  htmlFor="newBatteryCharge"
+                  className="flex items-center gap-2"
+                >
                   <BatteryIcon className="h-4 w-4 text-green-600" />
                   Mức sạc pin mới (%) <span className="text-red-500">*</span>
                 </Label>
@@ -1778,9 +1889,6 @@ const SwapTransactions: React.FC = () => {
                   disabled={actionLoading === selectedBooking.booking_id}
                   className="font-mono"
                 />
-                <p className="text-xs text-gray-500">
-                  💡 Nhập mức sạc của pin mới (0-100%)
-                </p>
               </div>
             </div>
           )}

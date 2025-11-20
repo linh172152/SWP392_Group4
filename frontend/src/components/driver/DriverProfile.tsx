@@ -1,82 +1,96 @@
-import React, { useEffect, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
-import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
-import { 
-  Battery,
-  CreditCard,
-  Edit,
-  Save,
-  Camera,
-  Loader2
-} from 'lucide-react';
-import API_ENDPOINTS, { fetchWithAuth } from '../../config/api';
-import authService from '../../services/auth.service';
+import React, { useEffect, useState } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../ui/card";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
+import { Battery, CreditCard, Edit, Save, Camera, Loader2 } from "lucide-react";
+import API_ENDPOINTS, { fetchWithAuth } from "../../config/api";
+import authService from "../../services/auth.service";
 
 const DriverProfile: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const [profile, setProfile] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    avatar: '',
+    name: "",
+    email: "",
+    phone: "",
+    avatar: "",
     totalSwaps: 0,
     monthlySwaps: 0,
-    monthlyCost: 0
+    monthlyCost: 0,
   });
 
   const loadProfile = async () => {
     setLoading(true);
-    setError('');
-    setMessage('');
+    setError("");
+    setMessage("");
     try {
       // Load user profile
       const profileData = await authService.getProfile();
       const u = profileData.data?.user || profileData.data;
-      setProfile(p => ({
+      setProfile((p) => ({
         ...p,
-        name: u.full_name || '',
-        email: u.email || '',
-        phone: u.phone || '',
-        avatar: u.avatar || '',
+        name: u.full_name || "",
+        email: u.email || "",
+        phone: u.phone || "",
+        avatar: u.avatar || "",
       }));
 
       // Load statistics
       try {
-        const statsRes = await fetchWithAuth(`${API_ENDPOINTS.DRIVER.TRANSACTIONS}/stats?period=30`);
+        const statsRes = await fetchWithAuth(
+          `${API_ENDPOINTS.DRIVER.TRANSACTIONS}/stats?period=30`
+        );
         const statsData = await statsRes.json();
         if (statsRes.ok && statsData.success) {
           // Get current month stats
           const now = new Date();
-          const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-          
+          const currentMonthStart = new Date(
+            now.getFullYear(),
+            now.getMonth(),
+            1
+          );
+
           // Load all transactions to calculate monthly stats
-          const transactionsRes = await fetchWithAuth(`${API_ENDPOINTS.DRIVER.TRANSACTIONS}?limit=1000`);
+          const transactionsRes = await fetchWithAuth(
+            `${API_ENDPOINTS.DRIVER.TRANSACTIONS}?limit=1000`
+          );
           const transactionsData = await transactionsRes.json();
-          
+
           if (transactionsRes.ok && transactionsData.success) {
-            const transactions = transactionsData.data?.transactions || transactionsData.data || [];
-            
+            const transactions =
+              transactionsData.data?.transactions ||
+              transactionsData.data ||
+              [];
+
             // Calculate total swaps (all time)
             const totalSwaps = transactions.length;
-            
+
             // Calculate monthly swaps and cost
             const monthlyTransactions = transactions.filter((t: any) => {
               const swapDate = new Date(t.swap_at || t.created_at);
               return swapDate >= currentMonthStart;
             });
-            
+
             const monthlySwaps = monthlyTransactions.length;
-            const monthlyCost = monthlyTransactions.reduce((sum: number, t: any) => {
-              return sum + (t.payment?.amount || 0);
-            }, 0);
-            
-            setProfile(p => ({
+            const monthlyCost = monthlyTransactions.reduce(
+              (sum: number, t: any) => {
+                const amount = t.payment?.amount || 0;
+                return sum + Number(amount);
+              },
+              0
+            );
+
+            setProfile((p) => ({
               ...p,
               totalSwaps,
               monthlySwaps,
@@ -85,34 +99,36 @@ const DriverProfile: React.FC = () => {
           }
         }
       } catch (statsError) {
-        console.error('Error loading statistics:', statsError);
+        console.error("Error loading statistics:", statsError);
         // Don't show error for stats, just use defaults
       }
     } catch (e: any) {
-      setError(e.message || 'Có lỗi xảy ra');
+      setError(e.message || "Có lỗi xảy ra");
     } finally {
       setLoading(false);
     }
   };
 
   const handleSave = async () => {
-    setError('');
-    setMessage('');
+    setError("");
+    setMessage("");
     try {
       await authService.updateProfile({
         full_name: profile.name,
         phone: profile.phone,
       });
       setIsEditing(false);
-      setMessage('Cập nhật hồ sơ thành công');
+      setMessage("Cập nhật hồ sơ thành công");
       // Reload profile to get updated data
       await loadProfile();
     } catch (e: any) {
-      setError(e.message || 'Có lỗi xảy ra');
+      setError(e.message || "Có lỗi xảy ra");
     }
   };
 
-  useEffect(() => { loadProfile(); }, []);
+  useEffect(() => {
+    loadProfile();
+  }, []);
 
   if (loading) {
     return (
@@ -126,11 +142,15 @@ const DriverProfile: React.FC = () => {
     <div className="p-6 space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="float">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-blue-900 dark:from-white dark:to-blue-100 bg-clip-text text-transparent">Hồ sơ Cá nhân</h1>
-          <p className="text-slate-600 dark:text-slate-300">Quản lý thông tin cá nhân và cài đặt tài khoản</p>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-blue-900 dark:from-white dark:to-blue-100 bg-clip-text text-transparent">
+            Hồ sơ Cá nhân
+          </h1>
+          <p className="text-slate-600 dark:text-slate-300">
+            Quản lý thông tin cá nhân và cài đặt tài khoản
+          </p>
         </div>
-        <Button 
-          onClick={() => isEditing ? handleSave() : setIsEditing(true)}
+        <Button
+          onClick={() => (isEditing ? handleSave() : setIsEditing(true))}
           className="gradient-primary text-white shadow-lg hover:shadow-xl transition-all duration-300"
           disabled={loading}
         >
@@ -149,10 +169,14 @@ const DriverProfile: React.FC = () => {
       </div>
 
       {error && (
-        <div className="text-sm text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-500/10 p-3 rounded-lg border border-red-200/50 dark:border-red-500/20">{error}</div>
+        <div className="text-sm text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-500/10 p-3 rounded-lg border border-red-200/50 dark:border-red-500/20">
+          {error}
+        </div>
       )}
       {message && (
-        <div className="text-sm text-green-700 bg-green-50 p-3 rounded-lg border border-green-200">{message}</div>
+        <div className="text-sm text-green-700 bg-green-50 p-3 rounded-lg border border-green-200">
+          {message}
+        </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -160,27 +184,46 @@ const DriverProfile: React.FC = () => {
           <CardContent className="p-6 text-center">
             <div className="relative inline-block mb-4">
               <Avatar className="w-24 h-24">
-                <AvatarImage src={profile.avatar || "/placeholder-avatar.jpg"} />
-                <AvatarFallback className="text-2xl gradient-primary text-white">{profile.name ? profile.name.charAt(0).toUpperCase() : 'U'}</AvatarFallback>
+                <AvatarImage
+                  src={profile.avatar || "/placeholder-avatar.jpg"}
+                />
+                <AvatarFallback className="text-2xl gradient-primary text-white">
+                  {profile.name ? profile.name.charAt(0).toUpperCase() : "U"}
+                </AvatarFallback>
               </Avatar>
               {isEditing && (
-                <Button size="sm" className="absolute bottom-0 right-0 rounded-full w-8 h-8 p-0">
+                <Button
+                  size="sm"
+                  className="absolute bottom-0 right-0 rounded-full w-8 h-8 p-0"
+                >
                   <Camera className="h-4 w-4" />
                 </Button>
               )}
             </div>
-            
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">{profile.name || '—'}</h2>
-            <p className="text-slate-600 dark:text-slate-400 mb-6">{profile.email || '—'}</p>
+
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
+              {profile.name || "—"}
+            </h2>
+            <p className="text-slate-600 dark:text-slate-400 mb-6">
+              {profile.email || "—"}
+            </p>
 
             <div className="grid grid-cols-2 gap-4 text-center">
               <div>
-                <div className="text-2xl font-bold text-slate-900 dark:text-white">{profile.totalSwaps}</div>
-                <div className="text-xs text-slate-600 dark:text-slate-400">Tổng lần thay</div>
+                <div className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {profile.totalSwaps}
+                </div>
+                <div className="text-xs text-slate-600 dark:text-slate-400">
+                  Tổng lần thay
+                </div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{profile.monthlySwaps}</div>
-                <div className="text-xs text-slate-600 dark:text-slate-400">Tháng này</div>
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  {profile.monthlySwaps}
+                </div>
+                <div className="text-xs text-slate-600 dark:text-slate-400">
+                  Tháng này
+                </div>
               </div>
             </div>
           </CardContent>
@@ -188,23 +231,39 @@ const DriverProfile: React.FC = () => {
 
         <Card className="lg:col-span-2 glass-card border-0 glow">
           <CardHeader>
-            <CardTitle className="text-slate-900 dark:text-white">Thông tin Cá nhân</CardTitle>
-            <CardDescription className="text-slate-600 dark:text-slate-400">Cập nhật thông tin liên lạc và chi tiết cá nhân</CardDescription>
+            <CardTitle className="text-slate-900 dark:text-white">
+              Thông tin Cá nhân
+            </CardTitle>
+            <CardDescription className="text-slate-600 dark:text-slate-400">
+              Cập nhật thông tin liên lạc và chi tiết cá nhân
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="name" className="text-slate-700 dark:text-slate-300">Họ và tên</Label>
+                <Label
+                  htmlFor="name"
+                  className="text-slate-700 dark:text-slate-300"
+                >
+                  Họ và tên
+                </Label>
                 <Input
                   id="name"
                   value={profile.name}
                   disabled={!isEditing}
-                  onChange={(e) => setProfile({...profile, name: e.target.value})}
+                  onChange={(e) =>
+                    setProfile({ ...profile, name: e.target.value })
+                  }
                   className="glass border-slate-200/50 dark:border-slate-700/50"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-slate-700 dark:text-slate-300">Email</Label>
+                <Label
+                  htmlFor="email"
+                  className="text-slate-700 dark:text-slate-300"
+                >
+                  Email
+                </Label>
                 <Input
                   id="email"
                   type="email"
@@ -214,12 +273,19 @@ const DriverProfile: React.FC = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="phone" className="text-slate-700 dark:text-slate-300">Số điện thoại</Label>
+                <Label
+                  htmlFor="phone"
+                  className="text-slate-700 dark:text-slate-300"
+                >
+                  Số điện thoại
+                </Label>
                 <Input
                   id="phone"
                   value={profile.phone}
                   disabled={!isEditing}
-                  onChange={(e) => setProfile({...profile, phone: e.target.value})}
+                  onChange={(e) =>
+                    setProfile({ ...profile, phone: e.target.value })
+                  }
                   className="glass border-slate-200/50 dark:border-slate-700/50"
                 />
               </div>
@@ -236,8 +302,12 @@ const DriverProfile: React.FC = () => {
                 <Battery className="h-5 w-5 text-white" />
               </div>
               <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Lần thay tháng này</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{profile.monthlySwaps}</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  Lần thay tháng này
+                </p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {profile.monthlySwaps}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -250,8 +320,12 @@ const DriverProfile: React.FC = () => {
                 <CreditCard className="h-5 w-5 text-white" />
               </div>
               <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Chi phí tháng này</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{profile.monthlyCost.toLocaleString()} đ</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  Chi phí tháng này
+                </p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {Number(profile.monthlyCost).toLocaleString("vi-VN")} đ
+                </p>
               </div>
             </div>
           </CardContent>
@@ -260,36 +334,53 @@ const DriverProfile: React.FC = () => {
 
       <Card className="glass-card border-0 glow">
         <CardHeader>
-          <CardTitle className="text-slate-900 dark:text-white">Cài đặt Tài khoản</CardTitle>
-          <CardDescription className="text-slate-600 dark:text-slate-400">Đổi mật khẩu</CardDescription>
+          <CardTitle className="text-slate-900 dark:text-white">
+            Cài đặt Tài khoản
+          </CardTitle>
+          <CardDescription className="text-slate-600 dark:text-slate-400">
+            Đổi mật khẩu
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <Input type="password" placeholder="Mật khẩu hiện tại" id="curPwd" />
+            <Input
+              type="password"
+              placeholder="Mật khẩu hiện tại"
+              id="curPwd"
+            />
             <Input type="password" placeholder="Mật khẩu mới" id="newPwd" />
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               className="glass border-slate-200/50 dark:border-slate-700/50"
               onClick={async () => {
-                const cur = (document.getElementById('curPwd') as HTMLInputElement)?.value;
-                const nw = (document.getElementById('newPwd') as HTMLInputElement)?.value;
+                const cur = (
+                  document.getElementById("curPwd") as HTMLInputElement
+                )?.value;
+                const nw = (
+                  document.getElementById("newPwd") as HTMLInputElement
+                )?.value;
                 if (!cur || !nw) {
-                  setError('Vui lòng điền đầy đủ mật khẩu');
+                  setError("Vui lòng điền đầy đủ mật khẩu");
                   return;
                 }
-                setError(''); setMessage('');
+                setError("");
+                setMessage("");
                 try {
                   await authService.changePassword({
                     current_password: cur,
                     new_password: nw,
                   });
-                  setMessage('Đổi mật khẩu thành công');
+                  setMessage("Đổi mật khẩu thành công");
                   // Clear password fields
-                  (document.getElementById('curPwd') as HTMLInputElement).value = '';
-                  (document.getElementById('newPwd') as HTMLInputElement).value = '';
+                  (
+                    document.getElementById("curPwd") as HTMLInputElement
+                  ).value = "";
+                  (
+                    document.getElementById("newPwd") as HTMLInputElement
+                  ).value = "";
                 } catch (e: any) {
-                  setError(e.message || 'Có lỗi xảy ra');
+                  setError(e.message || "Có lỗi xảy ra");
                 }
               }}
             >

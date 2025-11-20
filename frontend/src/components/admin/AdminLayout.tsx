@@ -28,7 +28,7 @@ interface AdminLayoutProps {
 }
 
 const navigation = [
-  { name: 'Bảng điều khiển', href: '/admin/home', icon: Home },
+  { name: 'Báo cáo & Phân tích', href: '/admin/reports', icon: BarChart3 },
   { name: 'Quản lý trạm', href: '/admin/stations', icon: Building },
   { name: 'Quản lý giá pin', href: '/admin/battery-pricing', icon: Shuffle },
   { name: 'Quản lý gói dịch vụ', href: '/admin/service-packages', icon: Package },
@@ -37,7 +37,6 @@ const navigation = [
   { name: 'Quản lý nhân viên', href: '/admin/employees', icon: Users },
   { name: 'Lịch làm việc', href: '/admin/schedules', icon: Calendar },
   { name: 'Quản lý hỗ trợ', href: '/admin/support', icon: MessageSquare },
-  { name: 'Báo cáo & Phân tích', href: '/admin/reports', icon: BarChart3 },
 ];
 
 const AdminLayout: React.FC<AdminLayoutProps> = ({ user, onLogout, children }) => {
