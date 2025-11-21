@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
 import { 
   Star, 
   MapPin, 
   Calendar,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  Users,
+  User
 } from 'lucide-react';
 import API_ENDPOINTS, { fetchWithAuth } from '../../config/api';
 import { ErrorDisplay } from '../ui/error-display';
@@ -27,19 +30,48 @@ interface Rating {
     transaction_code: string;
     swap_at: string;
   };
+  user?: {
+    user_id: string;
+    full_name: string;
+    email: string;
+  };
 }
+
+type FilterMode = 'all' | 'mine';
 
 const StationRating: React.FC = () => {
   const [ratings, setRatings] = useState<Rating[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [filterMode, setFilterMode] = useState<FilterMode>('all');
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  // Load ratings đã tạo
-  const loadRatings = async () => {
+  // Lấy user_id từ localStorage
+  useEffect(() => {
+    const storedUser = localStorage.getItem('ev_swap_user');
+    if (storedUser) {
+      const user = JSON.parse(storedUser);
+      setCurrentUserId(user.id || user.user_id || null);
+    }
+  }, []);
+
+  // Load ratings - có thể lấy tất cả hoặc chỉ của user hiện tại
+  const loadRatings = async (mode: FilterMode) => {
     setLoading(true);
     setError('');
     try {
-      const res = await fetchWithAuth(API_ENDPOINTS.RATINGS.BASE);
+      let url = API_ENDPOINTS.RATINGS.BASE;
+      
+      // Nếu chọn "Đánh giá của tôi", filter theo user_id
+      if (mode === 'mine') {
+        if (!currentUserId) {
+          throw new Error('Chưa đăng nhập');
+        }
+        url = `${API_ENDPOINTS.RATINGS.BASE}?user_id=${currentUserId}`;
+      }
+      // Nếu chọn "Tất cả đánh giá", không filter (lấy tất cả)
+      
+      const res = await fetchWithAuth(url);
       const data = await res.json();
       if (res.ok && data.success) {
         setRatings(data.data.ratings || data.data || []);
@@ -54,13 +86,22 @@ const StationRating: React.FC = () => {
     }
   };
 
+  // Load ratings khi filterMode thay đổi
   useEffect(() => {
-    loadRatings();
-  }, []);
+    if (filterMode === 'mine' && !currentUserId) {
+      // Chờ lấy user_id trước
+      return;
+    }
+    loadRatings(filterMode);
+  }, [filterMode, currentUserId]);
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleString('vi-VN');
+  };
+
+  const handleRefresh = () => {
+    loadRatings(filterMode);
   };
 
   return (
@@ -72,12 +113,12 @@ const StationRating: React.FC = () => {
             Đánh giá dịch vụ
           </h1>
           <p className="text-slate-600 dark:text-slate-400 mt-1">
-            Xem lại lịch sử đánh giá của bạn
+            Xem đánh giá của các driver về các trạm đổi pin
           </p>
         </div>
         <Button
           variant="outline"
-          onClick={loadRatings}
+          onClick={handleRefresh}
           className="shadow-sm"
           disabled={loading}
         >
@@ -88,98 +129,211 @@ const StationRating: React.FC = () => {
 
       {error && <ErrorDisplay error={error} variant="card" />}
 
-      {/* Danh sách đánh giá đã tạo */}
-      <Card className="glass-card border-0 shadow-xl">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Star className="h-5 w-5 text-yellow-500" />
-            Lịch sử đánh giá của tôi
-          </CardTitle>
-          <CardDescription>
-            {ratings.length > 0
-              ? `Tổng cộng ${ratings.length} đánh giá`
-              : 'Bạn chưa có đánh giá nào'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="space-y-4">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-24 w-full" />
-              ))}
-            </div>
-          ) : ratings.length === 0 ? (
-            <div className="text-center py-12 text-slate-500 dark:text-slate-400">
-              <Star className="h-16 w-16 mx-auto mb-4 opacity-50" />
-              <p className="text-lg font-medium mb-2">Bạn chưa có đánh giá nào</p>
-              <p className="text-sm">
-                Đánh giá dịch vụ tại trang{' '}
-                <span className="font-medium text-blue-600 dark:text-blue-400">
-                  Lịch sử Giao dịch
-                </span>
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {ratings.map((ratingItem) => (
-                <div
-                  key={ratingItem.rating_id}
-                  className="p-6 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 hover:shadow-lg transition-all duration-300"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <MapPin className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                        <span className="font-semibold text-lg text-slate-900 dark:text-white">
-                          {ratingItem.station?.name || 'Trạm đổi pin'}
-                        </span>
-                      </div>
-                      {ratingItem.station?.address && (
-                        <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
-                          {ratingItem.station.address}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="flex items-center gap-1">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <Star
-                              key={star}
-                              className={`h-5 w-5 ${
-                                star <= ratingItem.rating
-                                  ? 'fill-yellow-400 text-yellow-400'
-                                  : 'text-slate-300 dark:text-slate-600'
-                              }`}
-                            />
-                          ))}
-                        </div>
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                          {ratingItem.rating}/5
-                        </span>
-                        <span className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {formatDate(ratingItem.created_at)}
-                        </span>
-                      </div>
-                      {ratingItem.comment && (
-                        <div className="mt-3 p-3 rounded-lg bg-white dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600">
-                          <p className="text-sm text-slate-700 dark:text-slate-300">
-                            {ratingItem.comment}
-                          </p>
-                        </div>
-                      )}
-                      {ratingItem.transaction?.transaction_code && (
-                        <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                          Mã giao dịch: {ratingItem.transaction.transaction_code}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+      {/* Tabs để chuyển đổi giữa "Tất cả" và "Của tôi" */}
+      <Tabs value={filterMode} onValueChange={(value) => setFilterMode(value as FilterMode)}>
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="all" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Tất cả đánh giá
+          </TabsTrigger>
+          <TabsTrigger value="mine" className="flex items-center gap-2">
+            <User className="h-4 w-4" />
+            Đánh giá của tôi
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="all" className="mt-6">
+          <Card className="glass-card border-0 shadow-xl">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Star className="h-5 w-5 text-yellow-500" />
+                Tất cả đánh giá
+              </CardTitle>
+              <CardDescription>
+                {ratings.length > 0
+                  ? `Tổng cộng ${ratings.length} đánh giá từ các driver`
+                  : 'Chưa có đánh giá nào'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-24 w-full" />
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              ) : ratings.length === 0 ? (
+                <div className="text-center py-12 text-slate-500 dark:text-slate-400">
+                  <Star className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                  <p className="text-lg font-medium mb-2">Chưa có đánh giá nào</p>
+                  <p className="text-sm">
+                    Các driver sẽ đánh giá sau khi hoàn tất đổi pin
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {ratings.map((ratingItem) => (
+                    <div
+                      key={ratingItem.rating_id}
+                      className="p-6 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 hover:shadow-lg transition-all duration-300"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <MapPin className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                              <span className="font-semibold text-lg text-slate-900 dark:text-white">
+                                {ratingItem.station?.name || 'Trạm đổi pin'}
+                              </span>
+                            </div>
+                            {ratingItem.user && (
+                              <span className="text-sm text-slate-500 dark:text-slate-400">
+                                {ratingItem.user.full_name || ratingItem.user.email}
+                              </span>
+                            )}
+                          </div>
+                          {ratingItem.station?.address && (
+                            <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
+                              {ratingItem.station.address}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className="flex items-center gap-1">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <Star
+                                  key={star}
+                                  className={`h-5 w-5 ${
+                                    star <= ratingItem.rating
+                                      ? 'fill-yellow-400 text-yellow-400'
+                                      : 'text-slate-300 dark:text-slate-600'
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                              {ratingItem.rating}/5
+                            </span>
+                            <span className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {formatDate(ratingItem.created_at)}
+                            </span>
+                          </div>
+                          {ratingItem.comment && (
+                            <div className="mt-3 p-3 rounded-lg bg-white dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600">
+                              <p className="text-sm text-slate-700 dark:text-slate-300">
+                                {ratingItem.comment}
+                              </p>
+                            </div>
+                          )}
+                          {ratingItem.transaction?.transaction_code && (
+                            <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                              Mã giao dịch: {ratingItem.transaction.transaction_code}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="mine" className="mt-6">
+          <Card className="glass-card border-0 shadow-xl">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Star className="h-5 w-5 text-yellow-500" />
+                Đánh giá của tôi
+              </CardTitle>
+              <CardDescription>
+                {ratings.length > 0
+                  ? `Bạn đã có ${ratings.length} đánh giá`
+                  : 'Bạn chưa có đánh giá nào'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-24 w-full" />
+                  ))}
+                </div>
+              ) : ratings.length === 0 ? (
+                <div className="text-center py-12 text-slate-500 dark:text-slate-400">
+                  <Star className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                  <p className="text-lg font-medium mb-2">Bạn chưa có đánh giá nào</p>
+                  <p className="text-sm">
+                    Đánh giá dịch vụ tại trang{' '}
+                    <span className="font-medium text-blue-600 dark:text-blue-400">
+                      Lịch sử Giao dịch
+                    </span>
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {ratings.map((ratingItem) => (
+                    <div
+                      key={ratingItem.rating_id}
+                      className="p-6 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 hover:shadow-lg transition-all duration-300"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <MapPin className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                            <span className="font-semibold text-lg text-slate-900 dark:text-white">
+                              {ratingItem.station?.name || 'Trạm đổi pin'}
+                            </span>
+                          </div>
+                          {ratingItem.station?.address && (
+                            <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
+                              {ratingItem.station.address}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className="flex items-center gap-1">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <Star
+                                  key={star}
+                                  className={`h-5 w-5 ${
+                                    star <= ratingItem.rating
+                                      ? 'fill-yellow-400 text-yellow-400'
+                                      : 'text-slate-300 dark:text-slate-600'
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                              {ratingItem.rating}/5
+                            </span>
+                            <span className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {formatDate(ratingItem.created_at)}
+                            </span>
+                          </div>
+                          {ratingItem.comment && (
+                            <div className="mt-3 p-3 rounded-lg bg-white dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600">
+                              <p className="text-sm text-slate-700 dark:text-slate-300">
+                                {ratingItem.comment}
+                              </p>
+                            </div>
+                          )}
+                          {ratingItem.transaction?.transaction_code && (
+                            <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                              Mã giao dịch: {ratingItem.transaction.transaction_code}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
