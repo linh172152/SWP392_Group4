@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Label } from '../ui/label';
 import { 
   Star, 
   MapPin, 
@@ -9,7 +11,8 @@ import {
   Loader2,
   RefreshCw,
   Users,
-  User
+  User,
+  Filter
 } from 'lucide-react';
 import API_ENDPOINTS, { fetchWithAuth } from '../../config/api';
 import { ErrorDisplay } from '../ui/error-display';
@@ -38,13 +41,18 @@ interface Rating {
 }
 
 type FilterMode = 'all' | 'mine';
+type RatingFilter = 'all' | 'positive' | 'negative' | 'neutral';
 
 const StationRating: React.FC = () => {
-  const [ratings, setRatings] = useState<Rating[]>([]);
+  const [allRatings, setAllRatings] = useState<Rating[]>([]); // Tất cả ratings đã load
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  
+  // Filter states
+  const [ratingFilter, setRatingFilter] = useState<RatingFilter>('all');
+  const [stationFilter, setStationFilter] = useState<string>('all');
 
   // Lấy user_id từ localStorage
   useEffect(() => {
@@ -56,25 +64,34 @@ const StationRating: React.FC = () => {
   }, []);
 
   // Load ratings - có thể lấy tất cả hoặc chỉ của user hiện tại
-  const loadRatings = async (mode: FilterMode) => {
+  const loadRatings = async (mode: FilterMode, stationId?: string) => {
     setLoading(true);
     setError('');
     try {
       let url = API_ENDPOINTS.RATINGS.BASE;
+      const params = new URLSearchParams();
       
       // Nếu chọn "Đánh giá của tôi", filter theo user_id
       if (mode === 'mine') {
         if (!currentUserId) {
           throw new Error('Chưa đăng nhập');
         }
-        url = `${API_ENDPOINTS.RATINGS.BASE}?user_id=${currentUserId}`;
+        params.append('user_id', currentUserId);
       }
-      // Nếu chọn "Tất cả đánh giá", không filter (lấy tất cả)
+      
+      // Filter theo station nếu có
+      if (stationId && stationId !== 'all') {
+        params.append('station_id', stationId);
+      }
+      
+      if (params.toString()) {
+        url = `${url}?${params.toString()}`;
+      }
       
       const res = await fetchWithAuth(url);
       const data = await res.json();
       if (res.ok && data.success) {
-        setRatings(data.data.ratings || data.data || []);
+        setAllRatings(data.data.ratings || data.data || []);
       } else {
         throw new Error(data.message || 'Tải đánh giá thất bại');
       }
@@ -86,14 +103,49 @@ const StationRating: React.FC = () => {
     }
   };
 
-  // Load ratings khi filterMode thay đổi
+  // Load ratings khi filterMode hoặc stationFilter thay đổi
   useEffect(() => {
     if (filterMode === 'mine' && !currentUserId) {
       // Chờ lấy user_id trước
       return;
     }
-    loadRatings(filterMode);
-  }, [filterMode, currentUserId]);
+    loadRatings(filterMode, stationFilter !== 'all' ? stationFilter : undefined);
+  }, [filterMode, currentUserId, stationFilter]);
+
+  // Extract unique stations từ ratings
+  const availableStations = useMemo(() => {
+    const stationsMap = new Map<string, { station_id: string; name: string; address?: string }>();
+    allRatings.forEach((rating) => {
+      if (rating.station && rating.station_id) {
+        stationsMap.set(rating.station_id, {
+          station_id: rating.station_id,
+          name: rating.station.name || 'Trạm đổi pin',
+          address: rating.station.address,
+        });
+      }
+    });
+    return Array.from(stationsMap.values());
+  }, [allRatings]);
+
+  // Filter ratings theo rating filter và station filter
+  const filteredRatings = useMemo(() => {
+    let filtered = [...allRatings];
+
+    // Filter theo rating (tích cực/tiêu cực)
+    if (ratingFilter === 'positive') {
+      filtered = filtered.filter((r) => r.rating >= 4);
+    } else if (ratingFilter === 'negative') {
+      filtered = filtered.filter((r) => r.rating <= 2);
+    } else if (ratingFilter === 'neutral') {
+      filtered = filtered.filter((r) => r.rating === 3);
+    }
+
+    // Filter theo station đã được xử lý ở loadRatings (gọi API với station_id)
+    // Nhưng nếu đang filter ở frontend, có thể filter thêm ở đây
+    // (Hiện tại station filter được xử lý ở API level)
+
+    return filtered;
+  }, [allRatings, ratingFilter]);
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'N/A';
@@ -101,7 +153,17 @@ const StationRating: React.FC = () => {
   };
 
   const handleRefresh = () => {
-    loadRatings(filterMode);
+    loadRatings(filterMode, stationFilter !== 'all' ? stationFilter : undefined);
+  };
+
+  const handleRatingFilterChange = (value: string) => {
+    setRatingFilter(value as RatingFilter);
+  };
+
+  const handleStationFilterChange = (value: string) => {
+    setStationFilter(value);
+    // Khi đổi station filter, cần reload ratings với station_id mới
+    // useEffect sẽ tự động trigger loadRatings
   };
 
   return (
@@ -145,34 +207,91 @@ const StationRating: React.FC = () => {
         <TabsContent value="all" className="mt-6">
           <Card className="glass-card border-0 shadow-xl">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Star className="h-5 w-5 text-yellow-500" />
-                Tất cả đánh giá
-              </CardTitle>
-              <CardDescription>
-                {ratings.length > 0
-                  ? `Tổng cộng ${ratings.length} đánh giá từ các driver`
-                  : 'Chưa có đánh giá nào'}
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Star className="h-5 w-5 text-yellow-500" />
+                    Tất cả đánh giá
+                  </CardTitle>
+                  <CardDescription>
+                    {filteredRatings.length > 0
+                      ? `Hiển thị ${filteredRatings.length} / ${allRatings.length} đánh giá`
+                      : allRatings.length > 0
+                      ? `Không có đánh giá nào phù hợp với bộ lọc`
+                      : 'Chưa có đánh giá nào'}
+                  </CardDescription>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
+              {/* Filter Section */}
+              <div className="mb-6 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                <div className="p-4 bg-white dark:bg-slate-800">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Filter className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Bộ lọc</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="rating-filter" className="text-sm text-slate-600 dark:text-slate-400">
+                      Mức độ đánh giá
+                    </Label>
+                    <Select value={ratingFilter} onValueChange={handleRatingFilterChange}>
+                      <SelectTrigger id="rating-filter" className="w-full">
+                        <SelectValue placeholder="Chọn mức độ đánh giá" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tất cả</SelectItem>
+                        <SelectItem value="positive">Tích cực (4-5 sao)</SelectItem>
+                        <SelectItem value="neutral">Trung bình (3 sao)</SelectItem>
+                        <SelectItem value="negative">Tiêu cực (1-2 sao)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="station-filter" className="text-sm text-slate-600 dark:text-slate-400">
+                      Trạm đổi pin
+                    </Label>
+                    <Select value={stationFilter} onValueChange={handleStationFilterChange}>
+                      <SelectTrigger id="station-filter" className="w-full">
+                        <SelectValue placeholder="Chọn trạm" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tất cả trạm</SelectItem>
+                        {availableStations.map((station) => (
+                          <SelectItem key={station.station_id} value={station.station_id}>
+                            {station.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  </div>
+                </div>
+              </div>
               {loading ? (
                 <div className="space-y-4">
                   {[1, 2, 3].map((i) => (
                     <Skeleton key={i} className="h-24 w-full" />
                   ))}
                 </div>
-              ) : ratings.length === 0 ? (
+              ) : filteredRatings.length === 0 ? (
                 <div className="text-center py-12 text-slate-500 dark:text-slate-400">
                   <Star className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                  <p className="text-lg font-medium mb-2">Chưa có đánh giá nào</p>
+                  <p className="text-lg font-medium mb-2">
+                    {allRatings.length > 0 
+                      ? 'Không có đánh giá nào phù hợp với bộ lọc'
+                      : 'Chưa có đánh giá nào'}
+                  </p>
                   <p className="text-sm">
-                    Các driver sẽ đánh giá sau khi hoàn tất đổi pin
+                    {allRatings.length > 0
+                      ? 'Thử thay đổi bộ lọc để xem thêm đánh giá'
+                      : 'Các driver sẽ đánh giá sau khi hoàn tất đổi pin'}
                   </p>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {ratings.map((ratingItem) => (
+                  {filteredRatings.map((ratingItem) => (
                     <div
                       key={ratingItem.rating_id}
                       className="p-6 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 hover:shadow-lg transition-all duration-300"
@@ -243,37 +362,100 @@ const StationRating: React.FC = () => {
         <TabsContent value="mine" className="mt-6">
           <Card className="glass-card border-0 shadow-xl">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Star className="h-5 w-5 text-yellow-500" />
-                Đánh giá của tôi
-              </CardTitle>
-              <CardDescription>
-                {ratings.length > 0
-                  ? `Bạn đã có ${ratings.length} đánh giá`
-                  : 'Bạn chưa có đánh giá nào'}
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Star className="h-5 w-5 text-yellow-500" />
+                    Đánh giá của tôi
+                  </CardTitle>
+                  <CardDescription>
+                    {filteredRatings.length > 0
+                      ? `Bạn đã có ${filteredRatings.length} đánh giá`
+                      : allRatings.length > 0
+                      ? `Không có đánh giá nào phù hợp với bộ lọc`
+                      : 'Bạn chưa có đánh giá nào'}
+                  </CardDescription>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
+              {/* Filter Section cho tab "Đánh giá của tôi" */}
+              {allRatings.length > 0 && (
+                <div className="mb-6 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                  <div className="p-4 bg-white dark:bg-slate-800">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Filter className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Bộ lọc</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="rating-filter-mine" className="text-sm text-slate-600 dark:text-slate-400">
+                        Mức độ đánh giá
+                      </Label>
+                      <Select value={ratingFilter} onValueChange={handleRatingFilterChange}>
+                        <SelectTrigger id="rating-filter-mine" className="w-full">
+                          <SelectValue placeholder="Chọn mức độ đánh giá" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tất cả</SelectItem>
+                          <SelectItem value="positive">Tích cực (4-5 sao)</SelectItem>
+                          <SelectItem value="neutral">Trung bình (3 sao)</SelectItem>
+                          <SelectItem value="negative">Tiêu cực (1-2 sao)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="station-filter-mine" className="text-sm text-slate-600 dark:text-slate-400">
+                        Trạm đổi pin
+                      </Label>
+                      <Select value={stationFilter} onValueChange={handleStationFilterChange}>
+                        <SelectTrigger id="station-filter-mine" className="w-full">
+                          <SelectValue placeholder="Chọn trạm" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tất cả trạm</SelectItem>
+                          {availableStations.map((station) => (
+                            <SelectItem key={station.station_id} value={station.station_id}>
+                              {station.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    </div>
+                  </div>
+                </div>
+              )}
               {loading ? (
                 <div className="space-y-4">
                   {[1, 2, 3].map((i) => (
                     <Skeleton key={i} className="h-24 w-full" />
                   ))}
                 </div>
-              ) : ratings.length === 0 ? (
+              ) : filteredRatings.length === 0 ? (
                 <div className="text-center py-12 text-slate-500 dark:text-slate-400">
                   <Star className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                  <p className="text-lg font-medium mb-2">Bạn chưa có đánh giá nào</p>
+                  <p className="text-lg font-medium mb-2">
+                    {allRatings.length > 0
+                      ? 'Không có đánh giá nào phù hợp với bộ lọc'
+                      : 'Bạn chưa có đánh giá nào'}
+                  </p>
                   <p className="text-sm">
-                    Đánh giá dịch vụ tại trang{' '}
-                    <span className="font-medium text-blue-600 dark:text-blue-400">
-                      Lịch sử Giao dịch
-                    </span>
+                    {allRatings.length > 0 ? (
+                      'Thử thay đổi bộ lọc để xem thêm đánh giá'
+                    ) : (
+                      <>
+                        Đánh giá dịch vụ tại trang{' '}
+                        <span className="font-medium text-blue-600 dark:text-blue-400">
+                          Lịch sử Giao dịch
+                        </span>
+                      </>
+                    )}
                   </p>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {ratings.map((ratingItem) => (
+                  {filteredRatings.map((ratingItem) => (
                     <div
                       key={ratingItem.rating_id}
                       className="p-6 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 hover:shadow-lg transition-all duration-300"
