@@ -81,10 +81,7 @@ const BatteryPricingManagement: React.FC = () => {
   const [editingPricing, setEditingPricing] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Debug pricings state changes
-  useEffect(() => {
-    console.log("Pricings state updated:", pricings);
-  }, [pricings]);
+
 
   // Transfer state
   const [transfers, setTransfers] = useState<BatteryTransfer[]>([]);
@@ -169,6 +166,7 @@ const BatteryPricingManagement: React.FC = () => {
       fetchBatteries();
     } else if (activeTab === "warehouse") {
       fetchWarehouseData();
+      fetchStations(); // Load stations for "Add Battery" modal
     }
   }, [activeTab]);
 
@@ -176,16 +174,11 @@ const BatteryPricingManagement: React.FC = () => {
     try {
       setLoading(true);
       const response = await batteryPricingService.getBatteryPricing();
-      console.log("Full response:", response);
-      console.log("Response data:", response?.data);
-      console.log("Pricings array:", response?.data?.pricings);
 
       if (response?.success) {
         const pricingsData = response.data?.pricings || [];
-        console.log("Setting pricings:", pricingsData);
         setPricings(pricingsData);
       } else {
-        console.log("Response not successful:", response);
         toast.error("Không thể tải dữ liệu giá pin");
       }
     } catch (error) {
@@ -200,17 +193,9 @@ const BatteryPricingManagement: React.FC = () => {
     try {
       setLoading(true);
       const response = await batteryTransferService.getBatteryTransfers();
-      console.log("Transfer response:", response);
-      console.log("Transfer data:", response?.data);
 
       if (response?.success) {
         const transfersData = response.data?.transfers || [];
-        console.log(
-          "Setting transfers:",
-          transfersData,
-          "is array:",
-          Array.isArray(transfersData)
-        );
         setTransfers(transfersData);
       }
     } catch (error) {
@@ -263,47 +248,33 @@ const BatteryPricingManagement: React.FC = () => {
 
         // Set battery stats with fallback
         if (statsResponse?.success) {
-          console.log("Using API stats response:", statsResponse.data);
-          console.log(
-            "API stats by_status structure:",
-            statsResponse.data?.by_status
-          );
-
-          // Transform API response to match frontend interface
+          // Transform API response to match frontend interface and UI logic
+          const apiStats = statsResponse.data.by_status;
           const transformedStats = {
             ...statsResponse.data,
             by_status: {
-              ...statsResponse.data.by_status,
-              available: statsResponse.data.by_status.full || 0, // Map 'full' to 'available'
+              ...apiStats,
+              available: apiStats.full || 0, // Map 'full' to 'available'
+              // Calculate "damaged" as displayed in UI (not full, charging, maintenance)
+              damaged: (apiStats.in_use || 0) + (apiStats.reserved || 0) + (apiStats.damaged || 0),
             },
           };
-          console.log("Transformed stats:", transformedStats);
           setBatteryStats(transformedStats);
         } else {
-          console.warn(
-            "Using fallback stats calculation due to API unavailability"
-          );
-          // Debug: Log battery data to see actual statuses
-          console.log("Battery data for stats calculation:", batteriesData);
-          console.log("Battery statuses found:", [
-            ...new Set(batteriesData.map((b: any) => b.status)),
-          ]);
 
-          // Fallback: calculate stats from battery data
+          // Fallback: calculate stats from battery data using UI logic
           const fallbackStats = {
             total: batteriesData.length,
-            by_status: batteriesData.reduce((acc: any, battery: any) => {
-              // Map battery status to match interface expectation
-              let statusKey = battery.status;
-              if (battery.status === "full") statusKey = "available";
-              // Keep other statuses as-is: charging, in_use, maintenance, damaged
-
-              console.log(
-                `Mapping battery status '${battery.status}' to '${statusKey}'`
-              );
-              acc[statusKey] = (acc[statusKey] || 0) + 1;
-              return acc;
-            }, {}),
+            by_status: {
+              available: batteriesData.filter((b: any) => b.status === "full").length,
+              charging: batteriesData.filter((b: any) => b.status === "charging").length,
+              maintenance: batteriesData.filter((b: any) => b.status === "maintenance").length,
+              damaged: batteriesData.filter((b: any) => 
+                b.status !== "full" && b.status !== "charging" && b.status !== "maintenance"
+              ).length,
+              in_use: batteriesData.filter((b: any) => b.status === "in_use").length,
+              reserved: batteriesData.filter((b: any) => b.status === "reserved").length,
+            },
             by_model: Object.entries(
               batteriesData.reduce((acc: any, battery: any) => {
                 acc[battery.model] = (acc[battery.model] || 0) + 1;
@@ -324,7 +295,6 @@ const BatteryPricingManagement: React.FC = () => {
                 0
               ) / Math.max(batteriesData.length, 1),
           };
-          console.log("Calculated fallback stats:", fallbackStats);
           setBatteryStats(fallbackStats);
         }
 
@@ -332,6 +302,11 @@ const BatteryPricingManagement: React.FC = () => {
         const warehouseInfo = stationsData.map((station: any) => {
           const stationBatteries = batteriesData.filter(
             (battery: any) => battery.station_id === station.station_id
+          );
+
+          // Find batteries that would be displayed as "Hỏng" (not full, charging, or maintenance)
+          const displayedAsDamaged = stationBatteries.filter((b: any) => 
+            b.status !== "full" && b.status !== "charging" && b.status !== "maintenance"
           );
 
           const batteryStats = {
@@ -344,7 +319,10 @@ const BatteryPricingManagement: React.FC = () => {
             maintenance: stationBatteries.filter(
               (b: any) => b.status === "maintenance"
             ).length,
-            damaged: stationBatteries.filter((b: any) => b.status === "damaged")
+            damaged: displayedAsDamaged.length,
+            in_use: stationBatteries.filter((b: any) => b.status === "in_use")
+              .length,
+            reserved: stationBatteries.filter((b: any) => b.status === "reserved")
               .length,
           };
 
@@ -356,6 +334,53 @@ const BatteryPricingManagement: React.FC = () => {
         });
 
         setWarehouseData(warehouseInfo);
+
+        // If using fallback stats, recalculate from warehouseInfo for accuracy
+        if (!statsResponse?.success) {
+          const totalStats = warehouseInfo.reduce((total: any, station: any) => {
+            total.total += station.batteryStats.total;
+            total.available += station.batteryStats.available;
+            total.charging += station.batteryStats.charging;
+            total.maintenance += station.batteryStats.maintenance;
+            total.damaged += station.batteryStats.damaged;
+            total.in_use += (station.batteryStats.in_use || 0);
+            total.reserved += (station.batteryStats.reserved || 0);
+            return total;
+          }, { total: 0, available: 0, charging: 0, maintenance: 0, damaged: 0, in_use: 0, reserved: 0 });
+
+          const correctedStats = {
+            total: totalStats.total,
+            by_status: {
+              available: totalStats.available,
+              charging: totalStats.charging,
+              maintenance: totalStats.maintenance,
+              damaged: totalStats.damaged,
+              in_use: totalStats.in_use,
+              reserved: totalStats.reserved,
+            },
+            by_model: Object.entries(
+              batteriesData.reduce((acc: any, battery: any) => {
+                acc[battery.model] = (acc[battery.model] || 0) + 1;
+                return acc;
+              }, {})
+            ).map(([model, count]) => ({ model, count: count as number })),
+            low_health_count: batteriesData.filter(
+              (b: any) => b.health_percentage < 70
+            ).length,
+            avg_health:
+              batteriesData.reduce(
+                (sum: number, b: any) => sum + (b.health_percentage || 0),
+                0
+              ) / Math.max(batteriesData.length, 1),
+            avg_cycle_count:
+              batteriesData.reduce(
+                (sum: number, b: any) => sum + (b.cycle_count || 0),
+                0
+              ) / Math.max(batteriesData.length, 1),
+          };
+
+          setBatteryStats(correctedStats);
+        }
       }
     } catch (error) {
       console.error("Error fetching warehouse data:", error);
@@ -1032,7 +1057,7 @@ const BatteryPricingManagement: React.FC = () => {
                 <>
                   {/* Battery Statistics Overview */}
                   {batteryStats ? (
-                    <div className="grid gap-4 grid-cols-2 lg:grid-cols-4 mb-6">
+                    <div className="grid gap-4 grid-cols-2 lg:grid-cols-5 mb-6">
                       <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                           <CardTitle className="text-sm font-medium text-blue-700">
@@ -1089,24 +1114,43 @@ const BatteryPricingManagement: React.FC = () => {
                         </CardContent>
                       </Card>
 
+                      <Card className="bg-gradient-to-r from-red-50 to-rose-100 border-red-200">
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                          <CardTitle className="text-sm font-medium text-red-700">
+                            Pin hỏng
+                          </CardTitle>
+                          <XCircle className="h-4 w-4 text-red-600" />
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-red-800">
+                            {batteryStats.by_status.damaged || 0}
+                          </div>
+                          <p className="text-xs text-red-600">
+                            {batteryStats.total > 0 ? (
+                              ((batteryStats.by_status.damaged || 0) / batteryStats.total * 100).toFixed(1)
+                            ) : 0}%
+                          </p>
+                        </CardContent>
+                      </Card>
+
                       <Card
-                        className="bg-gradient-to-r from-red-50 to-rose-100 border-red-200 cursor-pointer hover:shadow-md transition-shadow"
+                        className="bg-gradient-to-r from-orange-50 to-orange-100 border-orange-200 cursor-pointer hover:shadow-md transition-shadow"
                         onClick={() => {
                           fetchLowHealthBatteries();
                           setShowLowHealthModal(true);
                         }}
                       >
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                          <CardTitle className="text-sm font-medium text-red-700">
+                          <CardTitle className="text-sm font-medium text-orange-700">
                             Cần bảo trì
                           </CardTitle>
-                          <AlertTriangle className="h-4 w-4 text-red-600" />
+                          <AlertTriangle className="h-4 w-4 text-orange-600" />
                         </CardHeader>
                         <CardContent>
-                          <div className="text-2xl font-bold text-red-800">
+                          <div className="text-2xl font-bold text-orange-800">
                             {batteryStats.low_health_count}
                           </div>
-                          <p className="text-xs text-red-600">
+                          <p className="text-xs text-orange-600">
                             Nhấp để xem chi tiết
                           </p>
                         </CardContent>
