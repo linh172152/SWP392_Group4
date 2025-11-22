@@ -14,16 +14,36 @@ const batteryStatusLabels: Record<string, string> = {
 
 /**
  * Get station batteries
+ * ✅ Staff: Chỉ xem pin của station mình được assign
+ * ✅ Admin: Có thể xem tất cả pin (nếu không có station_id trong query)
  */
 export const getStationBatteries = asyncHandler(
   async (req: Request, res: Response) => {
+    const userId = req.user?.userId;
     const { station_id, status, model } = req.query;
 
     const whereClause: any = {};
 
-    if (station_id) {
+    // ✅ Nếu là staff, force chỉ xem pin của station mình (bỏ qua station_id trong query)
+    if (userId) {
+      const user = await prisma.user.findUnique({
+        where: { user_id: userId },
+        select: { station_id: true, role: true },
+      });
+
+      if (user?.station_id && user.role === "STAFF") {
+        // ✅ Staff: Force chỉ xem pin của station mình, bỏ qua station_id trong query
+        whereClause.station_id = user.station_id;
+      } else if (station_id) {
+        // Admin hoặc user khác: Có thể filter theo station_id trong query
+        whereClause.station_id = station_id;
+      }
+      // Admin không có station_id trong query → xem tất cả (không set whereClause.station_id)
+    } else if (station_id) {
+      // Không authenticated: Chỉ xem theo station_id trong query
       whereClause.station_id = station_id;
     }
+
     if (status) {
       whereClause.status = status;
     }

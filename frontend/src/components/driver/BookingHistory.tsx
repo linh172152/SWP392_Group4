@@ -85,7 +85,7 @@ interface BookingItem {
   booking_code: string;
   scheduled_at: string;
   created_at: string;
-  status: "pending" | "confirmed" | "in_progress" | "completed" | "cancelled";
+  status: "pending" | "confirmed" | "completed" | "cancelled";
   is_instant?: boolean; // Flag instant booking
   station?: { name: string; address: string };
   vehicle?: {
@@ -144,7 +144,6 @@ const BookingHistory: React.FC = () => {
         return <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />;
       case "pending":
       case "confirmed":
-      case "in_progress":
       default:
         return (
           <AlertCircle className="h-4 w-4 text-slate-600 dark:text-slate-400" />
@@ -162,8 +161,6 @@ const BookingHistory: React.FC = () => {
         return "bg-amber-50/80 dark:bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-200/50 dark:border-amber-500/20";
       case "confirmed":
         return "bg-blue-50/80 dark:bg-blue-500/10 text-blue-800 dark:text-blue-400 border-blue-200/50 dark:border-blue-500/20";
-      case "in_progress":
-        return "bg-blue-50/80 dark:bg-blue-500/10 text-blue-800 dark:text-blue-400 border-blue-200/50 dark:border-blue-500/20";
       default:
         return "bg-slate-50/80 dark:bg-slate-500/10 text-slate-800 dark:text-slate-400 border-slate-200/50 dark:border-slate-500/20";
     }
@@ -179,8 +176,6 @@ const BookingHistory: React.FC = () => {
         return "Chờ xác nhận";
       case "confirmed":
         return "Đã xác nhận - Vui lòng đến trạm";
-      case "in_progress":
-        return "Đang thực hiện";
       default:
         return status;
     }
@@ -907,7 +902,6 @@ const BookingHistory: React.FC = () => {
               <SelectContent className="bg-white dark:bg-slate-800 border-0">
                 <SelectItem value="all">Tất cả</SelectItem>
                 <SelectItem value="completed">Hoàn thành</SelectItem>
-                <SelectItem value="in_progress">Đang thực hiện</SelectItem>
                 <SelectItem value="confirmed">Đã xác nhận</SelectItem>
                 <SelectItem value="pending">Chờ xác nhận</SelectItem>
                 <SelectItem value="cancelled">Đã hủy</SelectItem>
@@ -1242,8 +1236,7 @@ const BookingHistory: React.FC = () => {
                           </div>
                         );
                       })()}
-                    {(booking.status === "confirmed" ||
-                      booking.status === "in_progress") && (
+                    {(booking.status === "confirmed" || false) && (
                       <Button
                         variant="outline"
                         size="sm"

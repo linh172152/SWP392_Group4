@@ -136,13 +136,36 @@ export const createBatteryTransfer = asyncHandler(
         );
       }
 
-      const shouldMarkMaintenance = transferStatus === "completed";
+      // ✅ Chỉ set maintenance nếu transfer_reason liên quan đến maintenance
+      // Các lý do khác (restock, rebalance, etc.) → giữ nguyên status
+      const normalizedReason = transfer_reason.toLowerCase().trim();
+      const maintenanceReasons = [
+        "maintenance",
+        "manufacturer_service",
+        "repair",
+        "service",
+        "bảo trì",
+      ];
+      const shouldMarkMaintenance =
+        transferStatus === "completed" &&
+        maintenanceReasons.some((reason) =>
+          normalizedReason.includes(reason)
+        );
+
+      // ✅ Xác định status mới dựa trên transfer_reason
+      let newStatus: string;
+      if (shouldMarkMaintenance) {
+        newStatus = "maintenance";
+      } else {
+        // Giữ nguyên status hiện tại (full, charging, reserved, etc.)
+        newStatus = battery.status;
+      }
 
       await tx.battery.update({
         where: { battery_id },
         data: {
           station_id: to_station_id,
-          status: shouldMarkMaintenance ? "maintenance" : battery.status,
+          status: newStatus as any,
         },
       });
 

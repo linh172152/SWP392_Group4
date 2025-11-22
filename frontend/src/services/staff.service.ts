@@ -82,7 +82,7 @@ export interface StaffBooking {
 }
 
 export interface ConfirmBookingData {
-  phone: string;
+  // Phone verification đã được bỏ - không cần phone nữa
 }
 
 export interface CompleteBookingData {

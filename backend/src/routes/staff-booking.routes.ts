@@ -143,7 +143,7 @@ router.get("/:id/available-batteries", getAvailableBatteries);
  * @swagger
  * /api/staff/bookings/{id}/confirm:
  *   post:
- *     summary: Confirm booking (verify SĐT, không cần PIN)
+ *     summary: Confirm booking (không cần verify phone, chỉ xác nhận booking)
  *     tags: [Staff - Bookings]
  *     security:
  *       - bearerAuth: []
@@ -154,22 +154,16 @@ router.get("/:id/available-batteries", getAvailableBatteries);
  *         schema:
  *           type: string
  *     requestBody:
- *       required: true
+ *       required: false
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - phone
- *             properties:
- *               phone:
- *                 type: string
- *                 description: Phone number to verify user identity
  *     responses:
  *       200:
  *         description: Booking confirmed successfully
  *       400:
- *         description: Phone number does not match or invalid request
+ *         description: Invalid request
  *       401:
  *         description: Unauthorized
  *       403:

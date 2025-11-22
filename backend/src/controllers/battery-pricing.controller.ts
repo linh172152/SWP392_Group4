@@ -80,9 +80,12 @@ export const createBatteryPricing = asyncHandler(
       throw new CustomError("Battery model and price are required", 400);
     }
 
-    // Check if pricing for this model already exists
-    const existingPricing = await prisma.batteryPricing.findUnique({
-      where: { battery_model },
+    // Check if pricing for this model already exists (global pricing - station_id = null)
+    const existingPricing = await prisma.batteryPricing.findFirst({
+      where: {
+        battery_model,
+        station_id: null,
+      },
     });
 
     if (existingPricing) {
@@ -124,10 +127,13 @@ export const updateBatteryPricing = asyncHandler(
       throw new CustomError("Battery pricing not found", 404);
     }
 
-    // If battery_model is being changed, check if new model already exists
+    // If battery_model is being changed, check if new model already exists (global pricing - station_id = null)
     if (battery_model && battery_model !== pricing.battery_model) {
-      const existingPricing = await prisma.batteryPricing.findUnique({
-        where: { battery_model },
+      const existingPricing = await prisma.batteryPricing.findFirst({
+        where: {
+          battery_model,
+          station_id: null,
+        },
       });
 
       if (existingPricing) {

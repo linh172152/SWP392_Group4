@@ -7,8 +7,9 @@ import {
 } from "./booking-hold.service";
 
 /**
- * Auto-cancel bookings that are not checked in within 10 minutes after scheduled time
+ * Auto-cancel bookings that are not checked in within 30 minutes after scheduled time
  * This should run as a cron job every 5 minutes
+ * Example: Booking at 14:00 → Only cancel if current time is 14:30 or later
  */
 export async function autoCancelExpiredBookings() {
   try {
@@ -19,18 +20,18 @@ export async function autoCancelExpiredBookings() {
     }
 
     const now = new Date();
-    const tenMinutesAgo = new Date(now.getTime() - 10 * 60 * 1000); // 10 minutes ago
+    const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000); // 30 minutes ago
 
     // Find bookings that:
     // 1. Are confirmed
-    // 2. Scheduled time was more than 10 minutes ago
+    // 2. Scheduled time was more than 30 minutes ago
     // 3. Not checked in yet (checked_in_at is null)
     // 4. Not already completed or cancelled
     const expiredBookings = await prisma.booking.findMany({
       where: {
         status: "confirmed", // Only confirmed bookings can be auto-cancelled
         scheduled_at: {
-          lte: tenMinutesAgo, // Scheduled time was more than 10 minutes ago
+          lte: thirtyMinutesAgo, // Scheduled time was more than 30 minutes ago
         },
         checked_in_at: null, // ✅ User hasn't checked in (bỏ PIN check)
       },
@@ -63,7 +64,7 @@ export async function autoCancelExpiredBookings() {
 
     for (const booking of expiredBookings) {
       const autoCancelNote =
-        "Auto-cancelled: User did not arrive within 10 minutes of scheduled time.";
+        "Auto-cancelled: User did not arrive within 30 minutes of scheduled time.";
 
       const { updatedBooking, walletRefundAmount } =
         await prisma.$transaction(async (tx) => {
@@ -109,7 +110,7 @@ export async function autoCancelExpiredBookings() {
           type: "booking_cancelled",
           userId: booking.user_id,
           title: "Đặt chỗ đã bị hủy tự động",
-          message: `Đặt chỗ của bạn tại ${booking.station.name} đã bị hủy tự động do bạn không có mặt trong vòng 10 phút sau giờ đã đặt.${walletMessage}`,
+          message: `Đặt chỗ của bạn tại ${booking.station.name} đã bị hủy tự động do bạn không có mặt trong vòng 30 phút sau giờ đã đặt.${walletMessage}`,
           data: {
             email: booking.user.email,
             userName: booking.user.full_name,
@@ -271,8 +272,9 @@ export async function sendBookingReminders() {
 }
 
 /**
- * Auto-cancel instant bookings that are not checked in within 15 minutes
+ * Auto-cancel instant bookings that are not checked in within 30 minutes
  * This should run as a cron job every 5 minutes
+ * Example: Instant booking created at 14:00 → Only cancel if current time is 14:30 or later
  */
 export async function autoCancelInstantBookings() {
   try {
@@ -282,11 +284,11 @@ export async function autoCancelInstantBookings() {
       return { cancelled: 0, errors: [] };
     }
     const now = new Date();
-    const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000); // 15 minutes ago
+    const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000); // 30 minutes ago
 
     // Find instant bookings that:
     // 1. Are pending or confirmed
-    // 2. Created/scheduled more than 15 minutes ago
+    // 2. Created/scheduled more than 30 minutes ago
     // 3. Not checked in yet (checked_in_at is null)
     // 4. Not already completed or cancelled
     const expiredInstantBookings = await prisma.booking.findMany({
@@ -294,7 +296,7 @@ export async function autoCancelInstantBookings() {
         is_instant: true, // ✅ Only instant bookings
         status: { in: ["pending", "confirmed"] },
         scheduled_at: {
-          lte: fifteenMinutesAgo, // Created/scheduled more than 15 minutes ago
+          lte: thirtyMinutesAgo, // Created/scheduled more than 30 minutes ago
         },
         checked_in_at: null, // User hasn't checked in
       },
@@ -327,7 +329,7 @@ export async function autoCancelInstantBookings() {
 
     for (const booking of expiredInstantBookings) {
       const autoCancelNote =
-        "Auto-cancelled: Instant booking expired - User did not arrive within 15 minutes.";
+        "Auto-cancelled: Instant booking expired - User did not arrive within 30 minutes.";
 
       const { updatedBooking, walletRefundAmount } =
         await prisma.$transaction(async (tx) => {
@@ -373,7 +375,7 @@ export async function autoCancelInstantBookings() {
           type: "booking_cancelled",
           userId: booking.user_id,
           title: "Đặt chỗ ngay đã bị hủy tự động",
-          message: `Đặt chỗ ngay của bạn tại ${booking.station.name} đã bị hủy tự động do bạn không có mặt trong vòng 15 phút.${walletMessage}`,
+          message: `Đặt chỗ ngay của bạn tại ${booking.station.name} đã bị hủy tự động do bạn không có mặt trong vòng 30 phút.${walletMessage}`,
           data: {
             email: booking.user.email,
             userName: booking.user.full_name,
