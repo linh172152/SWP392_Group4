@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
 
@@ -31,10 +31,10 @@ export const getAllUsers = asyncHandler(async (req: Request, res: Response) => {
 
   const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
 
-  const users = await prisma.user.findMany({
+  const users = await prisma.users.findMany({
     where: whereClause,
     include: {
-      station: {
+      stations: {
         select: {
           station_id: true,
           name: true,
@@ -49,10 +49,10 @@ export const getAllUsers = asyncHandler(async (req: Request, res: Response) => {
           model: true,
         },
       },
-      subscriptions: {
+      user_subscriptions: {
         where: { status: "active" },
         include: {
-          package: {
+          service_packages: {
             select: {
               package_id: true,
               name: true,
@@ -68,7 +68,7 @@ export const getAllUsers = asyncHandler(async (req: Request, res: Response) => {
     take: parseInt(limit as string),
   });
 
-  const total = await prisma.user.count({ where: whereClause });
+  const total = await prisma.users.count({ where: whereClause });
 
   res.status(200).json({
     success: true,
@@ -92,10 +92,10 @@ export const getUserDetails = asyncHandler(
   async (req: Request, res: Response) => {
     const { id } = req.params;
 
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { user_id: id },
       include: {
-        station: {
+        stations: {
           select: {
             station_id: true,
             name: true,
@@ -117,14 +117,14 @@ export const getUserDetails = asyncHandler(
             created_at: true,
           },
         },
-        bookings: {
+        bookings_bookings_user_idTousers: {
           select: {
             booking_id: true,
             booking_code: true,
             status: true,
             scheduled_at: true,
             created_at: true,
-            station: {
+            stations: {
               select: {
                 station_id: true,
                 name: true,
@@ -135,14 +135,14 @@ export const getUserDetails = asyncHandler(
           orderBy: { created_at: "desc" },
           take: 10,
         },
-        transactions: {
+        transactions_transactions_user_idTousers: {
           select: {
             transaction_id: true,
             transaction_code: true,
             payment_status: true,
             amount: true,
             swap_at: true,
-            station: {
+            stations: {
               select: {
                 station_id: true,
                 name: true,
@@ -153,9 +153,9 @@ export const getUserDetails = asyncHandler(
           orderBy: { swap_at: "desc" },
           take: 10,
         },
-        subscriptions: {
+        user_subscriptions: {
           include: {
-            package: {
+            service_packages: {
               select: {
                 package_id: true,
                 name: true,
@@ -167,7 +167,7 @@ export const getUserDetails = asyncHandler(
           },
           orderBy: { created_at: "desc" },
         },
-        support_tickets: {
+        support_tickets_support_tickets_user_idTousers: {
           select: {
             ticket_id: true,
             ticket_number: true,
@@ -186,7 +186,7 @@ export const getUserDetails = asyncHandler(
             rating: true,
             comment: true,
             created_at: true,
-            station: {
+            stations: {
               select: {
                 station_id: true,
                 name: true,
@@ -232,7 +232,7 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
   }
 
   // Check if email already exists
-  const existingUser = await prisma.user.findUnique({
+  const existingUser = await prisma.users.findUnique({
     where: { email },
   });
 
@@ -247,7 +247,7 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
 
   // If station_id provided, check if station exists
   if (station_id) {
-    const station = await prisma.station.findUnique({
+    const station = await prisma.stations.findUnique({
       where: { station_id },
     });
 
@@ -256,19 +256,20 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
     }
   }
 
-  const user = await prisma.user.create({
+  const user = await prisma.users.create({
     data: {
-      full_name,
-      email,
-      password_hash,
-      phone,
-      avatar,
-      role,
-      station_id: role === "STAFF" ? station_id : null,
-      status,
-    },
+      full_name: full_name as string,
+      email: email as string,
+      password_hash: password_hash as string | null,
+      phone: phone as string | null,
+      avatar: avatar as string | null,
+      role: role as string,
+      station_id: role === "STAFF" ? (station_id as string | null) : null,
+      status: status as string,
+      updated_at: new Date(),
+    } as Prisma.usersUncheckedCreateInput,
     include: {
-      station: {
+      stations: {
         select: {
           station_id: true,
           name: true,
@@ -292,7 +293,7 @@ export const updateUser = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
   const { full_name, email, phone, avatar, station_id } = req.body;
 
-  const user = await prisma.user.findUnique({
+  const user = await prisma.users.findUnique({
     where: { user_id: id },
   });
 
@@ -302,7 +303,7 @@ export const updateUser = asyncHandler(async (req: Request, res: Response) => {
 
   // Check if email already exists (if changed)
   if (email && email !== user.email) {
-    const existingUser = await prisma.user.findUnique({
+    const existingUser = await prisma.users.findUnique({
       where: { email },
     });
 
@@ -313,7 +314,7 @@ export const updateUser = asyncHandler(async (req: Request, res: Response) => {
 
   // If station_id provided, check if station exists
   if (station_id) {
-    const station = await prisma.station.findUnique({
+    const station = await prisma.stations.findUnique({
       where: { station_id },
     });
 
@@ -322,7 +323,7 @@ export const updateUser = asyncHandler(async (req: Request, res: Response) => {
     }
   }
 
-  const updatedUser = await prisma.user.update({
+  const updatedUser = await prisma.users.update({
     where: { user_id: id },
     data: {
       full_name,
@@ -332,7 +333,7 @@ export const updateUser = asyncHandler(async (req: Request, res: Response) => {
       station_id,
     },
     include: {
-      station: {
+      stations: {
         select: {
           station_id: true,
           name: true,
@@ -361,7 +362,7 @@ export const updateUserStatus = asyncHandler(
       throw new CustomError("Status is required", 400);
     }
 
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { user_id: id },
     });
 
@@ -369,11 +370,11 @@ export const updateUserStatus = asyncHandler(
       throw new CustomError("User not found", 404);
     }
 
-    const updatedUser = await prisma.user.update({
+    const updatedUser = await prisma.users.update({
       where: { user_id: id },
       data: { status },
       include: {
-        station: {
+        stations: {
           select: {
             station_id: true,
             name: true,
@@ -403,7 +404,7 @@ export const updateUserRole = asyncHandler(
       throw new CustomError("Role is required", 400);
     }
 
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { user_id: id },
     });
 
@@ -418,7 +419,7 @@ export const updateUserRole = asyncHandler(
 
     // If station_id provided, check if station exists
     if (station_id) {
-      const station = await prisma.station.findUnique({
+      const station = await prisma.stations.findUnique({
         where: { station_id },
       });
 
@@ -427,14 +428,14 @@ export const updateUserRole = asyncHandler(
       }
     }
 
-    const updatedUser = await prisma.user.update({
+    const updatedUser = await prisma.users.update({
       where: { user_id: id },
       data: {
         role,
         station_id: role === "STAFF" ? station_id : null,
       },
       include: {
-        station: {
+        stations: {
           select: {
             station_id: true,
             name: true,
@@ -458,7 +459,7 @@ export const updateUserRole = asyncHandler(
 export const deleteUser = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
 
-  const user = await prisma.user.findUnique({
+  const user = await prisma.users.findUnique({
     where: { user_id: id },
   });
 
@@ -467,7 +468,7 @@ export const deleteUser = asyncHandler(async (req: Request, res: Response) => {
   }
 
   // Check if user has active bookings
-  const activeBookings = await prisma.booking.findFirst({
+  const activeBookings = await prisma.bookings.findFirst({
     where: {
       user_id: id,
       status: { in: ["pending", "confirmed"] },
@@ -479,7 +480,7 @@ export const deleteUser = asyncHandler(async (req: Request, res: Response) => {
   }
 
   // Check if user has active transactions
-  const activeTransactions = await prisma.transaction.findFirst({
+  const activeTransactions = await prisma.transactions.findFirst({
     where: {
       user_id: id,
       payment_status: { in: ["pending", "completed"] },
@@ -490,7 +491,7 @@ export const deleteUser = asyncHandler(async (req: Request, res: Response) => {
     throw new CustomError("Cannot delete user with active transactions", 400);
   }
 
-  await prisma.user.delete({
+  await prisma.users.delete({
     where: { user_id: id },
   });
 

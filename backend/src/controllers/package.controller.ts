@@ -66,7 +66,7 @@ export const getPublicPackages = asyncHandler(
   async (req: Request, res: Response) => {
     const { capacity } = req.query;
 
-    const where: Prisma.ServicePackageWhereInput = {
+    const where: Prisma.service_packagesWhereInput = {
       is_active: true,
     };
 
@@ -78,7 +78,7 @@ export const getPublicPackages = asyncHandler(
       where.battery_capacity_kwh = capacityNumber;
     }
 
-    const packages = await prisma.servicePackage.findMany({
+    const packages = await prisma.service_packages.findMany({
       where,
       orderBy: [{ battery_capacity_kwh: "asc" }, { billing_cycle: "asc" }],
     });
@@ -93,7 +93,7 @@ export const getPublicPackages = asyncHandler(
 
 export const adminListPackages = asyncHandler(
   async (_req: Request, res: Response) => {
-    const packages = await prisma.servicePackage.findMany({
+    const packages = await prisma.service_packages.findMany({
       orderBy: [{ battery_capacity_kwh: "asc" }, { billing_cycle: "asc" }],
     });
 
@@ -155,19 +155,20 @@ export const adminCreatePackage = asyncHandler(
     const benefitsValue = parseBenefits(benefits);
     const metadataValue = parsedMetadata;
 
-    const created = await prisma.servicePackage.create({
+    const created = await prisma.service_packages.create({
       data: {
-        name,
-        description,
+        name: name as string,
+        description: description as string | null,
         battery_capacity_kwh: capacityNumber,
         duration_days: durationNumber,
         price: new Prisma.Decimal(priceNumber),
         billing_cycle: billingCycleValue,
-        ...(benefitsValue !== undefined ? { benefits: benefitsValue } : {}),
+        ...(benefitsValue !== undefined ? { benefits: benefitsValue as Prisma.InputJsonValue } : {}),
         swap_limit: null,
-        ...(metadataValue !== undefined ? { metadata: metadataValue } : {}),
+        ...(metadataValue !== undefined ? { metadata: metadataValue as Prisma.InputJsonValue } : {}),
         is_active: parseBoolean(is_active, true),
-      },
+        updated_at: new Date(),
+      } as Prisma.service_packagesUncheckedCreateInput,
     });
 
     res.status(201).json({
@@ -197,7 +198,7 @@ export const adminUpdatePackage = asyncHandler(
       throw new CustomError("packageId is required", 400);
     }
 
-    const updateData: Prisma.ServicePackageUpdateInput = {};
+    const updateData: Prisma.service_packagesUpdateInput = {};
 
     if (name !== undefined) {
       if (!name || typeof name !== "string") {
@@ -267,7 +268,7 @@ export const adminUpdatePackage = asyncHandler(
       throw new CustomError("No update fields provided", 400);
     }
 
-    const updated = await prisma.servicePackage.update({
+    const updated = await prisma.service_packages.update({
       where: { package_id: packageId },
       data: updateData,
     });

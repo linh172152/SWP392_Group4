@@ -5,10 +5,10 @@ const prisma = new PrismaClient();
 export const vehicleService = {
   // Tạo xe mới
   createVehicle: async (vehicleData: any) => {
-    return await prisma.vehicle.create({
+    return await prisma.vehicles.create({
       data: vehicleData,
       include: {
-        user: {
+        users: {
           select: {
             user_id: true,
             full_name: true,
@@ -21,10 +21,10 @@ export const vehicleService = {
 
   // Lấy danh sách xe của user
   getUserVehicles: async (userId: string) => {
-    return await prisma.vehicle.findMany({
+    return await prisma.vehicles.findMany({
       where: { user_id: userId },
       include: {
-        user: {
+        users: {
           select: {
             user_id: true,
             full_name: true,
@@ -38,13 +38,13 @@ export const vehicleService = {
 
   // Lấy thông tin xe theo ID
   getVehicleById: async (vehicleId: string, userId: string) => {
-    return await prisma.vehicle.findFirst({
+    return await prisma.vehicles.findFirst({
       where: {
         vehicle_id: vehicleId,
         user_id: userId,
       },
       include: {
-        user: {
+        users: {
           select: {
             user_id: true,
             full_name: true,
@@ -57,11 +57,11 @@ export const vehicleService = {
 
   // Cập nhật thông tin xe
   updateVehicle: async (vehicleId: string, updateData: any) => {
-    return await prisma.vehicle.update({
+    return await prisma.vehicles.update({
       where: { vehicle_id: vehicleId },
       data: updateData,
       include: {
-        user: {
+        users: {
           select: {
             user_id: true,
             full_name: true,
@@ -74,7 +74,7 @@ export const vehicleService = {
 
   // Xóa xe
   deleteVehicle: async (vehicleId: string, userId: string) => {
-    const vehicle = await prisma.vehicle.findFirst({
+    const vehicle = await prisma.vehicles.findFirst({
       where: {
         vehicle_id: vehicleId,
         user_id: userId,
@@ -85,7 +85,7 @@ export const vehicleService = {
       return false;
     }
 
-    await prisma.vehicle.delete({
+    await prisma.vehicles.delete({
       where: { vehicle_id: vehicleId },
     });
 

@@ -75,7 +75,7 @@ export class NotificationService {
   async sendNotification(notification: NotificationData): Promise<void> {
     try {
       // 1. Create Notification record in database
-      const notificationRecord = await prisma.notification.create({
+      const notificationRecord = await prisma.notifications.create({
         data: {
           user_id: notification.userId,
           type: notification.type,

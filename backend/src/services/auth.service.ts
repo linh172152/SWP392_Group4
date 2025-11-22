@@ -1,4 +1,4 @@
-import { Prisma, PrismaClient, User } from "@prisma/client";
+import { Prisma, PrismaClient, users } from "@prisma/client";
 import {
   hashPassword,
   comparePassword,
@@ -13,9 +13,9 @@ import { CustomError } from "../middlewares/error.middleware";
 
 const prisma = new PrismaClient();
 
-type VehicleWithBattery = Prisma.VehicleGetPayload<{
+type VehicleWithBattery = Prisma.vehiclesGetPayload<{
   include: {
-    current_battery: {
+    batteries: {
       select: {
         battery_id: true;
         battery_code: true;
@@ -27,12 +27,12 @@ type VehicleWithBattery = Prisma.VehicleGetPayload<{
   };
 }>;
 
-type UserProfilePayload = Prisma.UserGetPayload<{
+type UserProfilePayload = Prisma.usersGetPayload<{
   include: {
-    station: true;
+    stations: true;
     vehicles: {
       include: {
-        current_battery: {
+        batteries: {
           select: {
             battery_id: true;
             battery_code: true;
@@ -77,7 +77,7 @@ export interface LoginData {
 }
 
 export interface AuthResponse {
-  user: Omit<User, "password_hash">;
+  user: Omit<users, "password_hash">;
   accessToken: string;
   refreshToken: string;
 }
@@ -99,7 +99,7 @@ export const registerUser = async (
     }
 
     // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
+    const existingUser = await prisma.users.findUnique({
       where: { email: data.email },
     });
 
@@ -111,7 +111,7 @@ export const registerUser = async (
     const hashedPassword = await hashPassword(data.password);
 
     // Create user
-    const user = await prisma.user.create({
+    const user = await prisma.users.create({
       data: {
         email: data.email,
         password_hash: hashedPassword,
@@ -119,7 +119,8 @@ export const registerUser = async (
         phone: data.phone || null,
         role: (data.role as "DRIVER" | "STAFF" | "ADMIN") || "DRIVER",
         status: "ACTIVE",
-      },
+        updated_at: new Date(),
+      } as Prisma.usersUncheckedCreateInput,
     });
 
     // Generate tokens
@@ -154,7 +155,7 @@ export const registerUser = async (
 export const loginUser = async (data: LoginData): Promise<AuthResponse> => {
   try {
     // Find user by email
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { email: data.email },
     });
 
@@ -180,7 +181,7 @@ export const loginUser = async (data: LoginData): Promise<AuthResponse> => {
     }
 
     // Update last login
-    await prisma.user.update({
+    await prisma.users.update({
       where: { user_id: user.user_id },
       data: { updated_at: new Date() },
     });
@@ -217,7 +218,7 @@ export const refreshAccessToken = async (
     const payload = verifyRefreshToken(data.refreshToken);
 
     // Find user
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { user_id: payload.userId },
     });
 
@@ -248,13 +249,13 @@ export const getUserProfile = async (
   userId: string
 ): Promise<UserProfileResponse> => {
   try {
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { user_id: userId },
       include: {
-        station: true,
+        stations: true,
         vehicles: {
           include: {
-            current_battery: {
+            batteries: {
               select: {
                 battery_id: true,
                 battery_code: true,
@@ -281,27 +282,27 @@ export const getUserProfile = async (
       const now = new Date();
       const [totalSwaps, subscriptionSwaps, activeSubscription] =
         await Promise.all([
-          prisma.transaction.count({
+          prisma.transactions.count({
             where: {
               user_id: userId,
             },
           }),
-          prisma.transaction.count({
+          prisma.transactions.count({
             where: {
               user_id: userId,
-              booking: {
+              bookings: {
                 use_subscription: true,
               },
             },
           }),
-          prisma.userSubscription.findFirst({
+          prisma.user_subscriptions.findFirst({
             where: {
               user_id: userId,
               status: "active",
               start_date: { lte: now },
               end_date: { gte: now },
             },
-            include: { package: true },
+            include: { service_packages: true },
             orderBy: { created_at: "desc" },
           }),
         ]);
@@ -317,9 +318,9 @@ export const getUserProfile = async (
         const unlimited = activeSubscription.remaining_swaps === null;
         activeSubscriptionInfo = {
           subscription_id: activeSubscription.subscription_id,
-          package_name: activeSubscription.package?.name ?? null,
+          package_name: activeSubscription.service_packages?.name ?? null,
           remaining_swaps: activeSubscription.remaining_swaps,
-          swap_limit: activeSubscription.package?.swap_limit ?? null,
+          swap_limit: activeSubscription.service_packages?.swap_limit ?? null,
           unlimited,
           ends_at: activeSubscription.end_date,
         };
@@ -351,10 +352,10 @@ export const getUserProfile = async (
  */
 export const updateUserProfile = async (
   userId: string,
-  updateData: Partial<Pick<User, "full_name" | "phone" | "avatar">>
-): Promise<Omit<User, "password_hash">> => {
+  updateData: Partial<Pick<users, "full_name" | "phone" | "avatar">>
+): Promise<Omit<users, "password_hash">> => {
   try {
-    const user = await prisma.user.update({
+    const user = await prisma.users.update({
       where: { user_id: userId },
       data: {
         ...updateData,
@@ -380,7 +381,7 @@ export const changePassword = async (
 ): Promise<void> => {
   try {
     // Get user
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { user_id: userId },
     });
 
@@ -413,7 +414,7 @@ export const changePassword = async (
     const hashedNewPassword = await hashPassword(newPassword);
 
     // Update password
-    await prisma.user.update({
+    await prisma.users.update({
       where: { user_id: userId },
       data: {
         password_hash: hashedNewPassword,

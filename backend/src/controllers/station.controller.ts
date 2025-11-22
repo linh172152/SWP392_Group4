@@ -23,7 +23,7 @@ export const findNearbyStations = asyncHandler(
     const searchRadius = parseFloat(radius as string);
 
     // Simple bounding box search (for production, use PostGIS or similar)
-    const stations = await prisma.station.findMany({
+    const stations = await prisma.stations.findMany({
       where: {
         status: "active",
         latitude: {
@@ -118,7 +118,7 @@ export const getStationDetails = asyncHandler(
   async (req: Request, res: Response) => {
     const { id } = req.params;
 
-    const station = await prisma.station.findUnique({
+    const station = await prisma.stations.findUnique({
       where: { station_id: id },
       include: {
         batteries: {
@@ -134,7 +134,7 @@ export const getStationDetails = asyncHandler(
         },
         station_ratings: {
           include: {
-            user: {
+            users: {
               select: {
                 user_id: true,
                 full_name: true,
@@ -142,7 +142,7 @@ export const getStationDetails = asyncHandler(
             },
           },
         },
-        staff: {
+        users: {
           select: {
             user_id: true,
             full_name: true,
@@ -159,8 +159,10 @@ export const getStationDetails = asyncHandler(
     // Calculate average rating
     const avgRating =
       station.station_ratings.length > 0
-        ? station.station_ratings.reduce((sum, r) => sum + r.rating, 0) /
-          station.station_ratings.length
+        ? station.station_ratings.reduce(
+            (sum: number, r: { rating: number }) => sum + r.rating,
+            0
+          ) / station.station_ratings.length
         : 0;
 
     // ✅ Optimized: Calculate battery inventory and capacity warning in one go
@@ -199,10 +201,10 @@ export const getStationBatteries = asyncHandler(
       whereClause.status = status;
     }
 
-    const batteries = await prisma.battery.findMany({
+    const batteries = await prisma.batteries.findMany({
       where: whereClause,
       include: {
-        station: {
+        stations: {
           select: {
             station_id: true,
             name: true,
@@ -257,7 +259,7 @@ export const searchStations = asyncHandler(
       };
     }
 
-    const stations = await prisma.station.findMany({
+    const stations = await prisma.stations.findMany({
       where: whereClause,
       include: {
         batteries: {

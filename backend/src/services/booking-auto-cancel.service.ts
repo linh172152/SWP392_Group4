@@ -27,7 +27,7 @@ export async function autoCancelExpiredBookings() {
     // 2. Scheduled time was more than 30 minutes ago
     // 3. Not checked in yet (checked_in_at is null)
     // 4. Not already completed or cancelled
-    const expiredBookings = await prisma.booking.findMany({
+    const expiredBookings = await prisma.bookings.findMany({
       where: {
         status: "confirmed", // Only confirmed bookings can be auto-cancelled
         scheduled_at: {
@@ -36,14 +36,14 @@ export async function autoCancelExpiredBookings() {
         checked_in_at: null, // ✅ User hasn't checked in (bỏ PIN check)
       },
       include: {
-        user: {
+        users_bookings_user_idTousers: {
           select: {
             user_id: true,
             full_name: true,
             email: true,
           },
         },
-        station: {
+        stations: {
           select: {
             name: true,
             address: true,
@@ -58,7 +58,7 @@ export async function autoCancelExpiredBookings() {
 
     const cancelledBookings: {
       original: (typeof expiredBookings)[number];
-      updated: Awaited<ReturnType<typeof prisma.booking.update>>;
+      updated: Awaited<ReturnType<typeof prisma.bookings.update>>;
       walletRefundAmount: number;
     }[] = [];
 
@@ -75,7 +75,7 @@ export async function autoCancelExpiredBookings() {
             notes: autoCancelNote,
           });
 
-          const bookingUpdateData: Prisma.BookingUncheckedUpdateInput = {
+          const bookingUpdateData: Prisma.bookingsUncheckedUpdateInput = {
             ...buildBookingUncheckedUpdate(release.bookingUpdate),
             status: "cancelled",
             notes: booking.notes
@@ -83,7 +83,7 @@ export async function autoCancelExpiredBookings() {
               : autoCancelNote,
           };
 
-          const updated = await tx.booking.update({
+          const updated = await tx.bookings.update({
             where: { booking_id: booking.booking_id },
             data: bookingUpdateData,
           });
@@ -110,13 +110,13 @@ export async function autoCancelExpiredBookings() {
           type: "booking_cancelled",
           userId: booking.user_id,
           title: "Đặt chỗ đã bị hủy tự động",
-          message: `Đặt chỗ của bạn tại ${booking.station.name} đã bị hủy tự động do bạn không có mặt trong vòng 30 phút sau giờ đã đặt.${walletMessage}`,
+            message: `Đặt chỗ của bạn tại ${booking.stations.name} đã bị hủy tự động do bạn không có mặt trong vòng 30 phút sau giờ đã đặt.${walletMessage}`,
           data: {
-            email: booking.user.email,
-            userName: booking.user.full_name,
+            email: booking.users_bookings_user_idTousers.email,
+            userName: booking.users_bookings_user_idTousers.full_name,
             bookingId: booking.booking_code,
-            stationName: booking.station.name,
-            stationAddress: booking.station.address,
+            stationName: booking.stations.name,
+            stationAddress: booking.stations.address,
             scheduledTime: booking.scheduled_at.toISOString(),
             cancelledAt: new Date().toISOString(),
             wallet_refund_amount: walletRefundAmount,
@@ -158,7 +158,7 @@ export async function sendBookingReminders() {
     const tenMinutesLater = new Date(now.getTime() + 10 * 60 * 1000); // 10 minutes from now
 
     // Find bookings scheduled in 30 minutes (send reminder)
-    const bookingsNeedingReminder = await prisma.booking.findMany({
+    const bookingsNeedingReminder = await prisma.bookings.findMany({
       where: {
         status: { in: ["pending", "confirmed"] },
         scheduled_at: {
@@ -167,14 +167,14 @@ export async function sendBookingReminders() {
         },
       },
       include: {
-        user: {
+        users_bookings_user_idTousers: {
           select: {
             user_id: true,
             full_name: true,
             email: true,
           },
         },
-        station: {
+        stations: {
           select: {
             name: true,
             address: true,
@@ -190,13 +190,13 @@ export async function sendBookingReminders() {
           type: "booking_reminder",
           userId: booking.user_id,
           title: "Nhắc nhở đặt chỗ",
-          message: `Bạn có đặt chỗ tại ${booking.station.name} sau 30 phút nữa. Vui lòng chuẩn bị đến đúng giờ.`,
+            message: `Bạn có đặt chỗ tại ${booking.stations.name} sau 30 phút nữa. Vui lòng chuẩn bị đến đúng giờ.`,
           data: {
-            email: booking.user.email,
-            userName: booking.user.full_name,
+            email: booking.users_bookings_user_idTousers.email,
+            userName: booking.users_bookings_user_idTousers.full_name,
             bookingId: booking.booking_code,
-            stationName: booking.station.name,
-            stationAddress: booking.station.address,
+            stationName: booking.stations.name,
+            stationAddress: booking.stations.address,
             scheduledTime: booking.scheduled_at.toISOString(),
           },
         });
@@ -209,7 +209,7 @@ export async function sendBookingReminders() {
     }
 
     // Find bookings scheduled in 10 minutes (final reminder)
-    const bookingsNeedingFinalReminder = await prisma.booking.findMany({
+    const bookingsNeedingFinalReminder = await prisma.bookings.findMany({
       where: {
         status: { in: ["pending", "confirmed"] },
         scheduled_at: {
@@ -218,14 +218,14 @@ export async function sendBookingReminders() {
         },
       },
       include: {
-        user: {
+        users_bookings_user_idTousers: {
           select: {
             user_id: true,
             full_name: true,
             email: true,
           },
         },
-        station: {
+        stations: {
           select: {
             name: true,
             address: true,
@@ -241,13 +241,13 @@ export async function sendBookingReminders() {
           type: "booking_final_reminder",
           userId: booking.user_id,
           title: "Nhắc nhở cuối cùng",
-          message: `Bạn có đặt chỗ tại ${booking.station.name} sau 10 phút nữa. Vui lòng đến đúng giờ để tránh bị hủy tự động.`,
+            message: `Bạn có đặt chỗ tại ${booking.stations.name} sau 10 phút nữa. Vui lòng đến đúng giờ để tránh bị hủy tự động.`,
           data: {
-            email: booking.user.email,
-            userName: booking.user.full_name,
+            email: booking.users_bookings_user_idTousers.email,
+            userName: booking.users_bookings_user_idTousers.full_name,
             bookingId: booking.booking_code,
-            stationName: booking.station.name,
-            stationAddress: booking.station.address,
+            stationName: booking.stations.name,
+            stationAddress: booking.stations.address,
             scheduledTime: booking.scheduled_at.toISOString(),
             // ✅ Removed: PIN code (không dùng nữa)
           },
@@ -291,7 +291,7 @@ export async function autoCancelInstantBookings() {
     // 2. Created/scheduled more than 30 minutes ago
     // 3. Not checked in yet (checked_in_at is null)
     // 4. Not already completed or cancelled
-    const expiredInstantBookings = await prisma.booking.findMany({
+    const expiredInstantBookings = await prisma.bookings.findMany({
       where: {
         is_instant: true, // ✅ Only instant bookings
         status: { in: ["pending", "confirmed"] },
@@ -301,14 +301,14 @@ export async function autoCancelInstantBookings() {
         checked_in_at: null, // User hasn't checked in
       },
       include: {
-        user: {
+        users_bookings_user_idTousers: {
           select: {
             user_id: true,
             full_name: true,
             email: true,
           },
         },
-        station: {
+        stations: {
           select: {
             name: true,
             address: true,
@@ -323,7 +323,7 @@ export async function autoCancelInstantBookings() {
 
     const cancelledBookings: {
       original: (typeof expiredInstantBookings)[number];
-      updated: Awaited<ReturnType<typeof prisma.booking.update>>;
+      updated: Awaited<ReturnType<typeof prisma.bookings.update>>;
       walletRefundAmount: number;
     }[] = [];
 
@@ -340,7 +340,7 @@ export async function autoCancelInstantBookings() {
             notes: autoCancelNote,
           });
 
-          const bookingUpdateData: Prisma.BookingUncheckedUpdateInput = {
+          const bookingUpdateData: Prisma.bookingsUncheckedUpdateInput = {
             ...buildBookingUncheckedUpdate(release.bookingUpdate),
             status: "cancelled",
             notes: booking.notes
@@ -348,7 +348,7 @@ export async function autoCancelInstantBookings() {
               : autoCancelNote,
           };
 
-          const updated = await tx.booking.update({
+          const updated = await tx.bookings.update({
             where: { booking_id: booking.booking_id },
             data: bookingUpdateData,
           });
@@ -375,13 +375,13 @@ export async function autoCancelInstantBookings() {
           type: "booking_cancelled",
           userId: booking.user_id,
           title: "Đặt chỗ ngay đã bị hủy tự động",
-          message: `Đặt chỗ ngay của bạn tại ${booking.station.name} đã bị hủy tự động do bạn không có mặt trong vòng 30 phút.${walletMessage}`,
+            message: `Đặt chỗ ngay của bạn tại ${booking.stations.name} đã bị hủy tự động do bạn không có mặt trong vòng 30 phút.${walletMessage}`,
           data: {
-            email: booking.user.email,
-            userName: booking.user.full_name,
+            email: booking.users_bookings_user_idTousers.email,
+            userName: booking.users_bookings_user_idTousers.full_name,
             bookingId: booking.booking_code,
-            stationName: booking.station.name,
-            stationAddress: booking.station.address,
+            stationName: booking.stations.name,
+            stationAddress: booking.stations.address,
             scheduledTime: booking.scheduled_at.toISOString(),
             cancelledAt: new Date().toISOString(),
             wallet_refund_amount: walletRefundAmount,

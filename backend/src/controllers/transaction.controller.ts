@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
 import { notificationService } from "../server";
@@ -25,17 +25,17 @@ export const getUserTransactions = asyncHandler(
 
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
 
-    const transactions = await prisma.transaction.findMany({
+    const transactions = await prisma.transactions.findMany({
       where: whereClause,
       include: {
-        station: {
+        stations: {
           select: {
             station_id: true,
             name: true,
             address: true,
           },
         },
-        vehicle: {
+        vehicles: {
           select: {
             vehicle_id: true,
             license_plate: true,
@@ -43,7 +43,7 @@ export const getUserTransactions = asyncHandler(
             model: true,
           },
         },
-        new_battery: {
+        batteries_transactions_new_battery_idTobatteries: {
           select: {
             battery_id: true,
             battery_code: true,
@@ -52,7 +52,7 @@ export const getUserTransactions = asyncHandler(
             current_charge: true,
           },
         },
-        old_battery: {
+        batteries_transactions_old_battery_idTobatteries: {
           select: {
             battery_id: true,
             battery_code: true,
@@ -61,14 +61,14 @@ export const getUserTransactions = asyncHandler(
             current_charge: true,
           },
         },
-        staff: {
+        users_transactions_staff_idTousers: {
           select: {
             user_id: true,
             full_name: true,
             email: true,
           },
         },
-        payment: {
+        payments: {
           select: {
             payment_id: true,
             amount: true,
@@ -77,7 +77,7 @@ export const getUserTransactions = asyncHandler(
             paid_at: true,
           },
         },
-        station_rating: {
+        station_ratings: {
           select: {
             rating_id: true,
             rating: true,
@@ -90,7 +90,7 @@ export const getUserTransactions = asyncHandler(
       take: parseInt(limit as string),
     });
 
-    const total = await prisma.transaction.count({ where: whereClause });
+    const total = await prisma.transactions.count({ where: whereClause });
 
     res.status(200).json({
       success: true,
@@ -120,13 +120,13 @@ export const getTransactionDetails = asyncHandler(
       throw new CustomError("User not authenticated", 401);
     }
 
-    const transaction = await prisma.transaction.findFirst({
+    const transaction = await prisma.transactions.findFirst({
       where: {
         transaction_id: id,
         user_id: userId,
       },
       include: {
-        booking: {
+        bookings: {
           select: {
             booking_id: true,
             booking_code: true,
@@ -134,7 +134,7 @@ export const getTransactionDetails = asyncHandler(
             status: true,
           },
         },
-        station: {
+        stations: {
           select: {
             station_id: true,
             name: true,
@@ -143,7 +143,7 @@ export const getTransactionDetails = asyncHandler(
             longitude: true,
           },
         },
-        vehicle: {
+        vehicles: {
           select: {
             vehicle_id: true,
             license_plate: true,
@@ -153,7 +153,7 @@ export const getTransactionDetails = asyncHandler(
             year: true,
           },
         },
-        new_battery: {
+        batteries_transactions_new_battery_idTobatteries: {
           select: {
             battery_id: true,
             battery_code: true,
@@ -163,7 +163,7 @@ export const getTransactionDetails = asyncHandler(
             status: true,
           },
         },
-        old_battery: {
+        batteries_transactions_old_battery_idTobatteries: {
           select: {
             battery_id: true,
             battery_code: true,
@@ -173,7 +173,7 @@ export const getTransactionDetails = asyncHandler(
             status: true,
           },
         },
-        staff: {
+        users_transactions_staff_idTousers: {
           select: {
             user_id: true,
             full_name: true,
@@ -181,7 +181,7 @@ export const getTransactionDetails = asyncHandler(
             phone: true,
           },
         },
-        payment: {
+        payments: {
           select: {
             payment_id: true,
             amount: true,
@@ -192,7 +192,7 @@ export const getTransactionDetails = asyncHandler(
             created_at: true,
           },
         },
-        station_rating: {
+        station_ratings: {
           select: {
             rating_id: true,
             rating: true,
@@ -231,7 +231,7 @@ export const getTransactionStats = asyncHandler(
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    const stats = await prisma.transaction.aggregate({
+    const stats = await prisma.transactions.aggregate({
       where: {
         user_id: userId,
         created_at: {
@@ -249,7 +249,7 @@ export const getTransactionStats = asyncHandler(
       },
     });
 
-    const statusCounts = await prisma.transaction.groupBy({
+    const statusCounts = await prisma.transactions.groupBy({
       by: ["payment_status"],
       where: {
         user_id: userId,
@@ -262,7 +262,7 @@ export const getTransactionStats = asyncHandler(
       },
     });
 
-    const monthlyStats = await prisma.transaction.groupBy({
+    const monthlyStats = await prisma.transactions.groupBy({
       by: ["created_at"],
       where: {
         user_id: userId,
@@ -304,21 +304,21 @@ export const getPendingTransactions = asyncHandler(
       throw new CustomError("User not authenticated", 401);
     }
 
-    const transactions = await prisma.transaction.findMany({
+    const transactions = await prisma.transactions.findMany({
       where: {
         user_id: userId,
         payment_status: "pending",
         amount: { gt: 0 }, // Only transactions that need payment
       },
       include: {
-        station: {
+        stations: {
           select: {
             station_id: true,
             name: true,
             address: true,
           },
         },
-        booking: {
+        bookings: {
           select: {
             booking_code: true,
             scheduled_at: true,
@@ -350,21 +350,21 @@ export const payTransaction = asyncHandler(
     }
 
     // Get transaction
-    const transaction = await prisma.transaction.findFirst({
+    const transaction = await prisma.transactions.findFirst({
       where: {
         transaction_id: id,
         user_id: userId,
         payment_status: "pending",
       },
       include: {
-        user: {
+        users_transactions_user_idTousers: {
           select: {
             user_id: true,
             full_name: true,
             email: true,
           },
         },
-        station: {
+        stations: {
           select: {
             station_id: true,
             name: true,
@@ -383,26 +383,26 @@ export const payTransaction = asyncHandler(
     }
 
     // Create payment record
-    const payment = await prisma.payment.create({
+    const payment = await prisma.payments.create({
       data: {
         transaction_id: id,
         user_id: userId,
         amount: transaction.amount,
-        payment_method,
+        payment_method: payment_method as string,
         payment_status: "pending",
         payment_type: "SWAP",
         metadata: {
           station_id: transaction.station_id,
           booking_id: transaction.booking_id,
-        },
-      },
+        } as Prisma.InputJsonValue,
+      } as Prisma.paymentsUncheckedCreateInput,
     });
 
     // If VNPay, redirect to payment gateway
     if (payment_method === "vnpay") {
       // TODO: Implement VNPay payment creation
       // For now, simulate payment success
-      await prisma.payment.update({
+      await prisma.payments.update({
         where: { payment_id: payment.payment_id },
         data: {
           payment_status: "completed",
@@ -414,7 +414,7 @@ export const payTransaction = asyncHandler(
         },
       });
 
-      await prisma.transaction.update({
+      await prisma.transactions.update({
         where: { transaction_id: id },
         data: { payment_status: "completed" },
       });
@@ -427,8 +427,8 @@ export const payTransaction = asyncHandler(
           title: "Thanh toán thành công!",
           message: `Giao dịch ${transaction.transaction_code} đã được thanh toán thành công. Số tiền: ${transaction.amount} VND`,
           data: {
-            email: transaction.user.email,
-            userName: transaction.user.full_name,
+            email: transaction.users_transactions_user_idTousers.email,
+            userName: transaction.users_transactions_user_idTousers.full_name,
             amount: transaction.amount,
             transactionId: transaction.transaction_code,
             paymentTime: new Date().toISOString(),
@@ -467,14 +467,14 @@ export const createRefundRequest = asyncHandler(
     }
 
     // Check if transaction exists and belongs to user
-    const transaction = await prisma.transaction.findFirst({
+    const transaction = await prisma.transactions.findFirst({
       where: {
         transaction_id,
         user_id: userId,
         payment_status: "completed",
       },
       include: {
-        payment: true,
+        payments: true,
       },
     });
 
@@ -497,7 +497,7 @@ export const createRefundRequest = asyncHandler(
     // Create support ticket for refund request
     const ticketNumber = `REF${Date.now()}${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
 
-    const supportTicket = await prisma.supportTicket.create({
+    const supportTicket = await prisma.support_tickets.create({
       data: {
         ticket_number: ticketNumber,
         user_id: userId,
@@ -506,7 +506,8 @@ export const createRefundRequest = asyncHandler(
         description: `Refund request for transaction ${transaction.transaction_code}. Amount: ${refundAmount}. Reason: ${reason}`,
         priority: "high",
         status: "open",
-      },
+        updated_at: new Date(),
+      } as Prisma.support_ticketsUncheckedCreateInput,
     });
 
     res.status(201).json({
