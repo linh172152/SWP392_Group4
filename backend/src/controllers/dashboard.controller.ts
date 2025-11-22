@@ -47,7 +47,7 @@ export const getDashboardStats = asyncHandler(
     // ============================================
     const [currentRevenue, previousRevenue, revenueByMethod] = await Promise.all([
       // Current period revenue
-      prisma.payment.aggregate({
+      prisma.payments.aggregate({
         where: {
           payment_status: "completed",
           created_at: { gte: periodStart },
@@ -56,7 +56,7 @@ export const getDashboardStats = asyncHandler(
         _count: { payment_id: true },
       }),
       // Previous period revenue
-      prisma.payment.aggregate({
+      prisma.payments.aggregate({
         where: {
           payment_status: "completed",
           created_at: {
@@ -67,7 +67,7 @@ export const getDashboardStats = asyncHandler(
         _sum: { amount: true },
       }),
       // Revenue by payment method
-      prisma.payment.groupBy({
+      prisma.payments.groupBy({
         by: ["payment_method"],
         where: {
           payment_status: "completed",
@@ -88,7 +88,7 @@ export const getDashboardStats = asyncHandler(
     const dailyAverage = totalRevenue / daysInPeriod;
 
     const revenueByMethodObj = revenueByMethod.reduce(
-      (acc, item) => {
+      (acc: Record<string, number>, item: { payment_method: string; _sum: { amount: any } }) => {
         acc[item.payment_method] = Number(item._sum.amount || 0);
         return acc;
       },
@@ -99,12 +99,12 @@ export const getDashboardStats = asyncHandler(
     // BOOKINGS STATS
     // ============================================
     const [bookingsStats, previousBookingsStats] = await Promise.all([
-      prisma.booking.groupBy({
+      prisma.bookings.groupBy({
         by: ["status"],
         where: { created_at: { gte: periodStart } },
         _count: { booking_id: true },
       }),
-      prisma.booking.groupBy({
+      prisma.bookings.groupBy({
         by: ["status"],
         where: {
           created_at: {
@@ -147,7 +147,7 @@ export const getDashboardStats = asyncHandler(
     // ============================================
     // TRANSACTIONS STATS
     // ============================================
-    const transactionsStats = await prisma.transaction.aggregate({
+    const transactionsStats = await prisma.transactions.aggregate({
       where: { created_at: { gte: periodStart } },
       _count: { transaction_id: true },
       _avg: { amount: true },
@@ -155,10 +155,10 @@ export const getDashboardStats = asyncHandler(
     });
 
     // Get battery models for transactions
-    const transactionsWithBatteries = await prisma.transaction.findMany({
+    const transactionsWithBatteries = await prisma.transactions.findMany({
       where: { created_at: { gte: periodStart } },
       include: {
-        booking: {
+        bookings: {
           select: { battery_model: true },
         },
       },
@@ -166,7 +166,7 @@ export const getDashboardStats = asyncHandler(
 
     const transactionsByModelObj = transactionsWithBatteries.reduce(
       (acc, txn) => {
-        const model = txn.booking.battery_model;
+        const model = txn.bookings.battery_model;
         if (!acc[model]) {
           acc[model] = { count: 0, total: 0 };
         }
@@ -181,11 +181,11 @@ export const getDashboardStats = asyncHandler(
     // STATIONS STATS
     // ============================================
     const [stationsStats, mostPopularStation] = await Promise.all([
-      prisma.station.groupBy({
+      prisma.stations.groupBy({
         by: ["status"],
         _count: { station_id: true },
       }),
-      prisma.booking.groupBy({
+      prisma.bookings.groupBy({
         by: ["station_id"],
         where: { created_at: { gte: periodStart } },
         _count: { booking_id: true },
@@ -194,11 +194,11 @@ export const getDashboardStats = asyncHandler(
       }),
     ]);
 
-    const activeStations = stationsStats.find((s) => s.status === "active")?._count.station_id || 0;
+    const activeStations = stationsStats.find((s: { status: string; _count: { station_id: number } }) => s.status === "active")?._count.station_id || 0;
     
     let mostPopularStationData = null;
     if (mostPopularStation.length > 0) {
-      const station = await prisma.station.findUnique({
+      const station = await prisma.stations.findUnique({
         where: { station_id: mostPopularStation[0].station_id },
         select: {
           station_id: true,
@@ -219,8 +219,8 @@ export const getDashboardStats = asyncHandler(
     // USERS STATS
     // ============================================
     const [totalUsers, newUsersThisPeriod] = await Promise.all([
-      prisma.user.count(),
-      prisma.user.count({
+      prisma.users.count(),
+      prisma.users.count({
         where: {
           created_at: { gte: periodStart },
         },
@@ -228,9 +228,9 @@ export const getDashboardStats = asyncHandler(
     ]);
 
     // Active users (users who made at least 1 booking this period)
-    const activeUsersThisPeriod = await prisma.user.count({
+    const activeUsersThisPeriod = await prisma.users.count({
       where: {
-        bookings: {
+        bookings_bookings_user_idTousers: {
           some: {
             created_at: { gte: periodStart },
           },

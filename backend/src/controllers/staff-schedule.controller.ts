@@ -21,7 +21,7 @@ const getShiftDate = (shiftStart: Date): Date => {
 };
 
 const assertStaffUser = async (staffId: string) => {
-  const staff = await prisma.user.findUnique({
+  const staff = await prisma.users.findUnique({
     where: { user_id: staffId },
     select: { user_id: true, role: true, station_id: true },
   });
@@ -39,7 +39,7 @@ const checkScheduleOverlap = async (
   shiftEnd: Date,
   excludeScheduleId?: string
 ) => {
-  const overlap = await prisma.staffSchedule.findFirst({
+    const overlap = await prisma.staff_schedules.findFirst({
     where: {
       staff_id: staffId,
       schedule_id: excludeScheduleId ? { not: excludeScheduleId } : undefined,
@@ -73,7 +73,7 @@ export const getMyStaffSchedules = asyncHandler(
 
     const { from, to, status, include_past = "false" } = req.query;
 
-    const where: Prisma.StaffScheduleWhereInput = {
+    const where: Prisma.staff_schedulesWhereInput = {
       staff_id: staffId,
     };
 
@@ -96,11 +96,11 @@ export const getMyStaffSchedules = asyncHandler(
       where.status = normalizeStatus(String(status));
     }
 
-    const schedules = await prisma.staffSchedule.findMany({
+    const schedules = await prisma.staff_schedules.findMany({
       where,
       orderBy: [{ shift_start: "asc" }],
       include: {
-        station: {
+        stations: {
           select: {
             station_id: true,
             name: true,
@@ -137,7 +137,7 @@ export const updateMyScheduleStatus = asyncHandler(
       throw new CustomError("Invalid status", 400);
     }
 
-    const schedule = await prisma.staffSchedule.findUnique({
+    const schedule = await prisma.staff_schedules.findUnique({
       where: { schedule_id: id },
     });
 
@@ -155,7 +155,7 @@ export const updateMyScheduleStatus = asyncHandler(
       throw new CustomError("Status update not allowed", 400);
     }
 
-    const updated = await prisma.staffSchedule.update({
+    const updated = await prisma.staff_schedules.update({
       where: { schedule_id: id },
       data: {
         status: normalizedStatus,
@@ -175,7 +175,7 @@ export const adminListStaffSchedules = asyncHandler(
   async (req: Request, res: Response) => {
     const { staff_id, station_id, shift_date, from, to, status, page = "1", limit = "20" } = req.query;
 
-    const where: Prisma.StaffScheduleWhereInput = {};
+    const where: Prisma.staff_schedulesWhereInput = {};
 
     if (staff_id) {
       where.staff_id = staff_id as string;
@@ -230,13 +230,13 @@ export const adminListStaffSchedules = asyncHandler(
     const skip = (pageNumber - 1) * pageSize;
 
     const [schedules, total] = await prisma.$transaction([
-      prisma.staffSchedule.findMany({
+      prisma.staff_schedules.findMany({
         where,
         orderBy: [{ shift_start: "asc" }],
         skip,
         take: pageSize,
         include: {
-          staff: {
+          users: {
             select: {
               user_id: true,
               full_name: true,
@@ -244,7 +244,7 @@ export const adminListStaffSchedules = asyncHandler(
               phone: true,
             },
           },
-          station: {
+          stations: {
             select: {
               station_id: true,
               name: true,
@@ -252,7 +252,7 @@ export const adminListStaffSchedules = asyncHandler(
           },
         },
       }),
-      prisma.staffSchedule.count({ where }),
+      prisma.staff_schedules.count({ where }),
     ]);
 
     res.status(200).json({
@@ -299,7 +299,7 @@ export const adminCreateStaffSchedule = asyncHandler(
 
     await checkScheduleOverlap(staff_id, shiftStart, shiftEnd);
 
-    const schedule = await prisma.staffSchedule.create({
+    const schedule = await prisma.staff_schedules.create({
       data: {
         staff_id,
         station_id: finalStationId,
@@ -310,14 +310,14 @@ export const adminCreateStaffSchedule = asyncHandler(
         notes,
       },
       include: {
-        staff: {
+        users: {
           select: {
             user_id: true,
             full_name: true,
             email: true,
           },
         },
-        station: {
+        stations: {
           select: {
             station_id: true,
             name: true,
@@ -339,7 +339,7 @@ export const adminUpdateStaffSchedule = asyncHandler(
     const { id } = req.params;
     const { shift_start, shift_end, status, notes, station_id } = req.body;
 
-    const schedule = await prisma.staffSchedule.findUnique({
+    const schedule = await prisma.staff_schedules.findUnique({
       where: { schedule_id: id },
     });
 
@@ -366,7 +366,7 @@ export const adminUpdateStaffSchedule = asyncHandler(
       await checkScheduleOverlap(schedule.staff_id, shiftStart, shiftEnd, schedule.schedule_id);
     }
 
-    const data: Prisma.StaffScheduleUpdateInput = {};
+    const data: Prisma.staff_schedulesUpdateInput = {};
 
     if (shiftStart) {
       data.shift_start = shiftStart;
@@ -383,9 +383,9 @@ export const adminUpdateStaffSchedule = asyncHandler(
     }
     if (station_id !== undefined) {
       if (station_id === null || station_id === "null") {
-        data.station = { disconnect: true };
+        data.stations = { disconnect: true };
       } else if (typeof station_id === "string" && station_id.trim().length > 0) {
-        data.station = {
+        data.stations = {
           connect: { station_id: station_id.trim() },
         };
       } else {
@@ -393,18 +393,18 @@ export const adminUpdateStaffSchedule = asyncHandler(
       }
     }
 
-    const updated = await prisma.staffSchedule.update({
+    const updated = await prisma.staff_schedules.update({
       where: { schedule_id: id },
       data,
       include: {
-        staff: {
+        users: {
           select: {
             user_id: true,
             full_name: true,
             email: true,
           },
         },
-        station: {
+        stations: {
           select: {
             station_id: true,
             name: true,
@@ -425,7 +425,7 @@ export const adminDeleteStaffSchedule = asyncHandler(
   async (req: Request, res: Response) => {
     const { id } = req.params;
 
-    await prisma.staffSchedule.delete({
+    await prisma.staff_schedules.delete({
       where: { schedule_id: id },
     });
 

@@ -30,7 +30,7 @@ export const getBookingForecast = asyncHandler(
       today.getTime() - historyDays * 24 * 60 * 60 * 1000
     );
 
-    const bookings = await prisma.booking.findMany({
+    const bookings = await prisma.bookings.findMany({
       where: {
         created_at: {
           gte: startDate,
@@ -44,7 +44,7 @@ export const getBookingForecast = asyncHandler(
 
     const dailyCounts = new Map<string, number>();
 
-    bookings.forEach((booking) => {
+    bookings.forEach((booking: { created_at: Date }) => {
       const key = toDateKey(booking.created_at);
       dailyCounts.set(key, (dailyCounts.get(key) ?? 0) + 1);
     });

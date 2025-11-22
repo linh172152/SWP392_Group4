@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
 
@@ -29,7 +29,7 @@ export const createRating = asyncHandler(
     }
 
     // Check if transaction exists and belongs to user
-    const transaction = await prisma.transaction.findFirst({
+    const transaction = await prisma.transactions.findFirst({
       where: {
         transaction_id,
         user_id: userId,
@@ -42,7 +42,7 @@ export const createRating = asyncHandler(
     }
 
     // Check if already rated
-    const existingRating = await prisma.stationRating.findFirst({
+    const existingRating = await prisma.station_ratings.findFirst({
       where: { transaction_id },
     });
 
@@ -50,30 +50,31 @@ export const createRating = asyncHandler(
       throw new CustomError("Transaction already rated", 400);
     }
 
-    const ratingData = await prisma.stationRating.create({
+    const ratingData = await prisma.station_ratings.create({
       data: {
         user_id: userId,
-        station_id,
-        transaction_id,
-        rating,
-        comment,
-      },
+        station_id: station_id as string,
+        transaction_id: transaction_id as string | null,
+        rating: rating as number,
+        comment: comment as string | null,
+        updated_at: new Date(),
+      } as Prisma.station_ratingsUncheckedCreateInput,
       include: {
-        user: {
+        users: {
           select: {
             user_id: true,
             full_name: true,
             email: true,
           },
         },
-        station: {
+        stations: {
           select: {
             station_id: true,
             name: true,
             address: true,
           },
         },
-        transaction: {
+        transactions: {
           select: {
             transaction_id: true,
             transaction_code: true,
@@ -107,24 +108,24 @@ export const getRatings = asyncHandler(async (req: Request, res: Response) => {
 
   const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
 
-  const ratings = await prisma.stationRating.findMany({
+  const ratings = await prisma.station_ratings.findMany({
     where: whereClause,
     include: {
-      user: {
+      users: {
         select: {
           user_id: true,
           full_name: true,
           email: true,
         },
       },
-      station: {
+      stations: {
         select: {
           station_id: true,
           name: true,
           address: true,
         },
       },
-      transaction: {
+      transactions: {
         select: {
           transaction_id: true,
           transaction_code: true,
@@ -137,7 +138,7 @@ export const getRatings = asyncHandler(async (req: Request, res: Response) => {
     take: parseInt(limit as string),
   });
 
-  const total = await prisma.stationRating.count({ where: whereClause });
+  const total = await prisma.station_ratings.count({ where: whereClause });
 
   res.status(200).json({
     success: true,
@@ -161,24 +162,24 @@ export const getRatingDetails = asyncHandler(
   async (req: Request, res: Response) => {
     const { id } = req.params;
 
-    const rating = await prisma.stationRating.findUnique({
+    const rating = await prisma.station_ratings.findUnique({
       where: { rating_id: id },
       include: {
-        user: {
+        users: {
           select: {
             user_id: true,
             full_name: true,
             email: true,
           },
         },
-        station: {
+        stations: {
           select: {
             station_id: true,
             name: true,
             address: true,
           },
         },
-        transaction: {
+        transactions: {
           select: {
             transaction_id: true,
             transaction_code: true,
@@ -217,7 +218,7 @@ export const updateRating = asyncHandler(
       throw new CustomError("Rating must be between 1 and 5", 400);
     }
 
-    const existingRating = await prisma.stationRating.findFirst({
+    const existingRating = await prisma.station_ratings.findFirst({
       where: {
         rating_id: id,
         user_id: userId,
@@ -228,28 +229,28 @@ export const updateRating = asyncHandler(
       throw new CustomError("Rating not found or not owned by user", 404);
     }
 
-    const updatedRating = await prisma.stationRating.update({
+    const updatedRating = await prisma.station_ratings.update({
       where: { rating_id: id },
       data: {
         rating,
         comment,
       },
       include: {
-        user: {
+        users: {
           select: {
             user_id: true,
             full_name: true,
             email: true,
           },
         },
-        station: {
+        stations: {
           select: {
             station_id: true,
             name: true,
             address: true,
           },
         },
-        transaction: {
+        transactions: {
           select: {
             transaction_id: true,
             transaction_code: true,
@@ -279,7 +280,7 @@ export const deleteRating = asyncHandler(
       throw new CustomError("User not authenticated", 401);
     }
 
-    const existingRating = await prisma.stationRating.findFirst({
+    const existingRating = await prisma.station_ratings.findFirst({
       where: {
         rating_id: id,
         user_id: userId,
@@ -290,7 +291,7 @@ export const deleteRating = asyncHandler(
       throw new CustomError("Rating not found or not owned by user", 404);
     }
 
-    await prisma.stationRating.delete({
+    await prisma.station_ratings.delete({
       where: { rating_id: id },
     });
 
@@ -311,17 +312,17 @@ export const getStationRatings = asyncHandler(
 
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
 
-    const ratings = await prisma.stationRating.findMany({
+    const ratings = await prisma.station_ratings.findMany({
       where: { station_id: id },
       include: {
-        user: {
+        users: {
           select: {
             user_id: true,
             full_name: true,
             email: true,
           },
         },
-        transaction: {
+        transactions: {
           select: {
             transaction_id: true,
             transaction_code: true,
@@ -334,7 +335,7 @@ export const getStationRatings = asyncHandler(
       take: parseInt(limit as string),
     });
 
-    const total = await prisma.stationRating.count({
+    const total = await prisma.station_ratings.count({
       where: { station_id: id },
     });
 
@@ -361,7 +362,7 @@ export const getStationRatingSummary = asyncHandler(
   async (req: Request, res: Response) => {
     const { id } = req.params;
 
-    const ratings = await prisma.stationRating.findMany({
+    const ratings = await prisma.station_ratings.findMany({
       where: { station_id: id },
       select: {
         rating: true,
