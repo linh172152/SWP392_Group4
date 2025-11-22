@@ -150,12 +150,23 @@ export async function releaseBookingHold({
     booking.locked_subscription_id &&
     booking.locked_swap_count > 0
   ) {
+    const now = new Date();
     const subscription = await tx.userSubscription.findUnique({
       where: { subscription_id: booking.locked_subscription_id },
-      select: { remaining_swaps: true },
+      select: {
+        remaining_swaps: true,
+        status: true,
+        end_date: true,
+      },
     });
 
-    if (subscription && subscription.remaining_swaps !== null) {
+    // ✅ Chỉ restore swaps nếu subscription còn active và chưa hết hạn
+    if (
+      subscription &&
+      subscription.remaining_swaps !== null &&
+      subscription.status === "active" &&
+      subscription.end_date >= now
+    ) {
       await tx.userSubscription.update({
         where: { subscription_id: booking.locked_subscription_id },
         data: {
@@ -163,6 +174,7 @@ export async function releaseBookingHold({
         },
       });
     }
+    // Nếu subscription đã hết hạn hoặc không active, không restore swaps (đã mất)
   }
 
   const bookingUpdate: BookingUpdatePatch = {

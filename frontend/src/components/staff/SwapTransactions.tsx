@@ -100,7 +100,6 @@ const SwapTransactions: React.FC = () => {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
 
   // Form states
-  const [phoneInput, setPhoneInput] = useState("");
   const [oldBatteryCode, setOldBatteryCode] = useState("");
   const [newBatteryCode, setNewBatteryCode] = useState("");
   const [batteryModel, setBatteryModel] = useState("");
@@ -377,26 +376,18 @@ const SwapTransactions: React.FC = () => {
   // Open confirm dialog
   const handleOpenConfirmDialog = (booking: StaffBooking) => {
     setSelectedBooking(booking);
-    setPhoneInput("");
     setConfirmDialogOpen(true);
   };
 
-  // Confirm booking - Verify phone
+  // Confirm booking - Không cần verify phone nữa
   const handleConfirmBooking = async () => {
-    if (!selectedBooking || !phoneInput.trim()) {
-      toast({
-        title: "Lỗi",
-        description: "Vui lòng nhập số điện thoại",
-        variant: "destructive",
-      });
+    if (!selectedBooking) {
       return;
     }
 
     try {
       setActionLoading(selectedBooking.booking_id);
-      const response = await confirmBooking(selectedBooking.booking_id, {
-        phone: phoneInput.trim(),
-      });
+      const response = await confirmBooking(selectedBooking.booking_id, {});
 
       if (response.success) {
         toast({
@@ -1425,7 +1416,7 @@ const SwapTransactions: React.FC = () => {
           <DialogHeader>
             <DialogTitle>Xác nhận khách hàng</DialogTitle>
             <DialogDescription>
-              Nhập số điện thoại của khách hàng để xác nhận booking
+              Xác nhận booking - Khách hàng sẽ nhận thông báo đến trạm để đổi pin
             </DialogDescription>
           </DialogHeader>
           {selectedBooking && (
@@ -1443,22 +1434,6 @@ const SwapTransactions: React.FC = () => {
                   </p>
                 )}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">
-                  Số điện thoại <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="Nhập số điện thoại khách hàng"
-                  value={phoneInput}
-                  onChange={(e) => setPhoneInput(e.target.value)}
-                  disabled={actionLoading === selectedBooking.booking_id}
-                />
-                <p className="text-xs text-gray-500">
-                  Số điện thoại phải khớp với thông tin đăng ký của khách hàng.
-                </p>
-              </div>
             </div>
           )}
           <DialogFooter>
@@ -1471,10 +1446,7 @@ const SwapTransactions: React.FC = () => {
             </Button>
             <Button
               onClick={handleConfirmBooking}
-              disabled={
-                !phoneInput.trim() ||
-                actionLoading === selectedBooking?.booking_id
-              }
+              disabled={actionLoading === selectedBooking?.booking_id}
             >
               {actionLoading === selectedBooking?.booking_id ? (
                 <>

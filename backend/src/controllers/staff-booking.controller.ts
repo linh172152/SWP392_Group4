@@ -370,14 +370,9 @@ export const confirmBooking = asyncHandler(
   async (req: Request, res: Response) => {
     const staffId = req.user?.userId;
     const { id } = req.params;
-    const { phone } = req.body; // ✅ Staff nhập SĐT để verify
 
     if (!staffId) {
       throw new CustomError("Staff not authenticated", 401);
-    }
-
-    if (!phone) {
-      throw new CustomError("Phone number is required for verification", 400);
     }
 
     const booking = await prisma.booking.findUnique({
@@ -418,26 +413,6 @@ export const confirmBooking = asyncHandler(
       throw new CustomError("Booking cannot be confirmed", 400);
     }
 
-    // ✅ Verify SĐT - Simple comparison (remove spaces and compare)
-    const normalizePhone = (phoneNum: string | null | undefined): string => {
-      if (!phoneNum) return "";
-      return String(phoneNum).trim().replace(/\s/g, "");
-    };
-
-    const normalizedInput = normalizePhone(phone);
-    const normalizedUser = normalizePhone(booking.user.phone);
-
-    if (!normalizedInput || !normalizedUser) {
-      throw new CustomError("Phone number is required for verification", 400);
-    }
-
-    if (normalizedUser !== normalizedInput) {
-      throw new CustomError(
-        `Số điện thoại không khớp. Số điện thoại đăng ký: ${booking.user.phone || "N/A"}, Số bạn nhập: ${phone}. Vui lòng kiểm tra lại.`,
-        400
-      );
-    }
-
     // Check if scheduled time has passed
     // Allow confirmation within 3 hours after scheduled time (for late arrivals)
     const scheduledTime = new Date(booking.scheduled_at);
@@ -459,14 +434,13 @@ export const confirmBooking = asyncHandler(
     // - Nếu booking không có locked_battery_id: staff sẽ chọn pin khi complete
     // Việc check availability đã được làm khi tạo booking rồi
 
-    // ✅ Không tạo PIN code nữa
+    // ✅ Chỉ đổi status, KHÔNG set checked_in_at (sẽ set khi complete)
     const updatedBooking = await prisma.booking.update({
       where: { booking_id: id },
       data: {
         status: "confirmed",
-        checked_in_at: new Date(),
-        checked_in_by_staff_id: staffId,
-        // ✅ KHÔNG tạo pin_code
+        // ✅ KHÔNG set checked_in_at và checked_in_by_staff_id ở đây
+        // Sẽ set khi completeBooking (khi driver thực sự đến đổi pin)
       } as any,
       include: {
         user: {
@@ -1139,6 +1113,9 @@ export const completeBooking = asyncHandler(
         ...buildBookingUncheckedUpdate(consume.bookingUpdate),
         status: "completed",
         battery_model: finalBatteryModel,
+        // ✅ Set checked_in_at và checked_in_by_staff_id khi complete (driver đã đến)
+        checked_in_at: new Date(),
+        checked_in_by_staff_id: staffId,
       };
 
       const updatedBooking = await tx.booking.update({

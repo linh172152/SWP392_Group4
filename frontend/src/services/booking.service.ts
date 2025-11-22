@@ -9,8 +9,9 @@ export interface Booking {
   battery_model: string;
   scheduled_at: string;
   is_instant?: boolean;
-  status: "pending" | "confirmed" | "in_progress" | "completed" | "cancelled";
+  status: "pending" | "confirmed" | "completed" | "cancelled";
   notes?: string;
+  checked_in_at?: string;
   created_at: string;
   updated_at: string;
   station?: {
@@ -66,6 +67,7 @@ export interface CreateInstantBookingData {
   station_id: string;
   battery_model: string;
   notes?: string;
+  use_subscription?: boolean; // Ưu tiên sử dụng subscription nếu có (default: true)
 }
 
 export interface UpdateBookingData {
@@ -188,10 +190,19 @@ export const bookingService = {
   async createInstantBooking(
     bookingData: CreateInstantBookingData
   ): Promise<Booking> {
+    // Default use_subscription = true nếu không được chỉ định
+    const requestData = {
+      ...bookingData,
+      use_subscription:
+        bookingData.use_subscription !== undefined
+          ? bookingData.use_subscription
+          : true,
+    };
+
     const response = await fetch(`${API_ENDPOINTS.DRIVER.BOOKINGS}/instant`, {
       method: "POST",
       headers: getAuthHeaders(),
-      body: JSON.stringify(bookingData),
+      body: JSON.stringify(requestData),
     });
 
     const data = await response.json();
