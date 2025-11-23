@@ -193,6 +193,8 @@ export const getStationBookings = asyncHandler(
             station_id: true,
             name: true,
             address: true,
+            latitude: true,
+            longitude: true,
           },
         },
         transactions: {
@@ -237,11 +239,73 @@ export const getStationBookings = asyncHandler(
 
     const total = await prisma.bookings.count({ where: whereClause });
 
+    const mappedBookings = bookings.map((booking: any) => {
+      const {
+        users_bookings_user_idTousers,
+        vehicles,
+        transactions,
+        stations,
+        ...rest
+      } = booking;
+      const user = users_bookings_user_idTousers || null;
+      const vehicle = vehicles
+        ? {
+            ...vehicles,
+            current_battery: (vehicles as any).batteries || null,
+          }
+        : null;
+      // Remove batteries field if it exists
+      if (vehicle && (vehicle as any).batteries) {
+        delete (vehicle as any).batteries;
+      }
+      const transaction = transactions
+        ? {
+            ...transactions,
+            amount: Number(transactions.amount),
+            old_battery:
+              (transactions as any)
+                .batteries_transactions_old_battery_idTobatteries || null,
+            new_battery:
+              (transactions as any)
+                .batteries_transactions_new_battery_idTobatteries || null,
+          }
+        : null;
+      // Remove old battery fields if they exist
+      if (transaction) {
+        if (
+          (transaction as any).batteries_transactions_old_battery_idTobatteries
+        ) {
+          delete (transaction as any)
+            .batteries_transactions_old_battery_idTobatteries;
+        }
+        if (
+          (transaction as any).batteries_transactions_new_battery_idTobatteries
+        ) {
+          delete (transaction as any)
+            .batteries_transactions_new_battery_idTobatteries;
+        }
+      }
+      const station = stations
+        ? {
+            ...stations,
+            latitude: stations.latitude ? Number(stations.latitude) : null,
+            longitude: stations.longitude ? Number(stations.longitude) : null,
+          }
+        : null;
+      return {
+        ...rest,
+        user,
+        vehicle,
+        transaction,
+        station,
+      };
+    });
+
     res.status(200).json({
       success: true,
       message: "Station bookings retrieved successfully",
       data: {
-        bookings,
+        bookings: mappedBookings,
         pagination: {
           page: parseInt(page as string),
           limit: parseInt(limit as string),
@@ -348,10 +412,72 @@ export const getBookingDetails = asyncHandler(
       throw new CustomError("Booking not found", 404);
     }
 
+    const {
+      users_bookings_user_idTousers,
+      vehicles,
+      transactions,
+      stations,
+      ...rest
+    } = booking;
+    const user = users_bookings_user_idTousers || null;
+    const vehicle = vehicles
+      ? {
+          ...vehicles,
+          current_battery: (vehicles as any).batteries || null,
+        }
+      : null;
+    // Remove batteries field if it exists
+    if (vehicle && (vehicle as any).batteries) {
+      delete (vehicle as any).batteries;
+    }
+    const mappedTransaction = transactions
+      ? {
+          ...transactions,
+          amount: Number(transactions.amount),
+          old_battery:
+            (transactions as any)
+              .batteries_transactions_old_battery_idTobatteries || null,
+          new_battery:
+            (transactions as any)
+              .batteries_transactions_new_battery_idTobatteries || null,
+        }
+      : null;
+    const station = stations
+      ? {
+          ...stations,
+          latitude: stations.latitude ? Number(stations.latitude) : null,
+          longitude: stations.longitude ? Number(stations.longitude) : null,
+        }
+      : null;
+    // Remove old battery fields if they exist
+    if (mappedTransaction) {
+      if (
+        (mappedTransaction as any)
+          .batteries_transactions_old_battery_idTobatteries
+      ) {
+        delete (mappedTransaction as any)
+          .batteries_transactions_old_battery_idTobatteries;
+      }
+      if (
+        (mappedTransaction as any)
+          .batteries_transactions_new_battery_idTobatteries
+      ) {
+        delete (mappedTransaction as any)
+          .batteries_transactions_new_battery_idTobatteries;
+      }
+    }
+    const mappedBooking = {
+      ...rest,
+      user,
+      vehicle,
+      transaction: mappedTransaction,
+      station,
+    };
+
     res.status(200).json({
       success: true,
       message: "Booking details retrieved successfully",
-      data: booking,
+      data: mappedBooking,
     });
   }
 );
@@ -488,11 +614,22 @@ export const confirmBooking = asyncHandler(
       console.error("Failed to send notification:", error);
     }
 
+    const mappedBooking = {
+      ...updatedBooking,
+      user: updatedBooking.users_bookings_user_idTousers || null,
+      vehicle: updatedBooking.vehicles
+        ? {
+            ...updatedBooking.vehicles,
+            current_battery: (updatedBooking.vehicles as any).batteries || null,
+          }
+        : null,
+    };
+
     res.status(200).json({
       success: true,
       message: "Booking confirmed successfully",
       data: {
-        booking: updatedBooking,
+        booking: mappedBooking,
         message: "Đã xác nhận. User có thể đến đổi pin.",
       },
     });
@@ -1264,11 +1401,23 @@ export const cancelBooking = asyncHandler(
       ? `Booking cancelled by staff. Reason: ${reasonNote}`
       : "Booking cancelled by staff.";
 
+    const mappedBooking = {
+      ...result.updatedBooking,
+      user: result.updatedBooking.users_bookings_user_idTousers || null,
+      vehicle: result.updatedBooking.vehicles
+        ? {
+            ...result.updatedBooking.vehicles,
+            current_battery:
+              (result.updatedBooking.vehicles as any).batteries || null,
+          }
+        : null,
+    };
+
     res.status(200).json({
       success: true,
       message: responseMessage,
       data: {
-        booking: result.updatedBooking,
+        booking: mappedBooking,
         wallet_refund_amount: result.release.walletRefundAmount,
         battery_released_id: result.release.batteryReleasedId,
       },

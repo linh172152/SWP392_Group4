@@ -259,7 +259,17 @@ export const getBatteryDetails = asyncHandler(
 
     const batteryWithLabel = {
       ...battery,
+      capacity_kwh: battery.capacity_kwh ? Number(battery.capacity_kwh) : null,
+      voltage: battery.voltage ? Number(battery.voltage) : null,
+      health_percentage: battery.health_percentage ? Number(battery.health_percentage) : null,
       status_label: batteryStatusLabels[battery.status] ?? battery.status,
+      stations: battery.stations
+        ? {
+            ...battery.stations,
+            latitude: battery.stations.latitude ? Number(battery.stations.latitude) : null,
+            longitude: battery.stations.longitude ? Number(battery.stations.longitude) : null,
+          }
+        : null,
     };
 
     res.status(200).json({

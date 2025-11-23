@@ -113,11 +113,42 @@ export const getWalletTransactions = asyncHandler(
       },
     });
 
+    const mappedPayments = payments.map((payment: any) => {
+      const { transactions, user_subscriptions, ...rest } = payment;
+      const transaction = transactions
+        ? {
+            ...transactions,
+            booking: transactions.bookings
+              ? {
+                  ...transactions.bookings,
+                  station: transactions.bookings.stations || null,
+                }
+              : null,
+          }
+        : null;
+      const subscription = user_subscriptions
+        ? {
+            ...user_subscriptions,
+            package: user_subscriptions.service_packages || null,
+          }
+        : null;
+      // Remove service_packages field if it exists
+      if (subscription && (subscription as any).service_packages) {
+        delete (subscription as any).service_packages;
+      }
+      return {
+        ...rest,
+        amount: Number(payment.amount),
+        transaction,
+        subscription,
+      };
+    });
+
     res.status(200).json({
       success: true,
       message: "Wallet transactions retrieved successfully",
       data: {
-        transactions: payments,
+        transactions: mappedPayments,
         pagination: {
           page: parseInt(page as string),
           limit: parseInt(limit as string),
