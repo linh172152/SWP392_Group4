@@ -70,11 +70,28 @@ export const getAllUsers = asyncHandler(async (req: Request, res: Response) => {
 
   const total = await prisma.users.count({ where: whereClause });
 
+  const mappedUsers = users.map((user: any) => {
+    const { user_subscriptions, ...rest } = user;
+    const subscriptions = user_subscriptions
+      ? user_subscriptions.map((sub: any) => {
+          const { service_packages, ...subRest } = sub;
+          return {
+            ...subRest,
+            package: service_packages || null,
+          };
+        })
+      : [];
+    return {
+      ...rest,
+      user_subscriptions: subscriptions,
+    };
+  });
+
   res.status(200).json({
     success: true,
     message: "Users retrieved successfully",
     data: {
-      users,
+      users: mappedUsers,
       pagination: {
         page: parseInt(page as string),
         limit: parseInt(limit as string),
@@ -204,10 +221,25 @@ export const getUserDetails = asyncHandler(
       throw new CustomError("User not found", 404);
     }
 
+    const { user_subscriptions, ...rest } = user;
+    const subscriptions = user_subscriptions
+      ? user_subscriptions.map((sub: any) => {
+          const { service_packages, ...subRest } = sub;
+          return {
+            ...subRest,
+            package: service_packages || null,
+          };
+        })
+      : [];
+    const mappedUser = {
+      ...rest,
+      user_subscriptions: subscriptions,
+    };
+
     res.status(200).json({
       success: true,
       message: "User details retrieved successfully",
-      data: user,
+      data: mappedUser,
     });
   }
 );

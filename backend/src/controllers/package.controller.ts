@@ -83,10 +83,15 @@ export const getPublicPackages = asyncHandler(
       orderBy: [{ battery_capacity_kwh: "asc" }, { billing_cycle: "asc" }],
     });
 
+    const mappedPackages = packages.map((pkg: any) => ({
+      ...pkg,
+      price: Number(pkg.price),
+    }));
+
     res.status(200).json({
       success: true,
       message: "Active packages retrieved successfully",
-      data: packages,
+      data: mappedPackages,
     });
   }
 );
@@ -97,10 +102,15 @@ export const adminListPackages = asyncHandler(
       orderBy: [{ battery_capacity_kwh: "asc" }, { billing_cycle: "asc" }],
     });
 
+    const mappedPackages = packages.map((pkg: any) => ({
+      ...pkg,
+      price: Number(pkg.price),
+    }));
+
     res.status(200).json({
       success: true,
       message: "Packages retrieved successfully",
-      data: packages,
+      data: mappedPackages,
     });
   }
 );
@@ -171,10 +181,15 @@ export const adminCreatePackage = asyncHandler(
       } as Prisma.service_packagesUncheckedCreateInput,
     });
 
+    const mappedPackage = {
+      ...created,
+      price: Number(created.price),
+    };
+
     res.status(201).json({
       success: true,
       message: "Package created successfully",
-      data: created,
+      data: mappedPackage,
     });
   }
 );
@@ -273,10 +288,15 @@ export const adminUpdatePackage = asyncHandler(
       data: updateData,
     });
 
+    const mappedPackage = {
+      ...updated,
+      price: Number(updated.price),
+    };
+
     res.status(200).json({
       success: true,
       message: "Package updated successfully",
-      data: updated,
+      data: mappedPackage,
     });
   }
 );

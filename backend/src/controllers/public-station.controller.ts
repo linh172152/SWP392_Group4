@@ -176,6 +176,14 @@ export const getPublicStationDetails = asyncHandler(
 
     const stationWithStats = {
       ...station,
+      latitude: station.latitude ? Number(station.latitude) : null,
+      longitude: station.longitude ? Number(station.longitude) : null,
+      batteries: station.batteries.map((b: any) => ({
+        ...b,
+        capacity_kwh: b.capacity_kwh ? Number(b.capacity_kwh) : null,
+        voltage: b.voltage ? Number(b.voltage) : null,
+        health_percentage: b.health_percentage ? Number(b.health_percentage) : null,
+      })),
       average_rating: avgRating,
       total_ratings: station.station_ratings.length,
       battery_stats: batteryStats,
@@ -276,6 +284,14 @@ export const findNearbyPublicStations = asyncHandler(
 
         return {
           ...station,
+          latitude: station.latitude ? Number(station.latitude) : null,
+          longitude: station.longitude ? Number(station.longitude) : null,
+          batteries: station.batteries.map((b: any) => ({
+            ...b,
+            capacity_kwh: b.capacity_kwh ? Number(b.capacity_kwh) : null,
+            voltage: b.voltage ? Number(b.voltage) : null,
+            health_percentage: b.health_percentage ? Number(b.health_percentage) : null,
+          })),
           average_rating: avgRating,
           total_ratings: station.station_ratings.length,
           available_batteries: station.batteries.length,

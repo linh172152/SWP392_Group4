@@ -90,6 +90,16 @@ export const findNearbyStations = asyncHandler(
 
         return {
           ...station,
+          latitude: station.latitude ? Number(station.latitude) : null,
+          longitude: station.longitude ? Number(station.longitude) : null,
+          batteries: station.batteries.map((b: any) => ({
+            ...b,
+            capacity_kwh: b.capacity_kwh ? Number(b.capacity_kwh) : null,
+            voltage: b.voltage ? Number(b.voltage) : null,
+            health_percentage: b.health_percentage
+              ? Number(b.health_percentage)
+              : null,
+          })),
           average_rating: avgRating,
           available_batteries: station.batteries.length,
           distance_km: distance,
@@ -173,6 +183,16 @@ export const getStationDetails = asyncHandler(
 
     const stationWithRating = {
       ...station,
+      latitude: station.latitude ? Number(station.latitude) : null,
+      longitude: station.longitude ? Number(station.longitude) : null,
+      batteries: station.batteries.map((b: any) => ({
+        ...b,
+        capacity_kwh: b.capacity_kwh ? Number(b.capacity_kwh) : null,
+        voltage: b.voltage ? Number(b.voltage) : null,
+        health_percentage: b.health_percentage
+          ? Number(b.health_percentage)
+          : null,
+      })),
       average_rating: avgRating,
       total_ratings: station.station_ratings.length,
       capacity_percentage: stationStats.capacityPercentage,
@@ -215,10 +235,30 @@ export const getStationBatteries = asyncHandler(
       orderBy: { created_at: "desc" },
     });
 
+    const mappedBatteries = batteries.map((battery: any) => ({
+      ...battery,
+      capacity_kwh: battery.capacity_kwh ? Number(battery.capacity_kwh) : null,
+      voltage: battery.voltage ? Number(battery.voltage) : null,
+      health_percentage: battery.health_percentage
+        ? Number(battery.health_percentage)
+        : null,
+      stations: battery.stations
+        ? {
+            ...battery.stations,
+            latitude: battery.stations.latitude
+              ? Number(battery.stations.latitude)
+              : null,
+            longitude: battery.stations.longitude
+              ? Number(battery.stations.longitude)
+              : null,
+          }
+        : null,
+    }));
+
     res.status(200).json({
       success: true,
       message: "Station batteries retrieved successfully",
-      data: batteries,
+      data: mappedBatteries,
     });
   }
 );

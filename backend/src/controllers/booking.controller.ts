@@ -489,8 +489,41 @@ export const getUserBookings = asyncHandler(
       capacity: new Map(),
     };
 
+    const mappedBookings = bookings.map((booking: any) => {
+      const { vehicles, transactions, stations, ...rest } = booking;
+      const vehicle = vehicles
+        ? {
+            ...vehicles,
+            current_battery: (vehicles as any).batteries || null,
+          }
+        : null;
+      // Remove batteries field if it exists
+      if (vehicle && (vehicle as any).batteries) {
+        delete (vehicle as any).batteries;
+      }
+      const transaction = transactions
+        ? {
+            ...transactions,
+            amount: Number(transactions.amount),
+          }
+        : null;
+      const station = stations
+        ? {
+            ...stations,
+            latitude: stations.latitude ? Number(stations.latitude) : null,
+            longitude: stations.longitude ? Number(stations.longitude) : null,
+          }
+        : null;
+      return {
+        ...rest,
+        vehicle,
+        transaction,
+        station,
+      };
+    });
+
     const bookingsWithPricing = await Promise.all(
-      bookings.map(async (booking) => {
+      mappedBookings.map(async (booking) => {
         const pricing_preview = await calculateBookingPricingPreview(
           {
             userId,
@@ -573,11 +606,11 @@ export const createBooking = asyncHandler(
       );
     }
 
-    const station = await prisma.stations.findUnique({
+    const stationRecord = await prisma.stations.findUnique({
       where: { station_id },
     });
 
-    if (!station || station.status !== "active") {
+    if (!stationRecord || stationRecord.status !== "active") {
       throw new CustomError("Station not found or not active", 404);
     }
 
@@ -918,6 +951,16 @@ export const createBooking = asyncHandler(
               model: true,
               year: true,
             },
+            include: {
+              batteries: {
+                select: {
+                  battery_id: true,
+                  battery_code: true,
+                  status: true,
+                  current_charge: true,
+                },
+              },
+            },
           },
         },
       });
@@ -968,8 +1011,8 @@ export const createBooking = asyncHandler(
           email: user?.email || "",
           userName: user?.full_name || "User",
           bookingId: txResult.booking.booking_code,
-          stationName: station.name,
-          stationAddress: station.address,
+          stationName: stationRecord.name,
+          stationAddress: stationRecord.address,
           bookingTime: scheduled_at,
           batteryType: battery_model,
           hold_expires_at: holdExpiresAtValue,
@@ -979,11 +1022,35 @@ export const createBooking = asyncHandler(
       console.error("Failed to send booking notification:", error);
     }
 
+    const { vehicles, stations, ...rest } = txResult.booking;
+    const mappedVehicle = vehicles
+      ? {
+          ...vehicles,
+          current_battery: (vehicles as any).batteries || null,
+        }
+      : null;
+    // Remove batteries field if it exists
+    if (mappedVehicle && (mappedVehicle as any).batteries) {
+      delete (mappedVehicle as any).batteries;
+    }
+    const mappedStation = stations
+      ? {
+          ...stations,
+          latitude: stations.latitude ? Number(stations.latitude) : null,
+          longitude: stations.longitude ? Number(stations.longitude) : null,
+        }
+      : null;
+    const mappedBooking = {
+      ...rest,
+      vehicle: mappedVehicle,
+      station: mappedStation,
+    };
+
     res.status(201).json({
       success: true,
       message: "Booking created successfully",
       data: {
-        booking: txResult.booking,
+        booking: mappedBooking,
         pricing_preview,
         hold_summary: {
           battery_code: txResult.reserveBattery.battery_code,
@@ -1077,11 +1144,42 @@ export const getBookingDetails = asyncHandler(
       batteryModel: booking.battery_model,
     });
 
+    const { vehicles, transactions, stations, ...rest } = booking;
+    const vehicle = vehicles
+      ? {
+          ...vehicles,
+          current_battery: (vehicles as any).batteries || null,
+        }
+      : null;
+    // Remove batteries field if it exists
+    if (vehicle && (vehicle as any).batteries) {
+      delete (vehicle as any).batteries;
+    }
+    const transaction = transactions
+      ? {
+          ...transactions,
+          amount: Number(transactions.amount),
+        }
+      : null;
+    const station = stations
+      ? {
+          ...stations,
+          latitude: stations.latitude ? Number(stations.latitude) : null,
+          longitude: stations.longitude ? Number(stations.longitude) : null,
+        }
+      : null;
+    const mappedBooking = {
+      ...rest,
+      vehicle,
+      transaction,
+      station,
+    };
+
     res.status(200).json({
       success: true,
       message: "Booking details retrieved successfully",
       data: {
-        ...booking,
+        ...mappedBooking,
         pricing_preview,
       },
     });
@@ -1748,12 +1846,22 @@ export const createInstantBooking = asyncHandler(
       console.error("Failed to send instant booking notification:", error);
     }
 
+    const mappedBooking = {
+      ...booking,
+      vehicle: booking.vehicles
+        ? {
+            ...booking.vehicles,
+            current_battery: (booking.vehicles as any).batteries || null,
+          }
+        : null,
+    };
+
     res.status(201).json({
       success: true,
       message:
         "Instant booking created successfully. Battery reserved for 15 minutes.",
       data: {
-        ...booking,
+        ...mappedBooking,
         reservation_expires_at: holdExpiresAt,
         hold_expires_at: holdExpiresAt,
         message: "Pin đã được tạm giữ. Vui lòng đến trạm trong vòng 15 phút.",

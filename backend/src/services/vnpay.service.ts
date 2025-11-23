@@ -88,7 +88,7 @@ export const createVNPayPayment = async (
     await prisma.payments.create({
       data: {
         user_id: userId,
-        amount: amount,
+        amount: new Prisma.Decimal(amount),
         payment_method: "vnpay",
         payment_status: "pending",
         payment_gateway_ref: orderId,

@@ -92,11 +92,33 @@ export const getUserTransactions = asyncHandler(
 
     const total = await prisma.transactions.count({ where: whereClause });
 
+    const mappedTransactions = transactions.map((transaction: any) => {
+      const {
+        batteries_transactions_old_battery_idTobatteries,
+        batteries_transactions_new_battery_idTobatteries,
+        amount,
+        payments,
+        ...rest
+      } = transaction;
+      return {
+        ...rest,
+        amount: Number(amount),
+        old_battery: batteries_transactions_old_battery_idTobatteries || null,
+        new_battery: batteries_transactions_new_battery_idTobatteries || null,
+        payments: payments
+          ? {
+              ...payments,
+              amount: Number(payments.amount),
+            }
+          : null,
+      };
+    });
+
     res.status(200).json({
       success: true,
       message: "User transactions retrieved successfully",
       data: {
-        transactions,
+        transactions: mappedTransactions,
         pagination: {
           page: parseInt(page as string),
           limit: parseInt(limit as string),
@@ -207,10 +229,30 @@ export const getTransactionDetails = asyncHandler(
       throw new CustomError("Transaction not found", 404);
     }
 
+    const {
+      batteries_transactions_old_battery_idTobatteries,
+      batteries_transactions_new_battery_idTobatteries,
+      amount,
+      payments,
+      ...rest
+    } = transaction;
+    const mappedTransaction = {
+      ...rest,
+      amount: Number(amount),
+      old_battery: batteries_transactions_old_battery_idTobatteries || null,
+      new_battery: batteries_transactions_new_battery_idTobatteries || null,
+      payments: payments
+        ? {
+            ...payments,
+            amount: Number(payments.amount),
+          }
+        : null,
+    };
+
     res.status(200).json({
       success: true,
       message: "Transaction details retrieved successfully",
-      data: transaction,
+      data: mappedTransaction,
     });
   }
 );

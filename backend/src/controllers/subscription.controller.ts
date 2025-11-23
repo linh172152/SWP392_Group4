@@ -45,10 +45,18 @@ export const getMySubscriptions = asyncHandler(
       orderBy: { created_at: "desc" },
     });
 
+    const mappedSubscriptions = subscriptions.map((sub: any) => {
+      const { service_packages, ...rest } = sub;
+      return {
+        ...rest,
+        package: service_packages || null,
+      };
+    });
+
     res.status(200).json({
       success: true,
       message: "Driver subscriptions retrieved successfully",
-      data: subscriptions,
+      data: mappedSubscriptions,
     });
   }
 );
@@ -149,10 +157,16 @@ export const subscribeToPackage = asyncHandler(
       return createdSubscription;
     });
 
+    const { service_packages, ...rest } = subscription;
+    const mappedSubscription = {
+      ...rest,
+      package: service_packages || null,
+    };
+
     res.status(201).json({
       success: true,
       message: "Subscription purchased successfully",
-      data: subscription,
+      data: mappedSubscription,
     });
   }
 );
@@ -371,11 +385,17 @@ export const cancelSubscription = asyncHandler(
       };
     });
 
+    const { service_packages, ...rest } = result.updatedSubscription;
+    const mappedSubscription = {
+      ...rest,
+      package: service_packages || null,
+    };
+
     res.status(200).json({
       success: true,
       message: "Subscription cancelled and refunded",
       data: {
-        subscription: result.updatedSubscription,
+        subscription: mappedSubscription,
         refund: {
           payment_id: result.refundPayment.payment_id,
           amount: Number(result.refundPayment.amount),
