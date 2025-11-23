@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { authService, UserProfile } from '../../services/auth.service';
 import { useToast } from '../../hooks/use-toast';
+import { parseError, logError } from '../../utils/errorHandler';
 import {
   Dialog,
   DialogContent,
@@ -257,9 +258,12 @@ const PersonalProfile: React.FC = () => {
         });
       }
     } catch (error: any) {
+      logError(error, "PersonalProfile.handleSave");
+      const errorInfo = parseError(error);
+      
       toast({
-        title: 'Lỗi',
-        description: error.message || 'Không thể cập nhật profile',
+        title: errorInfo.title,
+        description: errorInfo.description,
         variant: 'destructive',
       });
     } finally {
@@ -355,9 +359,12 @@ const PersonalProfile: React.FC = () => {
         setConfirmPasswordOpen(false);
       }
     } catch (error: any) {
+      logError(error, "PersonalProfile.handleChangePassword");
+      const errorInfo = parseError(error);
+      
       toast({
-        title: 'Lỗi',
-        description: error.message || 'Không thể đổi mật khẩu',
+        title: errorInfo.title,
+        description: errorInfo.description,
         variant: 'destructive',
       });
     } finally {
@@ -405,9 +412,12 @@ const PersonalProfile: React.FC = () => {
         });
       }
     } catch (error: any) {
+      logError(error, "PersonalProfile.handleAvatarUpload");
+      const errorInfo = parseError(error);
+      
       toast({
-        title: 'Lỗi',
-        description: error.message || 'Không thể upload ảnh',
+        title: errorInfo.title,
+        description: errorInfo.description,
         variant: 'destructive',
       });
     }

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { getMyStaffSchedules, updateScheduleStatus, StaffSchedule } from '../../services/staff.service';
 import { useToast } from '../../hooks/use-toast';
+import { parseError, logError } from '../../utils/errorHandler';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -162,20 +163,21 @@ const WorkSchedule: React.FC = () => {
       } else {
         const errorMsg = response?.message || 'Không thể tải lịch làm việc';
         setError(errorMsg);
-        console.error('Error loading schedules:', errorMsg, response);
+        logError(response, "WorkSchedule.loadSchedules");
+        const errorInfo = parseError(response);
         toast({
-          title: 'Lỗi',
-          description: errorMsg,
+          title: errorInfo.title,
+          description: errorInfo.description,
           variant: 'destructive',
         });
       }
     } catch (err: any) {
-      const errorMessage = err.message || 'Đã xảy ra lỗi khi tải lịch làm việc';
-      setError(errorMessage);
-      console.error('Exception loading schedules:', err);
+      logError(err, "WorkSchedule.loadSchedules");
+      const errorInfo = parseError(err);
+      setError(errorInfo.description);
       toast({
-        title: 'Lỗi',
-        description: errorMessage,
+        title: errorInfo.title,
+        description: errorInfo.description,
         variant: 'destructive',
       });
     } finally {
@@ -341,9 +343,12 @@ const WorkSchedule: React.FC = () => {
         throw new Error(response.message || 'Không thể cập nhật trạng thái');
       }
     } catch (err: any) {
+      logError(err, "WorkSchedule.handleUpdateStatus");
+      const errorInfo = parseError(err);
+      
       toast({
-        title: 'Lỗi',
-        description: err.message || 'Đã xảy ra lỗi khi cập nhật trạng thái',
+        title: errorInfo.title,
+        description: errorInfo.description,
         variant: 'destructive',
       });
     } finally {
@@ -681,17 +686,17 @@ const WorkSchedule: React.FC = () => {
                           <span className="ml-1">{getStatusLabel(schedule.status)}</span>
                         </Badge>
                       </div>
-                      {schedule.status === 'scheduled' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleOpenUpdateDialog(schedule)}
-                          className="glass border-slate-200/50 dark:border-slate-700/50"
-                        >
-                          <Edit2 className="h-4 w-4 mr-2" />
-                          Cập nhật
-                        </Button>
-                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenUpdateDialog(schedule)}
+                        disabled={schedule.status !== 'scheduled'}
+                        className="glass border-slate-200/50 dark:border-slate-700/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={schedule.status !== 'scheduled' ? 'Chỉ có thể cập nhật trạng thái cho các ca đã lên lịch' : 'Cập nhật trạng thái'}
+                      >
+                        <Edit2 className="h-4 w-4 mr-2" />
+                        Cập nhật
+                      </Button>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">

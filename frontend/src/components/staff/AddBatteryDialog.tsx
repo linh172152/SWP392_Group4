@@ -20,6 +20,7 @@ import {
 import { Loader2, AlertCircle } from 'lucide-react';
 import { addBattery, AddBatteryData } from '../../services/battery.service';
 import { useToast } from '../../hooks/use-toast';
+import { parseError, logError } from '../../utils/errorHandler';
 import { API_ENDPOINTS } from '../../config/api';
 
 interface AddBatteryDialogProps {
@@ -186,9 +187,12 @@ const AddBatteryDialog: React.FC<AddBatteryDialogProps> = ({
         }
       }
     } catch (error: any) {
+      logError(error, "AddBatteryDialog.handleSubmit");
+      const errorInfo = parseError(error);
+      
       toast({
-        title: 'Lỗi',
-        description: error.message || 'Không thể thêm pin',
+        title: errorInfo.title,
+        description: errorInfo.description,
         variant: 'destructive',
       });
     } finally {
