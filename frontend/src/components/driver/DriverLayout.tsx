@@ -31,7 +31,7 @@ interface DriverLayoutProps {
 const navigation = [
   { name: 'Xe của tôi', href: '/driver/vehicles', icon: Car },
   { name: 'Tìm trạm thay pin', href: '/driver/stations', icon: MapPin },
-  { name: 'Lịch sử thay pin', href: '/driver/bookings', icon: Calendar },
+  { name: 'Đơn đặt chỗ', href: '/driver/bookings', icon: Calendar },
   { name: 'Giao dịch', href: '/driver/transactions', icon: Receipt },
   { name: 'Ví của tôi', href: '/driver/wallet', icon: Wallet },
   { name: 'Gói dịch vụ', href: '/driver/subscriptions', icon: Package },
