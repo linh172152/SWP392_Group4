@@ -262,7 +262,6 @@ const UserManagement: React.FC = () => {
       };
       const res = await createUser(payload);
       if (res.success) {
-        toast.success("Tạo người dùng thành công");
         setIsCreateModalOpen(false);
         fetchUsers();
       } else {
@@ -277,7 +276,6 @@ const UserManagement: React.FC = () => {
     try {
       const res = await updateUserStatus(userId, status);
       if (res.success) {
-        toast.success("Cập nhật trạng thái thành công");
         fetchUsers();
       } else throw new Error(res.message || "Cập nhật thất bại");
     } catch (err: any) {
@@ -289,7 +287,6 @@ const UserManagement: React.FC = () => {
     try {
       const res = await updateUserRole(userId, role);
       if (res.success) {
-        toast.success("Cập nhật vai trò thành công");
         fetchUsers();
       } else throw new Error(res.message || "Cập nhật vai trò thất bại");
     } catch (err: any) {
@@ -309,7 +306,6 @@ const UserManagement: React.FC = () => {
     try {
       const res = await deleteUser(userToDelete);
       if (res.success) {
-        toast.success("Xóa người dùng thành công");
         fetchUsers();
         setUserToDelete(null);
       } else throw new Error(res.message || "Xóa thất bại");

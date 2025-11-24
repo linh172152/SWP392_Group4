@@ -103,10 +103,8 @@ const AdminServicePackageManagement: React.FC = () => {
 
       if (editingPackage) {
         await adminUpdatePackage(editingPackage.package_id, submitData);
-        toast.success('Cập nhật gói dịch vụ thành công!');
       } else {
         await adminCreatePackage(submitData);
-        toast.success('Tạo gói dịch vụ thành công!');
       }
 
       await fetchPackages();
