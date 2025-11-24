@@ -811,10 +811,10 @@ const BookingHistory: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="float">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-blue-900 dark:from-white dark:to-blue-100 bg-clip-text text-transparent">
-            Lịch sử Thay pin
+            Đơn đặt chỗ
           </h1>
           <p className="text-slate-600 dark:text-slate-300">
-            Xem lịch sử và chi tiết các lần thay pin
+            Quản lý và theo dõi các đơn đặt chỗ đổi pin của bạn
           </p>
         </div>
         <Button
