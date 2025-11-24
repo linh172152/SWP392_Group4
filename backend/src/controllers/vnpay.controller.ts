@@ -130,8 +130,8 @@ export const handleReturn = asyncHandler(
               title: "Thanh toán thành công!",
               message: `Thanh toán của bạn đã được xử lý thành công. Số tiền: ${result.amount || "N/A"} VND`,
               data: {
-                email: payment.user?.email,
-                userName: payment.user?.full_name,
+                email: payment.users?.email,
+                userName: payment.users?.full_name,
                 amount: result.amount,
                 transactionId: result.paymentId,
                 paymentTime: new Date().toISOString(),
@@ -160,8 +160,8 @@ export const handleReturn = asyncHandler(
               title: "Thanh toán thất bại",
               message: `Thanh toán của bạn không thành công. Lý do: ${result.message}`,
               data: {
-                email: payment.user?.email,
-                userName: payment.user?.full_name,
+                email: payment.users?.email,
+                userName: payment.users?.full_name,
                 reason: result.message,
                 transactionId: result.paymentId,
               },
@@ -260,7 +260,7 @@ export const testVNPay = asyncHandler(async (_req: Request, res: Response) => {
       language: "vn",
     };
 
-    const user = await prisma.user.findFirst({
+    const user = await prisma.users.findFirst({
       where: { role: "DRIVER", status: "ACTIVE" },
       orderBy: { created_at: "asc" },
     });

@@ -29,16 +29,16 @@ export const getSystemOverview = asyncHandler(
       totalTransactions,
       totalRevenue,
     ] = await Promise.all([
-      prisma.user.count(),
-      prisma.station.count(),
-      prisma.battery.count(),
-      prisma.booking.count({
+      prisma.users.count(),
+      prisma.stations.count(),
+      prisma.batteries.count(),
+      prisma.bookings.count({
         where: { created_at: dateFilter },
       }),
-      prisma.transaction.count({
+      prisma.transactions.count({
         where: { created_at: dateFilter },
       }),
-      prisma.payment.aggregate({
+      prisma.payments.aggregate({
         where: {
           payment_status: "completed",
           created_at: dateFilter,
@@ -48,25 +48,25 @@ export const getSystemOverview = asyncHandler(
     ]);
 
     // Get user breakdown by role
-    const userBreakdown = await prisma.user.groupBy({
+    const userBreakdown = await prisma.users.groupBy({
       by: ["role"],
       _count: { user_id: true },
     });
 
     // Get station breakdown by status
-    const stationBreakdown = await prisma.station.groupBy({
+    const stationBreakdown = await prisma.stations.groupBy({
       by: ["status"],
       _count: { station_id: true },
     });
 
     // Get battery breakdown by status
-    const batteryBreakdown = await prisma.battery.groupBy({
+    const batteryBreakdown = await prisma.batteries.groupBy({
       by: ["status"],
       _count: { battery_id: true },
     });
 
     // Get booking breakdown by status
-    const bookingBreakdown = await prisma.booking.groupBy({
+    const bookingBreakdown = await prisma.bookings.groupBy({
       by: ["status"],
       where: { created_at: dateFilter },
       _count: { booking_id: true },
@@ -76,21 +76,21 @@ export const getSystemOverview = asyncHandler(
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    const recentActivity = await prisma.transaction.findMany({
+    const recentActivity = await prisma.transactions.findMany({
       where: {
         created_at: {
           gte: sevenDaysAgo,
         },
       },
       include: {
-        user: {
+        users_transactions_user_idTousers: {
           select: {
             user_id: true,
             full_name: true,
             email: true,
           },
         },
-        station: {
+        stations: {
           select: {
             station_id: true,
             name: true,
@@ -159,12 +159,12 @@ export const getRevenueReports = asyncHandler(
       };
     }
 
-    const revenueData = await prisma.payment.findMany({
+    const revenueData = await prisma.payments.findMany({
       where: whereClause,
       include: {
-        transaction: {
+        transactions: {
           include: {
-            station: {
+            stations: {
               select: {
                 station_id: true,
                 name: true,
@@ -173,9 +173,9 @@ export const getRevenueReports = asyncHandler(
             },
           },
         },
-        subscription: {
+        user_subscriptions: {
           include: {
-            package: {
+            service_packages: {
               select: {
                 package_id: true,
                 name: true,
@@ -189,7 +189,7 @@ export const getRevenueReports = asyncHandler(
 
     // Group by date
     const groupedRevenue = revenueData.reduce(
-      (acc, payment) => {
+      (acc: Record<string, { date: string; total_amount: number; transaction_count: number; payments: any[] }>, payment: { created_at: Date; amount: any }) => {
         const date = payment.created_at.toISOString().split("T")[0];
         if (!acc[date]) {
           acc[date] = {
@@ -252,17 +252,17 @@ export const getUsageStatistics = asyncHandler(
     }
 
     // Get transaction statistics
-    const transactions = await prisma.transaction.findMany({
+    const transactions = await prisma.transactions.findMany({
       where: whereClause,
       include: {
-        station: {
+        stations: {
           select: {
             station_id: true,
             name: true,
             address: true,
           },
         },
-        user: {
+        users_transactions_user_idTousers: {
           select: {
             user_id: true,
             full_name: true,
@@ -274,7 +274,7 @@ export const getUsageStatistics = asyncHandler(
 
     // Group by hour to find peak hours
     const hourlyUsage = transactions.reduce(
-      (acc, transaction) => {
+      (acc: Record<number, number>, transaction: { swap_at: Date }) => {
         const hour = transaction.swap_at.getHours();
         acc[hour] = (acc[hour] || 0) + 1;
         return acc;
@@ -284,13 +284,13 @@ export const getUsageStatistics = asyncHandler(
 
     // Group by station
     const stationUsage = transactions.reduce(
-      (acc, transaction) => {
+      (acc: Record<string, any>, transaction: { station_id: string; swap_duration_minutes: number | null; stations: { name: string; address: string } }) => {
         const stationId = transaction.station_id;
         if (!acc[stationId]) {
           acc[stationId] = {
             station_id: stationId,
-            station_name: transaction.station.name,
-            station_address: transaction.station.address,
+            station_name: transaction.stations.name,
+            station_address: transaction.stations.address,
             transaction_count: 0,
             total_duration: 0,
           };
@@ -306,7 +306,7 @@ export const getUsageStatistics = asyncHandler(
 
     // Calculate average swap duration
     const totalDuration = transactions.reduce(
-      (sum, t) => sum + (t.swap_duration_minutes || 0),
+      (sum: number, t: { swap_duration_minutes: number | null }) => sum + (t.swap_duration_minutes || 0),
       0
     );
     const averageDuration =
@@ -349,10 +349,10 @@ export const getBatteryReports = asyncHandler(
       );
     }
 
-    const batteries = await prisma.battery.findMany({
+    const batteries = await prisma.batteries.findMany({
       where: whereClause,
       include: {
-        station: {
+        stations: {
           select: {
             station_id: true,
             name: true,
@@ -364,7 +364,7 @@ export const getBatteryReports = asyncHandler(
 
     // Group by status
     const statusBreakdown = batteries.reduce(
-      (acc, battery) => {
+      (acc: Record<string, number>, battery: { status: string }) => {
         acc[battery.status] = (acc[battery.status] || 0) + 1;
         return acc;
       },
@@ -373,7 +373,7 @@ export const getBatteryReports = asyncHandler(
 
     // Group by model
     const modelBreakdown = batteries.reduce(
-      (acc, battery) => {
+      (acc: Record<string, number>, battery: { model: string }) => {
         acc[battery.model] = (acc[battery.model] || 0) + 1;
         return acc;
       },
@@ -382,13 +382,13 @@ export const getBatteryReports = asyncHandler(
 
     // Group by station
     const stationBreakdown = batteries.reduce(
-      (acc, battery) => {
+      (acc: Record<string, any>, battery: { station_id: string; status: string; stations: { name: string; address: string } }) => {
         const stationId = battery.station_id;
         if (!acc[stationId]) {
           acc[stationId] = {
             station_id: stationId,
-            station_name: battery.station.name,
-            station_address: battery.station.address,
+            station_name: battery.stations.name,
+            station_address: battery.stations.address,
             total_batteries: 0,
             full_batteries: 0,
             charging_batteries: 0,

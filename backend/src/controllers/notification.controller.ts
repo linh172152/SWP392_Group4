@@ -24,18 +24,18 @@ export const getNotifications = asyncHandler(
 
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
 
-    const notifications = await prisma.notification.findMany({
+    const notifications = await prisma.notifications.findMany({
       where: whereClause,
       orderBy: { created_at: "desc" },
       skip,
       take: parseInt(limit as string),
     });
 
-    const total = await prisma.notification.count({
+    const total = await prisma.notifications.count({
       where: whereClause,
     });
 
-    const unreadCount = await prisma.notification.count({
+    const unreadCount = await prisma.notifications.count({
       where: {
         user_id: userId,
         is_read: false,
@@ -71,7 +71,7 @@ export const markNotificationAsRead = asyncHandler(
       throw new CustomError("User not authenticated", 401);
     }
 
-    const notification = await prisma.notification.findFirst({
+    const notification = await prisma.notifications.findFirst({
       where: {
         notification_id: id,
         user_id: userId,
@@ -82,7 +82,7 @@ export const markNotificationAsRead = asyncHandler(
       throw new CustomError("Notification not found", 404);
     }
 
-    const updatedNotification = await prisma.notification.update({
+    const updatedNotification = await prisma.notifications.update({
       where: { notification_id: id },
       data: { is_read: true },
     });
@@ -106,7 +106,7 @@ export const markAllNotificationsAsRead = asyncHandler(
       throw new CustomError("User not authenticated", 401);
     }
 
-    const result = await prisma.notification.updateMany({
+    const result = await prisma.notifications.updateMany({
       where: {
         user_id: userId,
         is_read: false,
@@ -125,4 +125,3 @@ export const markAllNotificationsAsRead = asyncHandler(
     });
   }
 );
-

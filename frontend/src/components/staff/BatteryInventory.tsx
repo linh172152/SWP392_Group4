@@ -50,9 +50,12 @@ import {
   getStationBatteries,
   deleteBattery,
   updateBatteryStatus,
-  UpdateBatteryData
+  UpdateBatteryData,
+  getBatteryHistory,
+  BatteryTransferLog
 } from '../../services/battery.service';
 import { useToast } from '../../hooks/use-toast';
+import { parseError, logError } from '../../utils/errorHandler';
 import AddBatteryDialog from './AddBatteryDialog';
 
 type SortField = 'battery_code' | 'model' | 'status' | 'current_charge' | 'created_at' | 'health_percentage';
@@ -87,10 +90,13 @@ const BatteryInventory: React.FC = () => {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteConfirmed, setDeleteConfirmed] = useState(false);
-  const [editFormData, setEditFormData] = useState<UpdateBatteryData>({
+  const [batteryHistory, setBatteryHistory] = useState<BatteryTransferLog[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [editFormData, setEditFormData] = useState<UpdateBatteryData & { cycle_count?: number }>({
     status: 'full',
     current_charge: 100,
     health_percentage: undefined,
+    cycle_count: undefined,
   });
   
   const { toast } = useToast();
@@ -230,9 +236,22 @@ const BatteryInventory: React.FC = () => {
   };
 
   // Dialog handlers
-  const handleViewDetail = (battery: BatteryType) => {
+  const handleViewDetail = async (battery: BatteryType) => {
     setSelectedBattery(battery);
     setDetailDialogOpen(true);
+    // Load battery history
+    try {
+      setLoadingHistory(true);
+      const response = await getBatteryHistory(battery.battery_id);
+      if (response.success && response.data) {
+        setBatteryHistory(response.data.history || []);
+      }
+    } catch (error: any) {
+      logError(error, "BatteryInventory.handleViewDetail");
+      setBatteryHistory([]);
+    } finally {
+      setLoadingHistory(false);
+    }
   };
 
   const handleEdit = (battery: BatteryType) => {
@@ -241,6 +260,7 @@ const BatteryInventory: React.FC = () => {
       status: battery.status,
       current_charge: battery.current_charge,
       health_percentage: battery.health_percentage || undefined,
+      cycle_count: (battery as any).cycle_count || undefined,
     });
     setEditDialogOpen(true);
   };
@@ -258,7 +278,19 @@ const BatteryInventory: React.FC = () => {
 
     try {
       setEditLoading(true);
-      const response = await updateBatteryStatus(selectedBattery.battery_id, editFormData);
+      // Prepare update data, only include defined fields
+      const updateData: UpdateBatteryData = {
+        status: editFormData.status,
+        current_charge: editFormData.current_charge,
+      };
+      if (editFormData.health_percentage !== undefined) {
+        updateData.health_percentage = editFormData.health_percentage;
+      }
+      if (editFormData.cycle_count !== undefined) {
+        (updateData as any).cycle_count = editFormData.cycle_count;
+      }
+      
+      const response = await updateBatteryStatus(selectedBattery.battery_id, updateData);
 
       if (response.success) {
         toast({
@@ -269,9 +301,12 @@ const BatteryInventory: React.FC = () => {
         setEditDialogOpen(false);
       }
     } catch (error: any) {
+      logError(error, "BatteryInventory.handleEditSubmit");
+      const errorInfo = parseError(error);
+      
       toast({
-        title: 'Lỗi',
-        description: error.message || 'Không thể cập nhật pin',
+        title: errorInfo.title,
+        description: errorInfo.description,
         variant: 'destructive',
       });
     } finally {
@@ -296,11 +331,13 @@ const BatteryInventory: React.FC = () => {
         setDeleteDialogOpen(false);
       }
     } catch (error: any) {
-      const errorMessage = error.message || 'Không thể xóa pin';
-      setDeleteError(errorMessage);
+      logError(error, "BatteryInventory.handleDeleteConfirm");
+      const errorInfo = parseError(error);
+      
+      setDeleteError(errorInfo.description);
       toast({
-        title: 'Lỗi',
-        description: errorMessage,
+        title: errorInfo.title,
+        description: errorInfo.description,
         variant: 'destructive',
       });
     } finally {
@@ -322,7 +359,8 @@ const BatteryInventory: React.FC = () => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'full': return <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />;
-      case 'charging': return <Zap className="h-4 w-4 text-blue-600 dark:text-blue-400" />;
+      case 'reserved': return <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" />;
+      case 'charging': return <Zap className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />;
       case 'in_use': return <Battery className="h-4 w-4 text-purple-600 dark:text-purple-400" />;
       case 'maintenance': return <Wrench className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />;
       case 'damaged': return <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />;
@@ -344,6 +382,7 @@ const BatteryInventory: React.FC = () => {
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'full': return 'Đầy';
+      case 'reserved': return 'Đã giữ chỗ';
       case 'charging': return 'Đang sạc';
       case 'in_use': return 'Đang dùng';
       case 'maintenance': return 'Bảo trì';
@@ -490,6 +529,7 @@ const BatteryInventory: React.FC = () => {
               <SelectContent className="glass-card border-0">
                 <SelectItem value="all">Tất cả trạng thái</SelectItem>
                 <SelectItem value="full">Đầy</SelectItem>
+                <SelectItem value="reserved">Đã giữ chỗ</SelectItem>
                 <SelectItem value="charging">Đang sạc</SelectItem>
                 <SelectItem value="in_use">Đang dùng</SelectItem>
                 <SelectItem value="maintenance">Bảo trì</SelectItem>
@@ -749,7 +789,7 @@ const BatteryInventory: React.FC = () => {
 
       {/* Battery Detail Dialog */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Battery className="h-5 w-5 text-blue-600" />
@@ -840,6 +880,15 @@ const BatteryInventory: React.FC = () => {
                     </div>
                   </div>
                 )}
+
+                {(selectedBattery as any).cycle_count !== undefined && (selectedBattery as any).cycle_count !== null && (
+                  <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                    <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Số chu kỳ</div>
+                    <p className="font-semibold text-gray-900 dark:text-white">
+                      {(selectedBattery as any).cycle_count}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {selectedBattery.station && (
@@ -876,6 +925,52 @@ const BatteryInventory: React.FC = () => {
                     {new Date(selectedBattery.created_at).toLocaleDateString('vi-VN')}
                   </p>
                 </div>
+              </div>
+
+              {/* Battery History */}
+              <div className="border-t pt-4 mt-4">
+                <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                  <Activity className="h-5 w-5" />
+                  Lịch sử chuyển trạm
+                </h3>
+                {loadingHistory ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                  </div>
+                ) : batteryHistory.length > 0 ? (
+                  <div className="space-y-3 max-h-64 overflow-y-auto">
+                    {batteryHistory.map((log) => (
+                      <div key={log.transfer_id} className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3 text-sm">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {new Date(log.transferred_at).toLocaleString('vi-VN')}
+                          </span>
+                          <Badge variant="outline" className="text-xs">
+                            {log.transfer_status || 'completed'}
+                          </Badge>
+                        </div>
+                        <div className="space-y-1 text-gray-600 dark:text-gray-400">
+                          <p>
+                            <span className="font-medium">Từ:</span> {log.from_station?.name || 'N/A'}
+                          </p>
+                          <p>
+                            <span className="font-medium">Đến:</span> {log.to_station?.name || 'N/A'}
+                          </p>
+                          <p>
+                            <span className="font-medium">Lý do:</span> {log.transfer_reason}
+                          </p>
+                          {log.notes && (
+                            <p className="text-xs italic mt-1">{log.notes}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                    Chưa có lịch sử chuyển trạm
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -974,6 +1069,24 @@ const BatteryInventory: React.FC = () => {
                     placeholder="Không bắt buộc"
                   />
                   <p className="text-xs text-gray-500 mt-1">Tình trạng sức khỏe pin (0-100%)</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="cycle_count" className="text-right">
+                  Số chu kỳ
+                </Label>
+                <div className="col-span-3">
+                  <Input
+                    id="cycle_count"
+                    type="number"
+                    min={0}
+                    value={editFormData.cycle_count || ''}
+                    onChange={(e) => setEditFormData({ ...editFormData, cycle_count: e.target.value ? Number(e.target.value) : undefined })}
+                    disabled={editLoading}
+                    placeholder="Không bắt buộc"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Số lần sạc/xả đã thực hiện</p>
                 </div>
               </div>
             </div>

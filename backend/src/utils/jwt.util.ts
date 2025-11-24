@@ -1,5 +1,5 @@
 import * as jwt from "jsonwebtoken";
-import { User } from "@prisma/client";
+import { users } from "@prisma/client";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-super-secret-jwt-key";
 const JWT_REFRESH_SECRET =
@@ -25,7 +25,7 @@ export interface RefreshTokenPayload {
 /**
  * Generate access token
  */
-export const generateAccessToken = (user: User): string => {
+export const generateAccessToken = (user: users): string => {
   const payload: JWTPayload = {
     userId: user.user_id,
     email: user.email,

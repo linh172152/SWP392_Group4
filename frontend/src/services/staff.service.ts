@@ -82,7 +82,7 @@ export interface StaffBooking {
 }
 
 export interface ConfirmBookingData {
-  phone: string;
+  // Phone verification đã được bỏ - không cần phone nữa
 }
 
 export interface CompleteBookingData {
@@ -399,9 +399,7 @@ export async function getMyStaffSchedules(params?: {
     qs.toString() ? `?${qs.toString()}` : ""
   }`;
   
-  console.log('Fetching schedules from:', url);
   const res = await authFetch(url);
-  console.log('API response:', res);
   return res; // { success, message, data: schedules[] }
 }
 

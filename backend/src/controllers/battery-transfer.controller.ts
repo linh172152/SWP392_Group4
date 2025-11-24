@@ -13,7 +13,7 @@ const TRANSFER_STATUS_VALUES = [
 type TransferStatusValue = (typeof TRANSFER_STATUS_VALUES)[number];
 
 const transferInclude = {
-  battery: {
+  batteries: {
     select: {
       battery_id: true,
       battery_code: true,
@@ -21,28 +21,28 @@ const transferInclude = {
       status: true,
     },
   },
-  from_station: {
+  stations_battery_transfer_logs_from_station_idTostations: {
     select: {
       station_id: true,
       name: true,
       address: true,
     },
   },
-  to_station: {
+  stations_battery_transfer_logs_to_station_idTostations: {
     select: {
       station_id: true,
       name: true,
       address: true,
     },
   },
-  transferred_by_user: {
+  users: {
     select: {
       user_id: true,
       full_name: true,
       email: true,
     },
   },
-} satisfies Prisma.BatteryTransferLogInclude;
+} satisfies Prisma.battery_transfer_logsInclude;
 
 export const createBatteryTransfer = asyncHandler(
   async (req: Request, res: Response) => {
@@ -77,7 +77,7 @@ export const createBatteryTransfer = asyncHandler(
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      const battery = await tx.battery.findUnique({
+      const battery = await tx.batteries.findUnique({
         where: { battery_id },
         select: {
           battery_id: true,
@@ -104,7 +104,7 @@ export const createBatteryTransfer = asyncHandler(
         );
       }
 
-      const destinationStation = await tx.station.findUnique({
+      const destinationStation = await tx.stations.findUnique({
         where: { station_id: to_station_id },
         select: {
           station_id: true,
@@ -125,7 +125,7 @@ export const createBatteryTransfer = asyncHandler(
         );
       }
 
-      const batteryCountAtDestination = await tx.battery.count({
+      const batteryCountAtDestination = await tx.batteries.count({
         where: { station_id: to_station_id },
       });
 
@@ -136,26 +136,49 @@ export const createBatteryTransfer = asyncHandler(
         );
       }
 
-      const shouldMarkMaintenance = transferStatus === "completed";
+      // ✅ Chỉ set maintenance nếu transfer_reason liên quan đến maintenance
+      // Các lý do khác (restock, rebalance, etc.) → giữ nguyên status
+      const normalizedReason = transfer_reason.toLowerCase().trim();
+      const maintenanceReasons = [
+        "maintenance",
+        "manufacturer_service",
+        "repair",
+        "service",
+        "bảo trì",
+      ];
+      const shouldMarkMaintenance =
+        transferStatus === "completed" &&
+        maintenanceReasons.some((reason) =>
+          normalizedReason.includes(reason)
+        );
 
-      await tx.battery.update({
+      // ✅ Xác định status mới dựa trên transfer_reason
+      let newStatus: string;
+      if (shouldMarkMaintenance) {
+        newStatus = "maintenance";
+      } else {
+        // Giữ nguyên status hiện tại (full, charging, reserved, etc.)
+        newStatus = battery.status;
+      }
+
+      await tx.batteries.update({
         where: { battery_id },
         data: {
           station_id: to_station_id,
-          status: shouldMarkMaintenance ? "maintenance" : battery.status,
+          status: newStatus as any,
         },
       });
 
-      const transferLog = await tx.batteryTransferLog.create({
+      const transferLog = await tx.battery_transfer_logs.create({
         data: {
-          battery_id,
+          battery_id: battery_id as string,
           from_station_id: battery.station_id,
-          to_station_id,
-          transfer_reason,
+          to_station_id: to_station_id as string,
+          transfer_reason: transfer_reason as string,
           transferred_by: adminId,
-          notes,
+          notes: notes as string | null,
           transfer_status: transferStatus,
-        },
+        } as Prisma.battery_transfer_logsUncheckedCreateInput,
         include: transferInclude,
       });
 
@@ -181,7 +204,7 @@ export const getBatteryTransfers = asyncHandler(
       limit = 10,
     } = req.query;
 
-    const whereClause: Prisma.BatteryTransferLogWhereInput = {};
+    const whereClause: Prisma.battery_transfer_logsWhereInput = {};
 
     if (batteryId) whereClause.battery_id = batteryId as string;
     if (fromStationId) whereClause.from_station_id = fromStationId as string;
@@ -200,14 +223,14 @@ export const getBatteryTransfers = asyncHandler(
     const skip = (Math.max(1, parseInt(page as string, 10)) - 1) * take;
 
     const [transfers, total] = await prisma.$transaction([
-      prisma.batteryTransferLog.findMany({
+      prisma.battery_transfer_logs.findMany({
         where: whereClause,
         include: transferInclude,
         orderBy: { transferred_at: "desc" },
         skip,
         take,
       }),
-      prisma.batteryTransferLog.count({ where: whereClause }),
+      prisma.battery_transfer_logs.count({ where: whereClause }),
     ]);
 
     res.status(200).json({
@@ -234,7 +257,7 @@ export const getBatteryTransferDetails = asyncHandler(
       throw new CustomError("transfer id is required", 400);
     }
 
-    const transfer = await prisma.batteryTransferLog.findUnique({
+    const transfer = await prisma.battery_transfer_logs.findUnique({
       where: { transfer_id: id },
       include: transferInclude,
     });

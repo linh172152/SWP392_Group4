@@ -19,14 +19,14 @@ export const getTopUpPackages = asyncHandler(
 
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
 
-    const packages = await prisma.topUpPackage.findMany({
+    const packages = await prisma.topup_packages.findMany({
       where: whereClause,
       orderBy: { created_at: "desc" },
       skip,
       take: parseInt(limit as string),
     });
 
-    const total = await prisma.topUpPackage.count({
+    const total = await prisma.topup_packages.count({
       where: whereClause,
     });
 
@@ -53,7 +53,7 @@ export const getTopUpPackageById = asyncHandler(
   async (req: Request, res: Response) => {
     const { id } = req.params;
 
-    const packageData = await prisma.topUpPackage.findUnique({
+    const packageData = await prisma.topup_packages.findUnique({
       where: { package_id: id },
     });
 
@@ -87,7 +87,7 @@ export const createTopUpPackage = asyncHandler(
     // Calculate actual_amount
     const actualAmount = parseFloat(topup_amount) + parseFloat(bonus_amount);
 
-    const packageData = await prisma.topUpPackage.create({
+    const packageData = await prisma.topup_packages.create({
       data: {
         name,
         description,
@@ -115,7 +115,7 @@ export const updateTopUpPackage = asyncHandler(
     const { name, description, topup_amount, bonus_amount, is_active } =
       req.body;
 
-    const packageData = await prisma.topUpPackage.findUnique({
+    const packageData = await prisma.topup_packages.findUnique({
       where: { package_id: id },
     });
 
@@ -134,7 +134,7 @@ export const updateTopUpPackage = asyncHandler(
       actualAmount = newTopupAmount + newBonusAmount; // Prisma Decimal accepts number
     }
 
-    const updatedPackage = await prisma.topUpPackage.update({
+    const updatedPackage = await prisma.topup_packages.update({
       where: { package_id: id },
       data: {
         ...(name && { name }),
@@ -167,7 +167,7 @@ export const deleteTopUpPackage = asyncHandler(
   async (req: Request, res: Response) => {
     const { id } = req.params;
 
-    const packageData = await prisma.topUpPackage.findUnique({
+    const packageData = await prisma.topup_packages.findUnique({
       where: { package_id: id },
     });
 
@@ -175,7 +175,7 @@ export const deleteTopUpPackage = asyncHandler(
       throw new CustomError("Top-up package not found", 404);
     }
 
-    await prisma.topUpPackage.delete({
+    await prisma.topup_packages.delete({
       where: { package_id: id },
     });
 

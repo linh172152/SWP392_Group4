@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { Prisma } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
 import { prisma } from "../server";
@@ -14,16 +15,36 @@ const batteryStatusLabels: Record<string, string> = {
 
 /**
  * Get station batteries
+ * ✅ Staff: Chỉ xem pin của station mình được assign
+ * ✅ Admin: Có thể xem tất cả pin (nếu không có station_id trong query)
  */
 export const getStationBatteries = asyncHandler(
   async (req: Request, res: Response) => {
+    const userId = req.user?.userId;
     const { station_id, status, model } = req.query;
 
     const whereClause: any = {};
 
-    if (station_id) {
+    // ✅ Nếu là staff, force chỉ xem pin của station mình (bỏ qua station_id trong query)
+    if (userId) {
+      const user = await prisma.users.findUnique({
+        where: { user_id: userId },
+        select: { station_id: true, role: true },
+      });
+
+      if (user?.station_id && user.role === "STAFF") {
+        // ✅ Staff: Force chỉ xem pin của station mình, bỏ qua station_id trong query
+        whereClause.station_id = user.station_id;
+      } else if (station_id) {
+        // Admin hoặc user khác: Có thể filter theo station_id trong query
+        whereClause.station_id = station_id;
+      }
+      // Admin không có station_id trong query → xem tất cả (không set whereClause.station_id)
+    } else if (station_id) {
+      // Không authenticated: Chỉ xem theo station_id trong query
       whereClause.station_id = station_id;
     }
+
     if (status) {
       whereClause.status = status;
     }
@@ -31,10 +52,10 @@ export const getStationBatteries = asyncHandler(
       whereClause.model = model;
     }
 
-    const batteries = await prisma.battery.findMany({
+    const batteries = await prisma.batteries.findMany({
       where: whereClause,
       include: {
-        station: {
+        stations: {
           select: {
             station_id: true,
             name: true,
@@ -45,10 +66,12 @@ export const getStationBatteries = asyncHandler(
       orderBy: { created_at: "desc" },
     });
 
-    const batteriesWithLabels = batteries.map((battery) => ({
-      ...battery,
-      status_label: batteryStatusLabels[battery.status] ?? battery.status,
-    }));
+    const batteriesWithLabels = batteries.map(
+      (battery: (typeof batteries)[number]) => ({
+        ...battery,
+        status_label: batteryStatusLabels[battery.status] ?? battery.status,
+      })
+    );
 
     res.status(200).json({
       success: true,
@@ -82,7 +105,7 @@ export const addBattery = asyncHandler(async (req: Request, res: Response) => {
   }
 
   // Check if station exists
-  const station = await prisma.station.findUnique({
+  const station = await prisma.stations.findUnique({
     where: { station_id },
   });
 
@@ -91,7 +114,7 @@ export const addBattery = asyncHandler(async (req: Request, res: Response) => {
   }
 
   // Check if battery code already exists
-  const existingBattery = await prisma.battery.findFirst({
+  const existingBattery = await prisma.batteries.findFirst({
     where: { battery_code },
   });
 
@@ -100,7 +123,7 @@ export const addBattery = asyncHandler(async (req: Request, res: Response) => {
   }
 
   // ✅ Capacity Warning Logic (theo DOC)
-  const currentBatteryCount = await prisma.battery.count({
+  const currentBatteryCount = await prisma.batteries.count({
     where: { station_id },
   });
 
@@ -131,21 +154,24 @@ export const addBattery = asyncHandler(async (req: Request, res: Response) => {
     throw new CustomError("cycle_count must be a non-negative number", 400);
   }
 
-  const battery = await prisma.battery.create({
+  const battery = await prisma.batteries.create({
     data: {
-      battery_code,
-      station_id,
-      model,
-      capacity_kwh,
-      voltage,
-      current_charge,
-      status,
+      battery_code: battery_code as string,
+      station_id: station_id as string,
+      model: model as string,
+      capacity_kwh: capacity_kwh
+        ? new Prisma.Decimal(capacity_kwh as number)
+        : null,
+      voltage: voltage ? new Prisma.Decimal(voltage as number) : null,
+      current_charge: current_charge as number,
+      status: status as string,
       last_charged_at: status === "full" ? new Date() : null,
-      health_percentage: healthValue,
+      health_percentage: healthValue ? new Prisma.Decimal(healthValue) : null,
       cycle_count: cycleValue,
-    },
+      updated_at: new Date(),
+    } as Prisma.batteriesUncheckedCreateInput,
     include: {
-      station: {
+      stations: {
         select: {
           station_id: true,
           name: true,
@@ -186,10 +212,10 @@ export const getBatteryDetails = asyncHandler(
   async (req: Request, res: Response) => {
     const { id } = req.params;
 
-    const battery = await prisma.battery.findUnique({
+    const battery = await prisma.batteries.findUnique({
       where: { battery_id: id },
       include: {
-        station: {
+        stations: {
           select: {
             station_id: true,
             name: true,
@@ -198,23 +224,23 @@ export const getBatteryDetails = asyncHandler(
             longitude: true,
           },
         },
-        transfer_logs: {
+        battery_transfer_logs: {
           include: {
-            from_station: {
+            stations_battery_transfer_logs_from_station_idTostations: {
               select: {
                 station_id: true,
                 name: true,
                 address: true,
               },
             },
-            to_station: {
+            stations_battery_transfer_logs_to_station_idTostations: {
               select: {
                 station_id: true,
                 name: true,
                 address: true,
               },
             },
-            transferred_by_user: {
+            users: {
               select: {
                 user_id: true,
                 full_name: true,
@@ -231,15 +257,25 @@ export const getBatteryDetails = asyncHandler(
       throw new CustomError("Battery not found", 404);
     }
 
-  const batteryWithLabel = {
-    ...battery,
-    status_label: batteryStatusLabels[battery.status] ?? battery.status,
-  };
+    const batteryWithLabel = {
+      ...battery,
+      capacity_kwh: battery.capacity_kwh ? Number(battery.capacity_kwh) : null,
+      voltage: battery.voltage ? Number(battery.voltage) : null,
+      health_percentage: battery.health_percentage ? Number(battery.health_percentage) : null,
+      status_label: batteryStatusLabels[battery.status] ?? battery.status,
+      stations: battery.stations
+        ? {
+            ...battery.stations,
+            latitude: battery.stations.latitude ? Number(battery.stations.latitude) : null,
+            longitude: battery.stations.longitude ? Number(battery.stations.longitude) : null,
+          }
+        : null,
+    };
 
     res.status(200).json({
       success: true,
       message: "Battery details retrieved successfully",
-    data: batteryWithLabel,
+      data: batteryWithLabel,
     });
   }
 );
@@ -256,7 +292,7 @@ export const updateBatteryStatus = asyncHandler(
       throw new CustomError("Status is required", 400);
     }
 
-    const battery = await prisma.battery.findUnique({
+    const battery = await prisma.batteries.findUnique({
       where: { battery_id: id },
     });
 
@@ -273,7 +309,10 @@ export const updateBatteryStatus = asyncHandler(
     if (health_percentage !== undefined) {
       const healthValue = Number(health_percentage);
       if (Number.isNaN(healthValue) || healthValue < 0 || healthValue > 100) {
-        throw new CustomError("health_percentage must be between 0 and 100", 400);
+        throw new CustomError(
+          "health_percentage must be between 0 and 100",
+          400
+        );
       }
       updateData.health_percentage = healthValue;
     }
@@ -295,7 +334,7 @@ export const updateBatteryStatus = asyncHandler(
       // Simulate charging process
       setTimeout(async () => {
         try {
-          await prisma.battery.update({
+          await prisma.batteries.update({
             where: { battery_id: id },
             data: {
               status: "charging",
@@ -305,7 +344,7 @@ export const updateBatteryStatus = asyncHandler(
 
           // If fully charged, update status
           if (current_charge + 20 >= 100) {
-            await prisma.battery.update({
+            await prisma.batteries.update({
               where: { battery_id: id },
               data: {
                 status: "full",
@@ -320,11 +359,11 @@ export const updateBatteryStatus = asyncHandler(
       }, 5000); // 5 seconds delay to simulate charging
     }
 
-    const updatedBattery = await prisma.battery.update({
+    const updatedBattery = await prisma.batteries.update({
       where: { battery_id: id },
       data: updateData,
       include: {
-        station: {
+        stations: {
           select: {
             station_id: true,
             name: true,
@@ -334,15 +373,16 @@ export const updateBatteryStatus = asyncHandler(
       },
     });
 
-  const updatedBatteryWithLabel = {
-    ...updatedBattery,
-    status_label: batteryStatusLabels[updatedBattery.status] ?? updatedBattery.status,
-  };
+    const updatedBatteryWithLabel = {
+      ...updatedBattery,
+      status_label:
+        batteryStatusLabels[updatedBattery.status] ?? updatedBattery.status,
+    };
 
     res.status(200).json({
       success: true,
       message: "Battery status updated successfully",
-    data: updatedBatteryWithLabel,
+      data: updatedBatteryWithLabel,
     });
   }
 );
@@ -357,24 +397,24 @@ export const getBatteryHistory = asyncHandler(
 
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
 
-    const history = await prisma.batteryTransferLog.findMany({
+    const history = await prisma.battery_transfer_logs.findMany({
       where: { battery_id: id },
       include: {
-        from_station: {
+        stations_battery_transfer_logs_from_station_idTostations: {
           select: {
             station_id: true,
             name: true,
             address: true,
           },
         },
-        to_station: {
+        stations_battery_transfer_logs_to_station_idTostations: {
           select: {
             station_id: true,
             name: true,
             address: true,
           },
         },
-        transferred_by_user: {
+        users: {
           select: {
             user_id: true,
             full_name: true,
@@ -387,7 +427,7 @@ export const getBatteryHistory = asyncHandler(
       take: parseInt(limit as string),
     });
 
-    const total = await prisma.batteryTransferLog.count({
+    const total = await prisma.battery_transfer_logs.count({
       where: { battery_id: id },
     });
 
@@ -414,7 +454,7 @@ export const deleteBattery = asyncHandler(
   async (req: Request, res: Response) => {
     const { id } = req.params;
 
-    const battery = await prisma.battery.findUnique({
+    const battery = await prisma.batteries.findUnique({
       where: { battery_id: id },
     });
 
@@ -431,7 +471,7 @@ export const deleteBattery = asyncHandler(
     }
 
     // Check if battery has active transactions
-    const activeTransactions = await prisma.transaction.findFirst({
+    const activeTransactions = await prisma.transactions.findFirst({
       where: {
         OR: [{ old_battery_id: id }, { new_battery_id: id }],
         payment_status: { in: ["pending", "completed"] },
@@ -445,7 +485,7 @@ export const deleteBattery = asyncHandler(
       );
     }
 
-    await prisma.battery.delete({
+    await prisma.batteries.delete({
       where: { battery_id: id },
     });
 

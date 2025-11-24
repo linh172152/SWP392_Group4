@@ -112,7 +112,7 @@ export const optionalAuth = async (
 
     if (token) {
       const payload: JWTPayload = verifyAccessToken(token);
-      const user = await prisma.user.findUnique({
+      const user = await prisma.users.findUnique({
         where: { user_id: payload.userId },
         select: {
           user_id: true,

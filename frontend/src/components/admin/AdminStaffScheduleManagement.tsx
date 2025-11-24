@@ -530,10 +530,8 @@ const AdminStaffScheduleManagement: React.FC = () => {
 
       if (editingSchedule) {
         await adminUpdateStaffSchedule(editingSchedule.schedule_id, apiData);
-        toast.success("Cập nhật lịch làm việc thành công!");
       } else {
         await adminCreateStaffSchedule(apiData);
-        toast.success("Tạo lịch làm việc thành công!");
       }
 
       await fetchSchedules();
@@ -669,7 +667,6 @@ const AdminStaffScheduleManagement: React.FC = () => {
     setStaffFilter("");
     setStationFilter("");
     setDateFilter("");
-    toast.success("Đã reset bộ lọc");
   };
 
   const handleViewSchedule = (schedule: AdminStaffSchedule) => {
@@ -727,7 +724,6 @@ const AdminStaffScheduleManagement: React.FC = () => {
 
     try {
       await adminDeleteStaffSchedule(scheduleToDelete);
-      toast.success("Xóa lịch làm việc thành công!");
       await fetchSchedules();
       setScheduleToDelete(null);
     } catch (error) {

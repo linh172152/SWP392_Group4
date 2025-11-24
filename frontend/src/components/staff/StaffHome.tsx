@@ -27,6 +27,7 @@ import {
   PaginationEllipsis,
 } from '../ui/pagination';
 import { useToast } from '../../hooks/use-toast';
+import { parseError, logError } from '../../utils/errorHandler';
 
 const StaffHome: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -103,14 +104,15 @@ const StaffHome: React.FC = () => {
       
       setLastRefreshTime(new Date());
     } catch (error: any) {
+      logError(error, "StaffHome.fetchStats");
       if (!isAutoRefresh) {
+        const errorInfo = parseError(error);
         toast({
-          title: 'Lỗi',
-          description: error.message || 'Không thể tải dữ liệu',
+          title: errorInfo.title,
+          description: errorInfo.description,
           variant: 'destructive',
         });
       }
-      console.error('Error loading data:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);

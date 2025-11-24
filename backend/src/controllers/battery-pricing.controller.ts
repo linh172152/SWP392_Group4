@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
 
@@ -12,37 +12,61 @@ export const getBatteryPricing = asyncHandler(
   async (req: Request, res: Response) => {
     const { is_active, page = 1, limit = 10 } = req.query;
 
-    const whereClause: any = {};
+    // Validate and parse query parameters
+    const pageNum = Math.max(1, parseInt(page as string) || 1);
+    const limitNum = Math.min(
+      100,
+      Math.max(1, parseInt(limit as string) || 10)
+    ); // Max 100, min 1
+
+    // Only get global pricing (station_id = null) for public API
+    const whereClause: Prisma.battery_pricingsWhereInput = {
+      station_id: null,
+    };
     if (is_active !== undefined) {
-      whereClause.is_active = is_active === "true";
+      whereClause.is_active = String(is_active) === "true";
     }
 
-    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+    const skip = (pageNum - 1) * limitNum;
 
-    const pricings = await prisma.batteryPricing.findMany({
-      where: whereClause,
-      orderBy: { created_at: "desc" },
-      skip,
-      take: parseInt(limit as string),
-    });
+    try {
+      const pricings = await prisma.battery_pricings.findMany({
+        where: whereClause,
+        orderBy: { created_at: "desc" },
+        skip,
+        take: limitNum,
+      });
 
-    const total = await prisma.batteryPricing.count({
-      where: whereClause,
-    });
+      const total = await prisma.battery_pricings.count({
+        where: whereClause,
+      });
 
-    res.status(200).json({
-      success: true,
-      message: "Battery pricing retrieved successfully",
-      data: {
-        pricings,
-        pagination: {
-          page: parseInt(page as string),
-          limit: parseInt(limit as string),
-          total,
-          pages: Math.ceil(total / parseInt(limit as string)),
+      // Convert Decimal price to number for JSON response (frontend expects number)
+      const pricingsWithNumberPrice = pricings.map((pricing) => ({
+        ...pricing,
+        price: Number(pricing.price),
+      }));
+
+      res.status(200).json({
+        success: true,
+        message: "Battery pricing retrieved successfully",
+        data: {
+          pricings: pricingsWithNumberPrice,
+          pagination: {
+            page: pageNum,
+            limit: limitNum,
+            total,
+            pages: Math.ceil(total / limitNum),
+          },
         },
-      },
-    });
+      });
+    } catch (error: any) {
+      console.error("Error fetching battery pricing:", error);
+      throw new CustomError(
+        error.message || "Database error",
+        error.code === "P1001" ? 500 : 400
+      );
+    }
   }
 );
 
@@ -53,7 +77,7 @@ export const getBatteryPricingById = asyncHandler(
   async (req: Request, res: Response) => {
     const { id } = req.params;
 
-    const pricing = await prisma.batteryPricing.findUnique({
+    const pricing = await prisma.battery_pricings.findUnique({
       where: { pricing_id: id },
     });
 
@@ -61,10 +85,16 @@ export const getBatteryPricingById = asyncHandler(
       throw new CustomError("Battery pricing not found", 404);
     }
 
+    // Convert Decimal price to number for JSON response (frontend expects number)
+    const pricingWithNumberPrice = {
+      ...pricing,
+      price: Number(pricing.price),
+    };
+
     res.status(200).json({
       success: true,
       message: "Battery pricing retrieved successfully",
-      data: pricing,
+      data: pricingWithNumberPrice,
     });
   }
 );
@@ -80,9 +110,17 @@ export const createBatteryPricing = asyncHandler(
       throw new CustomError("Battery model and price are required", 400);
     }
 
-    // Check if pricing for this model already exists
-    const existingPricing = await prisma.batteryPricing.findUnique({
-      where: { battery_model },
+    const priceNumber = parseFloat(price);
+    if (isNaN(priceNumber) || priceNumber < 0) {
+      throw new CustomError("Price must be a valid non-negative number", 400);
+    }
+
+    // Check if pricing for this model already exists (global pricing - station_id = null)
+    const existingPricing = await prisma.battery_pricings.findFirst({
+      where: {
+        battery_model,
+        station_id: null, // Prisma accepts null directly for nullable fields
+      },
     });
 
     if (existingPricing) {
@@ -92,18 +130,25 @@ export const createBatteryPricing = asyncHandler(
       );
     }
 
-    const pricing = await prisma.batteryPricing.create({
+    const pricing = await prisma.battery_pricings.create({
       data: {
         battery_model,
-        price: parseFloat(price),
+        price: new Prisma.Decimal(priceNumber),
         is_active,
+        station_id: null, // ✅ Global pricing (not station-specific)
       },
     });
+
+    // Convert Decimal price to number for JSON response (frontend expects number)
+    const pricingWithNumberPrice = {
+      ...pricing,
+      price: Number(pricing.price),
+    };
 
     res.status(201).json({
       success: true,
       message: "Battery pricing created successfully",
-      data: pricing,
+      data: pricingWithNumberPrice,
     });
   }
 );
@@ -116,7 +161,7 @@ export const updateBatteryPricing = asyncHandler(
     const { id } = req.params;
     const { battery_model, price, is_active } = req.body;
 
-    const pricing = await prisma.batteryPricing.findUnique({
+    const pricing = await prisma.battery_pricings.findUnique({
       where: { pricing_id: id },
     });
 
@@ -124,10 +169,13 @@ export const updateBatteryPricing = asyncHandler(
       throw new CustomError("Battery pricing not found", 404);
     }
 
-    // If battery_model is being changed, check if new model already exists
+    // If battery_model is being changed, check if new model already exists (global pricing - station_id = null)
     if (battery_model && battery_model !== pricing.battery_model) {
-      const existingPricing = await prisma.batteryPricing.findUnique({
-        where: { battery_model },
+      const existingPricing = await prisma.battery_pricings.findFirst({
+        where: {
+          battery_model,
+          station_id: null, // Prisma accepts null directly for nullable fields
+        },
       });
 
       if (existingPricing) {
@@ -138,19 +186,36 @@ export const updateBatteryPricing = asyncHandler(
       }
     }
 
-    const updatedPricing = await prisma.batteryPricing.update({
+    const updateData: Prisma.battery_pricingsUpdateInput = {};
+    if (battery_model) {
+      updateData.battery_model = battery_model;
+    }
+    if (price !== undefined) {
+      const priceNumber = parseFloat(price);
+      if (isNaN(priceNumber) || priceNumber < 0) {
+        throw new CustomError("Price must be a valid non-negative number", 400);
+      }
+      updateData.price = new Prisma.Decimal(priceNumber);
+    }
+    if (is_active !== undefined) {
+      updateData.is_active = is_active;
+    }
+
+    const updatedPricing = await prisma.battery_pricings.update({
       where: { pricing_id: id },
-      data: {
-        ...(battery_model && { battery_model }),
-        ...(price !== undefined && { price: parseFloat(price) }),
-        ...(is_active !== undefined && { is_active }),
-      },
+      data: updateData,
     });
+
+    // Convert Decimal price to number for JSON response (frontend expects number)
+    const pricingWithNumberPrice = {
+      ...updatedPricing,
+      price: Number(updatedPricing.price),
+    };
 
     res.status(200).json({
       success: true,
       message: "Battery pricing updated successfully",
-      data: updatedPricing,
+      data: pricingWithNumberPrice,
     });
   }
 );
@@ -162,7 +227,7 @@ export const deleteBatteryPricing = asyncHandler(
   async (req: Request, res: Response) => {
     const { id } = req.params;
 
-    const pricing = await prisma.batteryPricing.findUnique({
+    const pricing = await prisma.battery_pricings.findUnique({
       where: { pricing_id: id },
     });
 
@@ -170,7 +235,7 @@ export const deleteBatteryPricing = asyncHandler(
       throw new CustomError("Battery pricing not found", 404);
     }
 
-    await prisma.batteryPricing.delete({
+    await prisma.battery_pricings.delete({
       where: { pricing_id: id },
     });
 
@@ -180,4 +245,3 @@ export const deleteBatteryPricing = asyncHandler(
     });
   }
 );
-

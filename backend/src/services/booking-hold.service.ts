@@ -38,8 +38,8 @@ type ReleaseResult = {
 
 export function buildBookingUncheckedUpdate(
   patch: BookingUpdatePatch
-): Prisma.BookingUncheckedUpdateInput {
-  const data: Prisma.BookingUncheckedUpdateInput = {};
+): Prisma.bookingsUncheckedUpdateInput {
+  const data: Prisma.bookingsUncheckedUpdateInput = {};
 
   if (patch.locked_battery_id !== undefined) {
     data.locked_battery_id = patch.locked_battery_id;
@@ -84,7 +84,7 @@ export async function releaseBookingHold({
     const targetStatus =
       booking.locked_battery_previous_status ?? BATTERY_STATUS_DEFAULT;
 
-    await tx.battery.update({
+    await tx.batteries.update({
       where: { battery_id: booking.locked_battery_id },
       data: {
         status: targetStatus,
@@ -109,7 +109,7 @@ export async function releaseBookingHold({
   }
 
   if (booking.locked_wallet_payment_id) {
-    const payment = await tx.payment.findUnique({
+    const payment = await tx.payments.findUnique({
       where: { payment_id: booking.locked_wallet_payment_id },
     });
 
@@ -117,7 +117,7 @@ export async function releaseBookingHold({
       booking.locked_wallet_amount ?? new Prisma.Decimal(0);
     walletRefundAmount = Number(amountDecimal);
 
-    const wallet = await tx.wallet.upsert({
+    const wallet = await tx.wallets.upsert({
       where: { user_id: booking.user_id },
       update: {
         balance: {
@@ -130,7 +130,7 @@ export async function releaseBookingHold({
       },
     });
 
-    await tx.payment.update({
+    await tx.payments.update({
       where: { payment_id: booking.locked_wallet_payment_id },
       data: {
         payment_status: PAYMENT_STATUS_REFUNDED,
@@ -150,19 +150,31 @@ export async function releaseBookingHold({
     booking.locked_subscription_id &&
     booking.locked_swap_count > 0
   ) {
-    const subscription = await tx.userSubscription.findUnique({
+    const now = new Date();
+    const subscription = await tx.user_subscriptions.findUnique({
       where: { subscription_id: booking.locked_subscription_id },
-      select: { remaining_swaps: true },
+      select: {
+        remaining_swaps: true,
+        status: true,
+        end_date: true,
+      },
     });
 
-    if (subscription && subscription.remaining_swaps !== null) {
-      await tx.userSubscription.update({
+    // ✅ Chỉ restore swaps nếu subscription còn active và chưa hết hạn
+    if (
+      subscription &&
+      subscription.remaining_swaps !== null &&
+      subscription.status === "active" &&
+      subscription.end_date >= now
+    ) {
+      await tx.user_subscriptions.update({
         where: { subscription_id: booking.locked_subscription_id },
         data: {
           remaining_swaps: subscription.remaining_swaps + booking.locked_swap_count,
         },
       });
     }
+    // Nếu subscription đã hết hạn hoặc không active, không restore swaps (đã mất)
   }
 
   const bookingUpdate: BookingUpdatePatch = {
@@ -218,7 +230,7 @@ export async function consumeBookingHold({
   let paymentRecord: ConsumeResult["payment"] = null;
 
   if (booking.locked_wallet_payment_id) {
-    const payment = await tx.payment.findUnique({
+    const payment = await tx.payments.findUnique({
       where: { payment_id: booking.locked_wallet_payment_id },
     });
 
@@ -230,7 +242,7 @@ export async function consumeBookingHold({
         payment_status: PAYMENT_STATUS_COMPLETED,
       };
 
-      await tx.payment.update({
+      await tx.payments.update({
         where: { payment_id: payment.payment_id },
         data: {
           payment_status: PAYMENT_STATUS_COMPLETED,
