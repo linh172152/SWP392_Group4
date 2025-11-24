@@ -58,7 +58,7 @@ const AddBatteryDialog: React.FC<AddBatteryDialogProps> = ({
           setStationId(data.data.user.station.station_id);
         }
       } catch (error) {
-        console.error('Failed to fetch user profile:', error);
+        logError(error, "AddBatteryDialog.fetchUserProfile");
       }
     };
 

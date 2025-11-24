@@ -130,25 +130,11 @@ const WorkSchedule: React.FC = () => {
         include_past: true, // Luôn load tất cả lịch để hiển thị ngay
       };
       
-      console.log('Loading schedules with params:', params);
       const response = await getMyStaffSchedules(params);
-      console.log('Schedule response:', response);
       
       if (response && response.success) {
         // Handle both array and non-array responses
         const schedulesData = Array.isArray(response.data) ? response.data : (response.data || []);
-        console.log('Schedules data received:', schedulesData.length, 'schedules');
-        
-        if (schedulesData.length > 0) {
-          console.log('Sample schedule:', schedulesData[0]);
-          console.log('All schedules:', schedulesData);
-        } else {
-          console.warn('⚠️ No schedules found. Possible reasons:');
-          console.warn('  1. Staff has no schedules assigned');
-          console.warn('  2. All schedules have ended (shift_end < now)');
-          console.warn('  3. Try enabling "Bao gồm quá khứ" to see past schedules');
-          console.warn('  4. Admin needs to create schedules for this staff');
-        }
         
         // Always set allSchedules, even if empty
         setAllSchedules(schedulesData);
@@ -226,7 +212,6 @@ const WorkSchedule: React.FC = () => {
     }
     // If no filters are applied, show all schedules
     
-    console.log('Applied filters - Total:', schedulesToFilter.length, 'Filtered:', filtered.length);
     setSchedules(filtered);
   };
 

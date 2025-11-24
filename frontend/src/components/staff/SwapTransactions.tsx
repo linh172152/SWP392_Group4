@@ -141,42 +141,6 @@ const SwapTransactions: React.FC = () => {
       if (response.success && response.data) {
         let allBookings = response.data.bookings || [];
 
-        // Debug: Log bookings count
-        console.log("[SwapTransactions] Fetched bookings:", allBookings.length);
-        console.log("[SwapTransactions] Status filter:", statusFilter);
-        if (allBookings.length > 0) {
-          // Sort by created_at to see newest first
-          const sortedByCreated = [...allBookings].sort(
-            (a, b) =>
-              new Date(b.created_at).getTime() -
-              new Date(a.created_at).getTime()
-          );
-
-          console.log("[SwapTransactions] Newest booking:", {
-            booking_code: sortedByCreated[0].booking_code,
-            status: sortedByCreated[0].status,
-            station_id: sortedByCreated[0].station_id,
-            created_at: sortedByCreated[0].created_at,
-            scheduled_at: sortedByCreated[0].scheduled_at,
-          });
-
-          console.log(
-            "[SwapTransactions] All bookings (sorted by created_at desc):",
-            sortedByCreated.map((b: StaffBooking) => ({
-              code: b.booking_code,
-              status: b.status,
-              created: b.created_at,
-              scheduled: b.scheduled_at,
-              station_id: b.station_id,
-            }))
-          );
-        } else {
-          console.log(
-            "[SwapTransactions] No bookings found. Status filter:",
-            statusFilter
-          );
-        }
-
         // Apply client-side search
         if (searchTerm.trim()) {
           const searchLower = searchTerm.toLowerCase();
@@ -424,10 +388,6 @@ const SwapTransactions: React.FC = () => {
     if (existingBatteryCode && existingBatteryCode.trim() !== "") {
       setOldBatteryCode(existingBatteryCode);
       setIsOldBatteryCodeAutoLoaded(true);
-      console.log(
-        "[handleOpenCompleteDialog] ✅ Set old battery code from booking object:",
-        existingBatteryCode
-      );
     } else {
       setOldBatteryCode("");
       setIsOldBatteryCodeAutoLoaded(false);
@@ -437,10 +397,6 @@ const SwapTransactions: React.FC = () => {
     const reservedBatteryCode = booking.locked_battery?.battery_code || "";
     if (reservedBatteryCode && reservedBatteryCode.trim() !== "") {
       setNewBatteryCode(reservedBatteryCode);
-      console.log(
-        "[handleOpenCompleteDialog] ✅ Set new battery code from booking object:",
-        reservedBatteryCode
-      );
     } else {
       setNewBatteryCode("");
     }
@@ -450,97 +406,19 @@ const SwapTransactions: React.FC = () => {
     try {
       // Lấy thông tin chi tiết booking để có vehicle.current_battery (đảm bảo dữ liệu mới nhất)
       setLoadingBatteries(true);
-      console.log(
-        "[handleOpenCompleteDialog] Calling getBookingDetails with booking_id:",
-        booking.booking_id
-      );
       const bookingDetails = await getBookingDetails(booking.booking_id);
 
       if (bookingDetails.success && bookingDetails.data) {
         const fullBooking = bookingDetails.data as any;
 
-        // Debug: Log để kiểm tra dữ liệu
-        console.log(
-          "[handleOpenCompleteDialog] Full booking data:",
-          fullBooking
-        );
-        console.log("[handleOpenCompleteDialog] Vehicle:", fullBooking.vehicle);
-        console.log(
-          "[handleOpenCompleteDialog] Vehicle current_battery_id:",
-          fullBooking.vehicle?.current_battery_id
-        );
-        console.log(
-          "[handleOpenCompleteDialog] Current battery:",
-          fullBooking.vehicle?.current_battery
-        );
-        console.log(
-          "[handleOpenCompleteDialog] Current battery type:",
-          typeof fullBooking.vehicle?.current_battery
-        );
-        console.log(
-          "[handleOpenCompleteDialog] Current battery is null?",
-          fullBooking.vehicle?.current_battery === null
-        );
-        console.log(
-          "[handleOpenCompleteDialog] Current battery is undefined?",
-          fullBooking.vehicle?.current_battery === undefined
-        );
-
         // Lấy mã pin hiện tại từ vehicle.current_battery (từ API response - đảm bảo dữ liệu mới nhất)
         const currentBattery = fullBooking.vehicle?.current_battery;
         const currentBatteryCode = currentBattery?.battery_code || "";
-
-        console.log(
-          "[handleOpenCompleteDialog] Current battery object:",
-          currentBattery
-        );
-        console.log(
-          "[handleOpenCompleteDialog] Current battery code:",
-          currentBatteryCode
-        );
-        console.log(
-          "[handleOpenCompleteDialog] Current battery code type:",
-          typeof currentBatteryCode
-        );
 
         // Luôn cập nhật mã pin hiện tại từ API response (đảm bảo dữ liệu mới nhất)
         if (currentBatteryCode && currentBatteryCode.trim() !== "") {
           setOldBatteryCode(currentBatteryCode);
           setIsOldBatteryCodeAutoLoaded(true); // Đánh dấu là đã load tự động
-          console.log(
-            "[handleOpenCompleteDialog] ✅ Set old battery code from API:",
-            currentBatteryCode
-          );
-        } else {
-          // Nếu API không trả về current_battery, giữ nguyên giá trị từ booking object (nếu có)
-          if (!oldBatteryCode || oldBatteryCode.trim() === "") {
-            if (!currentBattery) {
-              console.warn(
-                "[handleOpenCompleteDialog] ⚠️ Vehicle has no current_battery (current_battery is null/undefined)"
-              );
-              console.warn(
-                "[handleOpenCompleteDialog] ⚠️ Vehicle current_battery_id:",
-                fullBooking.vehicle?.current_battery_id
-              );
-            } else if (!currentBattery.battery_code) {
-              console.warn(
-                "[handleOpenCompleteDialog] ⚠️ Current battery exists but has no battery_code"
-              );
-              console.warn(
-                "[handleOpenCompleteDialog] ⚠️ Current battery object:",
-                currentBattery
-              );
-            } else {
-              console.warn(
-                "[handleOpenCompleteDialog] ⚠️ Current battery code is empty string"
-              );
-            }
-          } else {
-            console.log(
-              "[handleOpenCompleteDialog] ℹ️ Keeping existing old battery code from booking object:",
-              oldBatteryCode
-            );
-          }
         }
 
         // Lấy model pin hiện tại từ vehicle.current_battery
@@ -548,10 +426,6 @@ const SwapTransactions: React.FC = () => {
           fullBooking.vehicle?.current_battery?.model || "";
         if (currentBatteryModelValue) {
           setCurrentBatteryModel(currentBatteryModelValue);
-          console.log(
-            "[handleOpenCompleteDialog] ✅ Set current battery model:",
-            currentBatteryModelValue
-          );
         }
 
         // Lấy danh sách pin có sẵn cho booking này (sử dụng endpoint chuyên dụng)
@@ -559,10 +433,6 @@ const SwapTransactions: React.FC = () => {
           const availableBatteriesResponse = await getAvailableBatteries(booking.booking_id);
           if (availableBatteriesResponse.success && availableBatteriesResponse.data) {
             setAvailableBatteries(availableBatteriesResponse.data.batteries || []);
-            // Nếu có locked_battery, đảm bảo nó được hiển thị
-            if (availableBatteriesResponse.data.booking?.locked_battery_id) {
-              console.log('[handleOpenCompleteDialog] ✅ Locked battery ID:', availableBatteriesResponse.data.booking.locked_battery_id);
-            }
           }
         } catch (error: any) {
           logError(error, "SwapTransactions.loadAvailableBatteries");

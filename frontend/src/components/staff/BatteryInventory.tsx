@@ -247,7 +247,7 @@ const BatteryInventory: React.FC = () => {
         setBatteryHistory(response.data.history || []);
       }
     } catch (error: any) {
-      console.error('Error loading battery history:', error);
+      logError(error, "BatteryInventory.handleViewDetail");
       setBatteryHistory([]);
     } finally {
       setLoadingHistory(false);
