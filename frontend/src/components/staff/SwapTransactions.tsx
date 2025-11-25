@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -121,7 +121,7 @@ const SwapTransactions: React.FC = () => {
 
   const { toast } = useToast();
 
-  // Fetch all bookings (for client-side filtering, searching, sorting)
+  // Fetch bookings với server-side pagination và filtering
   const fetchBookings = async (resetPage = false) => {
     try {
       setRefreshing(true);
@@ -129,78 +129,26 @@ const SwapTransactions: React.FC = () => {
       // Reset to page 1 if needed
       if (resetPage && currentPage !== 1) {
         setCurrentPage(1);
+        return; // useEffect sẽ gọi lại với page 1
       }
 
-      // Fetch a large number to get all bookings matching the status filter
+      // Fetch với server-side pagination và status filter
       const response = await getStationBookings({
         status: statusFilter !== "all" ? statusFilter : undefined,
-        page: 1,
-        limit: 1000, // Fetch large number for client-side operations
+        page: currentPage,
+        limit: pageSize,
       });
 
       if (response.success && response.data) {
-        let allBookings = response.data.bookings || [];
+        const bookings = response.data.bookings || [];
+        // Lưu raw bookings, filter/sort sẽ được xử lý bằng useMemo
+        setBookings(bookings);
 
-        // Apply client-side search
-        if (searchTerm.trim()) {
-          const searchLower = searchTerm.toLowerCase();
-          allBookings = allBookings.filter(
-            (b: StaffBooking) =>
-              b.user?.full_name?.toLowerCase().includes(searchLower) ||
-              b.booking_code?.toLowerCase().includes(searchLower) ||
-              b.user?.phone?.includes(searchTerm) ||
-              b.user?.email?.toLowerCase().includes(searchLower) ||
-              b.vehicle?.license_plate?.toLowerCase().includes(searchLower) ||
-              b.vehicle?.make?.toLowerCase().includes(searchLower) ||
-              b.vehicle?.model?.toLowerCase().includes(searchLower)
-          );
+        // Sử dụng pagination từ server
+        if (response.data.pagination) {
+          setTotalItems(response.data.pagination.total || 0);
+          setTotalPages(response.data.pagination.pages || 1);
         }
-
-        // Apply client-side sorting
-        allBookings.sort((a: StaffBooking, b: StaffBooking) => {
-          let aValue: any;
-          let bValue: any;
-
-          switch (sortField) {
-            case "scheduled_at":
-              aValue = new Date(a.scheduled_at).getTime();
-              bValue = new Date(b.scheduled_at).getTime();
-              break;
-            case "created_at":
-              aValue = new Date(a.created_at).getTime();
-              bValue = new Date(b.created_at).getTime();
-              break;
-            case "user_name":
-              aValue = a.user?.full_name || "";
-              bValue = b.user?.full_name || "";
-              break;
-            case "booking_code":
-              aValue = a.booking_code || "";
-              bValue = b.booking_code || "";
-              break;
-            default:
-              return 0;
-          }
-
-          if (sortOrder === "asc") {
-            return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
-          } else {
-            return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
-          }
-        });
-
-        // Calculate pagination
-        const totalFiltered = allBookings.length;
-        const totalPagesCalculated = Math.ceil(totalFiltered / pageSize);
-        setTotalItems(totalFiltered);
-        setTotalPages(totalPagesCalculated);
-
-        // Apply pagination
-        const startIndex = (currentPage - 1) * pageSize;
-        const endIndex = startIndex + pageSize;
-        const paginatedBookings = allBookings.slice(startIndex, endIndex);
-
-        setBookings(paginatedBookings);
       }
     } catch (error: any) {
       logError(error, "SwapTransactions.fetchBookings");
@@ -218,59 +166,71 @@ const SwapTransactions: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchBookings(false); // Don't reset page when dependencies change
+    fetchBookings(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, pageSize, statusFilter, sortField, sortOrder]);
+  }, [currentPage, pageSize, statusFilter]);
 
-  // Debounce search and reset to page 1
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (currentPage !== 1) {
-        setCurrentPage(1);
-      } else {
-        fetchBookings(true); // Reset to page 1 when search changes
-      }
-    }, 500);
+  // Memoize filtered and sorted bookings
+  const filteredAndSortedBookings = useMemo(() => {
+    if (bookings.length === 0) return [];
 
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm]);
+    let processed = [...bookings];
 
-  // Auto-refresh every 30 seconds to get new bookings
-  useEffect(() => {
-    if (!autoRefreshEnabled) return;
-
-    const interval = setInterval(() => {
-      // Always reset to page 1 when auto-refreshing to see newest bookings
-      fetchBookings(true);
-    }, 30000); // Refresh every 30 seconds
-
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoRefreshEnabled, statusFilter, sortField, sortOrder]);
-
-  // Handle sort change
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortOrder("desc");
+    // Apply client-side search
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase();
+      processed = processed.filter(
+        (b: StaffBooking) =>
+          b.user?.full_name?.toLowerCase().includes(searchLower) ||
+          b.booking_code?.toLowerCase().includes(searchLower) ||
+          b.user?.phone?.includes(searchTerm) ||
+          b.user?.email?.toLowerCase().includes(searchLower) ||
+          b.vehicle?.license_plate?.toLowerCase().includes(searchLower) ||
+          b.vehicle?.make?.toLowerCase().includes(searchLower) ||
+          b.vehicle?.model?.toLowerCase().includes(searchLower)
+      );
     }
-  };
 
-  const getSortIcon = (field: SortField) => {
-    if (sortField !== field) {
-      return <ArrowUpDown className="h-4 w-4 text-gray-400" />;
+    // Apply client-side sorting (chỉ sort nếu không phải default)
+    if (sortField !== "created_at" || sortOrder !== "desc") {
+      processed.sort((a: StaffBooking, b: StaffBooking) => {
+        let aValue: any;
+        let bValue: any;
+
+        switch (sortField) {
+          case "scheduled_at":
+            aValue = new Date(a.scheduled_at).getTime();
+            bValue = new Date(b.scheduled_at).getTime();
+            break;
+          case "created_at":
+            aValue = new Date(a.created_at).getTime();
+            bValue = new Date(b.created_at).getTime();
+            break;
+          case "user_name":
+            aValue = a.user?.full_name || "";
+            bValue = b.user?.full_name || "";
+            break;
+          case "booking_code":
+            aValue = a.booking_code || "";
+            bValue = b.booking_code || "";
+            break;
+          default:
+            return 0;
+        }
+
+        if (sortOrder === "asc") {
+          return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+        } else {
+          return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+        }
+      });
     }
-    return sortOrder === "asc" ? (
-      <ArrowUp className="h-4 w-4 text-blue-600" />
-    ) : (
-      <ArrowDown className="h-4 w-4 text-blue-600" />
-    );
-  };
 
-  const getStatusColor = (status: string) => {
+    return processed;
+  }, [bookings, searchTerm, sortField, sortOrder]);
+
+  // Memoize helper functions
+  const getStatusColor = useCallback((status: string) => {
     switch (status) {
       case "pending":
         return "bg-yellow-100 text-yellow-800";
@@ -283,9 +243,9 @@ const SwapTransactions: React.FC = () => {
       default:
         return "bg-gray-100 text-gray-800";
     }
-  };
+  }, []);
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = useCallback((status: string) => {
     switch (status) {
       case "pending":
         return <Clock className="h-4 w-4" />;
@@ -298,9 +258,9 @@ const SwapTransactions: React.FC = () => {
       default:
         return <Clock className="h-4 w-4" />;
     }
-  };
+  }, []);
 
-  const getStatusText = (status: string) => {
+  const getStatusText = useCallback((status: string) => {
     switch (status) {
       case "pending":
         return "Chờ xác nhận";
@@ -313,19 +273,67 @@ const SwapTransactions: React.FC = () => {
       default:
         return status;
     }
-  };
+  }, []);
 
-  // Open detail dialog
-  const handleViewDetail = (booking: StaffBooking) => {
+  const getSortIcon = useCallback((field: SortField) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="h-4 w-4 text-gray-400" />;
+    }
+    return sortOrder === "asc" ? (
+      <ArrowUp className="h-4 w-4 text-blue-600" />
+    ) : (
+      <ArrowDown className="h-4 w-4 text-blue-600" />
+    );
+  }, [sortField, sortOrder]);
+
+  // Debounce search - chỉ filter trong page hiện tại (client-side)
+  // Note: Search chỉ áp dụng cho items trong page hiện tại
+  // Nếu cần search toàn bộ, cần backend hỗ trợ search parameter
+  useEffect(() => {
+    // Search được xử lý trong fetchBookings (client-side filter)
+    // Không cần fetch lại khi search thay đổi vì chỉ filter trong page hiện tại
+    // Nếu muốn search toàn bộ, cần reset page và fetch lại
+    if (searchTerm.trim() && currentPage !== 1) {
+      // Nếu có search term và không ở page 1, có thể reset về page 1
+      // Nhưng vì search chỉ trong page hiện tại, nên không reset
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm]);
+
+  // Auto-refresh every 30 seconds to get new bookings
+  useEffect(() => {
+    if (!autoRefreshEnabled) return;
+
+    const interval = setInterval(() => {
+      // Refresh page hiện tại (không reset về page 1)
+      fetchBookings(false);
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRefreshEnabled, currentPage, pageSize, statusFilter]);
+
+  // Memoize event handlers
+  const handleSort = useCallback((field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortOrder("desc");
+    }
+  }, [sortField, sortOrder]);
+
+
+  // Memoize dialog handlers
+  const handleViewDetail = useCallback((booking: StaffBooking) => {
     setSelectedBooking(booking);
     setDetailDialogOpen(true);
-  };
+  }, []);
 
-  // Open confirm dialog
-  const handleOpenConfirmDialog = (booking: StaffBooking) => {
+  const handleOpenConfirmDialog = useCallback((booking: StaffBooking) => {
     setSelectedBooking(booking);
     setConfirmDialogOpen(true);
-  };
+  }, []);
 
   // Confirm booking - Không cần verify phone nữa
   const handleConfirmBooking = async () => {
@@ -779,7 +787,7 @@ const SwapTransactions: React.FC = () => {
 
       {/* Active Queue */}
       <div className="space-y-4">
-        {bookings.map((booking) => (
+        {filteredAndSortedBookings.map((booking) => (
           <Card
             key={booking.booking_id}
             className="glass-card border-0 glow-hover overflow-hidden"
