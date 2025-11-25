@@ -307,26 +307,6 @@ const BookingForm: React.FC = () => {
   
   // Tổng cộng dự kiến: Dựa trên lựa chọn của driver (useSubscription state)
   const totalPrice = (useSubscription && subscriptionCanApply) ? 0 : batteryPrice;
-  
-  // Debug log để kiểm tra
-  if (selectedBatteryType && currentSubscription) {
-    console.log('💰 [PRICING]', {
-      batteryModel: selectedBatteryType,
-      batteryPrice,
-      hasSubscription: !!currentSubscription,
-      subscriptionName: currentSubscription.package?.name,
-      remaining_swaps: currentSubscription.remaining_swaps,
-      subscriptionCanApply,
-      useSubscription,
-      totalPrice,
-      reason: !currentSubscription ? 'No subscription' :
-              !selectedBatteryType ? 'No battery selected' :
-              !doesSubscriptionCoverModel(currentSubscription, selectedBatteryType) ? 'Model not covered' :
-              (currentSubscription.remaining_swaps !== null && currentSubscription.remaining_swaps <= 0) ? 'No swaps left' :
-              !useSubscription ? 'Driver chose not to use subscription' :
-              'Should apply'
-    });
-  }
 
   // Xử lý chọn battery type
   const handleBatteryTypeSelect = (model: string) => {
@@ -410,59 +390,38 @@ const BookingForm: React.FC = () => {
         throw new Error('Vui lòng chọn xe');
       }
 
-      const bookingData = {
+      const bookingData: any = {
         vehicle_id: selectedVehicleId,
         station_id: stationId,
         battery_model: selectedBatteryType.trim(),
-        notes: undefined,
       };
+      // Notes không được sử dụng trong form này, bỏ qua
 
       // Sử dụng state useSubscription mà driver đã chọn
       if (selectedTimeSlot === 'instant') {
-        // Đặt chỗ đổi pin ngay
-        // Nếu KHÔNG dùng subscription → gọi createBooking với scheduled_at = now + 30 phút để trừ tiền ví
-        // BE yêu cầu scheduled_at phải > 30 phút từ bây giờ (strict <, không phải <=)
-        // QUAN TRỌNG: Tính lại thời gian ngay trước khi gọi API để đảm bảo chính xác (tránh độ trễ network)
-        // Thêm buffer để đảm bảo luôn > 30 phút ngay cả khi có độ trễ network
-        const now = new Date();
-        // Buffer 3 phút để đảm bảo luôn > 30 phút (33 phút) để tránh lỗi do timing/network delay
-        const bufferMinutes = 3;
-        const instantScheduledTime = new Date(now.getTime() + (30 + bufferMinutes) * 60 * 1000); // 33 phút từ bây giờ
-        
-        // Validate lại trước khi gửi - đảm bảo > 30 phút (không phải >=)
-        const minutesFromNow = (instantScheduledTime.getTime() - now.getTime()) / (1000 * 60);
-        if (minutesFromNow <= 30) {
-          // Nếu <= 30 phút, tăng lên 31 phút để đảm bảo > 30 phút
-          const safeScheduledTime = new Date(now.getTime() + 31 * 60 * 1000);
-          console.warn('⚠️ [INSTANT BOOKING] Thời gian <= 30 phút, điều chỉnh lên 31 phút');
-          instantScheduledTime.setTime(safeScheduledTime.getTime());
-        }
-        
-        console.log('🕐 [INSTANT BOOKING]', {
-          now: now.toISOString(),
-          scheduled_at: instantScheduledTime.toISOString(),
-          minutesFromNow: (instantScheduledTime.getTime() - now.getTime()) / (1000 * 60),
-          use_subscription: useSubscription
-        });
-        
-        const result = await bookingService.createBooking({
+        // Đặt chỗ đổi pin ngay - sử dụng createInstantBooking API
+        // Backend tự động set scheduled_at = now + 15 phút
+        const result = await bookingService.createInstantBooking({
           ...bookingData,
-          scheduled_at: instantScheduledTime.toISOString(),
           use_subscription: useSubscription, // Driver đã chọn có dùng subscription hay không
         });
         
-        // Hiển thị thông tin hold_summary
-        if (result.hold_summary) {
-          const hold = result.hold_summary;
-          if (hold.use_subscription && hold.subscription_name) {
-            setSuccess(`Đã đặt chỗ đổi pin ngay thành công! Gói "${hold.subscription_name}" sẽ được sử dụng.${hold.subscription_remaining_after !== null ? ` Còn ${hold.subscription_remaining_after} lượt sau giao dịch này.` : ''}`);
-          } else if (hold.wallet_amount_locked && hold.wallet_amount_locked > 0) {
-            setSuccess(`Đã đặt chỗ đổi pin ngay thành công! Đã trừ ${hold.wallet_amount_locked.toLocaleString('vi-VN')}₫ từ ví. Số dư: ${hold.wallet_balance_after ? hold.wallet_balance_after.toLocaleString('vi-VN') + '₫' : 'N/A'}`);
-          } else {
-            setSuccess('Đã đặt chỗ đổi pin ngay thành công! Pin đã được tạm giữ. Vui lòng đến trạm trong vòng 30 phút.');
-          }
+        // Hiển thị thông tin từ response
+        if (result.use_subscription && result.subscription_remaining_after !== undefined) {
+          const subscriptionName = result.subscription_name || 'Gói dịch vụ';
+          const remainingText = result.subscription_unlimited 
+            ? ' (Không giới hạn)' 
+            : result.subscription_remaining_after !== null 
+            ? ` (Còn ${result.subscription_remaining_after} lượt)` 
+            : '';
+          setSuccess(`Đã đặt chỗ đổi pin ngay thành công! Gói "${subscriptionName}" sẽ được sử dụng.${remainingText}`);
+        } else if (result.locked_wallet_amount && result.locked_wallet_amount > 0) {
+          const balanceText = result.wallet_balance_after 
+            ? ` Số dư: ${result.wallet_balance_after.toLocaleString('vi-VN')}₫` 
+            : '';
+          setSuccess(`Đã đặt chỗ đổi pin ngay thành công! Đã trừ ${result.locked_wallet_amount.toLocaleString('vi-VN')}₫ từ ví.${balanceText}`);
         } else {
-          setSuccess('Đã đặt chỗ đổi pin ngay thành công! Pin đã được tạm giữ. Vui lòng đến trạm trong vòng 30 phút.');
+          setSuccess(result.message || 'Đã đặt chỗ đổi pin ngay thành công! Pin đã được tạm giữ. Vui lòng đến trạm trong vòng 15 phút.');
         }
       } else if (selectedTimeSlot && selectedTimeSlot !== 'instant') {
         // Đặt lịch hẹn với time slot
