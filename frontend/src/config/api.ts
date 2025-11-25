@@ -146,6 +146,14 @@ export const API_ENDPOINTS = {
     SCHEDULES: `${API_BASE_URL}/staff/schedules`,
     UPDATE_SCHEDULE_STATUS: (id: string) =>
       `${API_BASE_URL}/staff/schedules/${id}/status`,
+
+    // Notification endpoints (sử dụng chung endpoint với driver)
+    NOTIFICATIONS: {
+      BASE: `${API_BASE_URL}/driver/notifications`,
+      MARK_READ: (id: string) =>
+        `${API_BASE_URL}/driver/notifications/${id}/read`,
+      MARK_ALL_READ: `${API_BASE_URL}/driver/notifications/read-all`,
+    },
   },
   HEALTH: `${API_BASE_URL}/health`,
 };
