@@ -460,12 +460,12 @@ const BookingForm: React.FC = () => {
         throw new Error("Vui lòng chọn xe");
       }
 
-      const bookingData = {
+      const bookingData: any = {
         vehicle_id: selectedVehicleId,
         station_id: stationId,
         battery_model: selectedBatteryType.trim(),
-        notes: undefined,
       };
+      // Notes không được sử dụng trong form này, bỏ qua
 
       // Sử dụng state useSubscription mà driver đã chọn
       if (selectedTimeSlot === "instant") {
