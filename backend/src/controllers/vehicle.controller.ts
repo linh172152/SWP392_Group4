@@ -194,7 +194,7 @@ export const addVehicle = asyncHandler(async (req: Request, res: Response) => {
       } as any,
     });
 
-    await (tx as any).batteryHistory.create({
+    await tx.battery_history.create({
       data: {
         battery_id: createdBattery.battery_id,
         vehicle_id: newVehicle.vehicle_id,

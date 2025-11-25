@@ -92,7 +92,7 @@ export async function releaseBookingHold({
       },
     });
 
-    await (tx as any).batteryHistory.create({
+    await tx.battery_history.create({
       data: {
         battery_id: booking.locked_battery_id,
         booking_id: booking.booking_id,

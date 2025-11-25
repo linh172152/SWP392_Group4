@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import {
   Prisma,
   BatteryStatus,
+  BatteryHistoryAction,
   PaymentStatus,
   PaymentType,
 } from "@prisma/client";
@@ -397,7 +398,7 @@ const createBatteryHistoryEntry = async (
     batteryId: string;
     bookingId: string;
     stationId: string;
-    actorUserId: string;
+    actorUserId: string | null;
     action?: string;
     notes?: string;
   }
@@ -411,14 +412,14 @@ const createBatteryHistoryEntry = async (
     notes,
   } = params;
 
-  await (tx as any).batteryHistory.create({
+  await tx.battery_history.create({
     data: {
       battery_id: batteryId,
       booking_id: bookingId,
       station_id: stationId,
-      actor_user_id: actorUserId,
-      action,
-      notes,
+      actor_user_id: actorUserId ?? null,
+      action: action as BatteryHistoryAction,
+      notes: notes ?? null,
     },
   });
 };
@@ -934,6 +935,7 @@ export const createBooking = asyncHandler(
       }
 
       const bookingData = {
+        booking_id: randomUUID(),
         booking_code: bookingCode,
         user_id: userId,
         vehicle_id,
@@ -1793,6 +1795,7 @@ export const createInstantBooking = asyncHandler(
       }
 
       const bookingData = {
+        booking_id: randomUUID(),
         booking_code: bookingCode,
         user_id: userId,
         vehicle_id,
