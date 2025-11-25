@@ -402,7 +402,7 @@ const VehicleManagement: React.FC = () => {
             Xe của tôi
           </h1>
           <p className="text-slate-600 dark:text-slate-300">
-            Quản lý thông tin xe và lịch sử thay pin
+            Quản lý thông tin xe của bạn
           </p>
         </div>
         <Button
