@@ -3,12 +3,16 @@ import {
   authenticateToken,
   authorizeRole,
 } from "../middlewares/auth.middleware";
+import notificationRoutes from "./notification.routes";
 
 const router = Router();
 
 // All staff routes require authentication and staff role
 router.use(authenticateToken);
 router.use(authorizeRole("STAFF"));
+
+// Notification routes - Staff cũng cần xem notifications của mình
+router.use("/notifications", notificationRoutes);
 
 /**
  * @swagger

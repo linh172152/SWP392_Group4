@@ -685,6 +685,31 @@ export const completeBooking = asyncHandler(
       );
     }
 
+    // ✅ Validate và parse charge values với logging chi tiết
+    if (old_battery_charge === undefined || old_battery_charge === null) {
+      console.error("[COMPLETE BOOKING] old_battery_charge is missing:", {
+        booking_id: id,
+        old_battery_charge,
+        body: req.body,
+      });
+      throw new CustomError(
+        "Mức sạc pin cũ là bắt buộc. Vui lòng nhập mức sạc pin cũ (0-100%).",
+        400
+      );
+    }
+
+    if (new_battery_charge === undefined || new_battery_charge === null) {
+      console.error("[COMPLETE BOOKING] new_battery_charge is missing:", {
+        booking_id: id,
+        new_battery_charge,
+        body: req.body,
+      });
+      throw new CustomError(
+        "Mức sạc pin mới là bắt buộc. Vui lòng nhập mức sạc pin mới (0-100%).",
+        400
+      );
+    }
+
     const oldBatteryChargeValue = parseChargePercentage(
       old_battery_charge,
       "Old battery charge"

@@ -159,13 +159,40 @@ const BookingForm: React.FC = () => {
 
     setLoadingStation(true);
     try {
+      // ✅ Validate stationId format (UUID)
+      const uuidRegex =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(stationId)) {
+        throw new Error(`Station ID không hợp lệ: ${stationId}`);
+      }
+
+      console.log("🔍 [LOAD STATION] Loading station details for:", stationId);
       const details = await driverStationService.getPublicStationDetails(
         stationId
       );
+      console.log(
+        "✅ [LOAD STATION] Station loaded:",
+        details?.name,
+        details?.status
+      );
+
+      // ✅ Check if station is active
+      if (details && details.status !== "active") {
+        console.warn(
+          "⚠️ [LOAD STATION] Station is not active:",
+          details.status
+        );
+        setError(
+          `Trạm "${details.name}" hiện không hoạt động. Vui lòng chọn trạm khác.`
+        );
+        return;
+      }
+
       setStationDetails(details);
     } catch (err: any) {
-      console.error("Error loading station details:", err);
-      setError("Không thể tải thông tin trạm");
+      console.error("❌ [LOAD STATION] Error loading station details:", err);
+      const errorMessage = err.message || "Không thể tải thông tin trạm";
+      setError(errorMessage);
     } finally {
       setLoadingStation(false);
     }
@@ -465,6 +492,15 @@ const BookingForm: React.FC = () => {
         station_id: stationId,
         battery_model: selectedBatteryType.trim(),
       };
+
+      // ✅ Log để debug
+      console.log("📤 [CREATE BOOKING REQUEST]", {
+        station_id: stationId,
+        vehicle_id: selectedVehicleId,
+        battery_model: selectedBatteryType.trim(),
+        stationId_type: typeof stationId,
+        stationId_length: stationId?.length,
+      });
       // Notes không được sử dụng trong form này, bỏ qua
 
       // Sử dụng state useSubscription mà driver đã chọn
@@ -499,6 +535,7 @@ const BookingForm: React.FC = () => {
           minutesFromNow:
             (instantScheduledTime.getTime() - now.getTime()) / (1000 * 60),
           use_subscription: useSubscription,
+          station_id: stationId, // ✅ Log station_id để debug
         });
 
         const result = await bookingService.createBooking({

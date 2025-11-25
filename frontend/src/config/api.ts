@@ -147,12 +147,12 @@ export const API_ENDPOINTS = {
     UPDATE_SCHEDULE_STATUS: (id: string) =>
       `${API_BASE_URL}/staff/schedules/${id}/status`,
 
-    // Notification endpoints (sử dụng chung endpoint với driver)
+    // Notification endpoints - Staff có endpoint riêng
     NOTIFICATIONS: {
-      BASE: `${API_BASE_URL}/driver/notifications`,
+      BASE: `${API_BASE_URL}/staff/notifications`,
       MARK_READ: (id: string) =>
-        `${API_BASE_URL}/driver/notifications/${id}/read`,
-      MARK_ALL_READ: `${API_BASE_URL}/driver/notifications/read-all`,
+        `${API_BASE_URL}/staff/notifications/${id}/read`,
+      MARK_ALL_READ: `${API_BASE_URL}/staff/notifications/read-all`,
     },
   },
   HEALTH: `${API_BASE_URL}/health`,
