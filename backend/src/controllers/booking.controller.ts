@@ -1498,8 +1498,27 @@ export const createInstantBooking = asyncHandler(
       where: { station_id },
     });
 
-    if (!station || station.status !== "active") {
-      throw new CustomError("Station not found or not active", 404);
+    if (!station) {
+      throw new CustomError("Trạm không tồn tại", 404);
+    }
+
+    if (station.status !== "active") {
+      if (station.status === "maintenance") {
+        throw new CustomError(
+          `Trạm "${station.name}" đang bảo trì, không thể đặt chỗ. Vui lòng chọn trạm khác.`,
+          400
+        );
+      } else if (station.status === "closed") {
+        throw new CustomError(
+          `Trạm "${station.name}" đã đóng cửa, không thể đặt chỗ. Vui lòng chọn trạm khác.`,
+          400
+        );
+      } else {
+        throw new CustomError(
+          `Trạm "${station.name}" không hoạt động, không thể đặt chỗ. Vui lòng chọn trạm khác.`,
+          400
+        );
+      }
     }
 
     // Check if battery model is compatible (case-insensitive)

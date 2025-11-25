@@ -1,8 +1,6 @@
 import { Request, Response } from "express";
-import { PrismaClient } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
-
-const prisma = new PrismaClient();
+import { prisma } from "../server";
 
 /**
  * Get Admin Dashboard Stats

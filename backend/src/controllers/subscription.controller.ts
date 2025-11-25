@@ -349,6 +349,7 @@ export const cancelSubscription = asyncHandler(
 
       const refundPayment = await tx.payments.create({
         data: {
+          payment_id: randomUUID(),
           subscription_id: subscription.subscription_id,
           user_id: userId,
           amount: refundAmountDecimal,

@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import type { service_packages, user_subscriptions } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
-import { notificationService } from "../server";
+import { notificationService, prisma } from "../server";
 import {
   consumeBookingHold,
   releaseBookingHold,
@@ -11,8 +11,6 @@ import {
   buildBookingUncheckedUpdate,
 } from "../services/booking-hold.service";
 import { decimalToNumber } from "../utils/decimal.util";
-
-const prisma = new PrismaClient();
 
 type VehicleWithCurrentBattery = Prisma.vehiclesGetPayload<{
   include: {

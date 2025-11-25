@@ -2,8 +2,6 @@ import { Server as SocketIOServer } from "socket.io";
 import { Server as HTTPServer } from "http";
 import { PrismaClient } from "@prisma/client";
 
-const prisma = new PrismaClient();
-
 export interface NotificationData {
   type:
     | "booking_confirmed"
@@ -23,8 +21,10 @@ export interface NotificationData {
 export class NotificationService {
   private io: SocketIOServer;
   private connectedUsers: Map<string, string> = new Map(); // userId -> socketId
+  private prisma: PrismaClient;
 
-  constructor(httpServer: HTTPServer) {
+  constructor(httpServer: HTTPServer, prismaClient: PrismaClient) {
+    this.prisma = prismaClient;
     this.io = new SocketIOServer(httpServer, {
       cors: {
         origin: process.env.FRONTEND_URL || "http://localhost:5173",
@@ -75,7 +75,7 @@ export class NotificationService {
   async sendNotification(notification: NotificationData): Promise<void> {
     try {
       // 1. Create Notification record in database
-      const notificationRecord = await prisma.notifications.create({
+      const notificationRecord = await this.prisma.notifications.create({
         data: {
           user_id: notification.userId,
           type: notification.type,
@@ -119,4 +119,3 @@ export class NotificationService {
     return this.connectedUsers.has(userId);
   }
 }
-

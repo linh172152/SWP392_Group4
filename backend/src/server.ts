@@ -120,7 +120,7 @@ const server = createServer(app);
 const PORT = process.env.PORT || 3000;
 
 // Initialize Notification Service
-export const notificationService = new NotificationService(server);
+export const notificationService = new NotificationService(server, prisma);
 
 // Security middleware
 app.use(helmet());

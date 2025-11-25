@@ -54,13 +54,13 @@ model battery_history {
 }
 
 model battery_pricings {
-  pricing_id    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  battery_model String   @db.VarChar(50)
-  station_id    String?  @db.Uuid
-  price         Decimal  @db.Decimal(10, 2)
-  is_active     Boolean  @default(true)
-  created_at    DateTime @default(now())
-  updated_at    DateTime @default(now())
+  pricing_id    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  battery_model String    @db.VarChar(50)
+  station_id    String?   @db.Uuid
+  price         Decimal   @db.Decimal(10, 2)
+  is_active     Boolean   @default(true)
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @default(now())
   stations      stations? @relation(fields: [station_id], references: [station_id], onDelete: Cascade)
 
   @@unique([battery_model, station_id])

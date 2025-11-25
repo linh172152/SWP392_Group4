@@ -1,12 +1,10 @@
 import { Request, Response } from "express";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { randomUUID } from "crypto";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
-import { notificationService } from "../server";
+import { notificationService, prisma } from "../server";
 import { safeToNumber } from "../utils/decimal.util";
-
-const prisma = new PrismaClient();
 
 /**
  * Get user transactions

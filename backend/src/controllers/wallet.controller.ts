@@ -1,10 +1,8 @@
 import { Request, Response } from "express";
-import { PrismaClient } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
 import { createVNPayPayment } from "../services/vnpay.service";
-
-const prisma = new PrismaClient();
+import { prisma } from "../server";
 
 /**
  * Get wallet balance

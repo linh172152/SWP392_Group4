@@ -1,4 +1,4 @@
-import { Prisma, PrismaClient, users } from "@prisma/client";
+import { Prisma, users } from "@prisma/client";
 import {
   hashPassword,
   comparePassword,
@@ -10,8 +10,7 @@ import {
   verifyRefreshToken,
 } from "../utils/jwt.util";
 import { CustomError } from "../middlewares/error.middleware";
-
-const prisma = new PrismaClient();
+import { prisma } from "../server";
 
 type VehicleWithBattery = Prisma.vehiclesGetPayload<{
   include: {
