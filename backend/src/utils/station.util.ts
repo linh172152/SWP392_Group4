@@ -6,7 +6,11 @@ import { prisma } from "../server";
  */
 export async function calculateBatteryInventory(stationId: string) {
   const allBatteries = await prisma.batteries.findMany({
-    where: { station_id: stationId },
+    where: {
+      station_id: stationId,
+      // ✅ Exclude pin "in_use" vì pin đó đã được driver đem đi, không còn ở trạm
+      status: { not: "in_use" },
+    },
     select: {
       model: true,
       status: true,
@@ -20,7 +24,13 @@ export async function calculateBatteryInventory(stationId: string) {
 
   // Group by model
   const batteriesByModel = allBatteries.reduce(
-    (acc: Record<string, { available: number; charging: number; total: number }>, battery: { model: string; status: string }) => {
+    (
+      acc: Record<
+        string,
+        { available: number; charging: number; total: number }
+      >,
+      battery: { model: string; status: string }
+    ) => {
       if (!acc[battery.model]) {
         acc[battery.model] = { available: 0, charging: 0, total: 0 };
       }
@@ -51,7 +61,11 @@ export async function calculateCapacityWarning(
   capacity: number | null
 ) {
   const totalBatteries = await prisma.batteries.count({
-    where: { station_id: stationId },
+    where: {
+      station_id: stationId,
+      // ✅ Exclude pin "in_use" vì pin đó đã được driver đem đi, không còn ở trạm
+      status: { not: "in_use" },
+    },
   });
 
   const capacityPercentage = capacity
@@ -84,14 +98,22 @@ export async function calculateStationStats(
   // Fetch all data in parallel
   const [allBatteries, totalBatteries] = await Promise.all([
     prisma.batteries.findMany({
-      where: { station_id: stationId },
+      where: {
+        station_id: stationId,
+        // ✅ Exclude pin "in_use" vì pin đó đã được driver đem đi, không còn ở trạm
+        status: { not: "in_use" },
+      },
       select: {
         model: true,
         status: true,
       },
     }),
     prisma.batteries.count({
-      where: { station_id: stationId },
+      where: {
+        station_id: stationId,
+        // ✅ Exclude pin "in_use" khi tính tổng số pin trong kho
+        status: { not: "in_use" },
+      },
     }),
   ]);
 
@@ -102,7 +124,13 @@ export async function calculateStationStats(
   > = {};
 
   const batteriesByModel = allBatteries.reduce(
-    (acc: Record<string, { available: number; charging: number; total: number }>, battery: { model: string; status: string }) => {
+    (
+      acc: Record<
+        string,
+        { available: number; charging: number; total: number }
+      >,
+      battery: { model: string; status: string }
+    ) => {
       if (!acc[battery.model]) {
         acc[battery.model] = { available: 0, charging: 0, total: 0 };
       }
