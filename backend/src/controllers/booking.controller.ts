@@ -306,7 +306,7 @@ const reserveBatteryForBooking = async (
 
   const normalizedModel = batteryModel.trim();
 
-  // ✅ Chỉ pick pin có charge >= 90% và KHÔNG bị reserved (tiêu chuẩn để đổi pin)
+  // ✅ Chỉ pick pin có charge >= 90% và status hợp lệ (không phải maintenance, damaged, reserved, in_use)
   const pickBattery = async (status: BatteryStatus) =>
     tx.batteries.findFirst({
       where: {
@@ -321,9 +321,11 @@ const reserveBatteryForBooking = async (
         current_charge: {
           gte: 90, // ✅ Pin phải >= 90% mới đủ để đổi
         },
-        // ✅ Exclude pin đã bị reserved để tránh race condition
+        // ✅ Explicit exclude: không lấy pin maintenance, damaged, reserved, in_use
         NOT: {
-          status: "reserved",
+          status: {
+            in: ["maintenance", "damaged", "reserved", "in_use"],
+          },
         },
       },
       orderBy: {
@@ -677,7 +679,7 @@ export const createBooking = asyncHandler(
     const hoursUntilScheduled =
       (scheduledTime.getTime() - now.getTime()) / (1000 * 60 * 60);
 
-    // ✅ Count full batteries (phải có charge >= 90% và không bị reserved)
+    // ✅ Count full batteries (phải có charge >= 90%, không phải maintenance, damaged, reserved, in_use)
     const fullBatteries = await prisma.batteries.count({
       where: {
         station_id,
@@ -689,14 +691,16 @@ export const createBooking = asyncHandler(
         current_charge: {
           gte: 90, // ✅ Pin phải >= 90% mới đủ để đổi
         },
-        // ✅ Exclude pin đã bị reserved
+        // ✅ Explicit exclude: không đếm pin maintenance, damaged, reserved, in_use
         NOT: {
-          status: "reserved",
+          status: {
+            in: ["maintenance", "damaged", "reserved", "in_use"],
+          },
         },
       },
     });
 
-    // ✅ Count charging batteries (chỉ nếu >= 1 giờ trước scheduled time, charge >= 90%, không reserved)
+    // ✅ Count charging batteries (chỉ nếu >= 1 giờ trước scheduled time, charge >= 90%, không phải maintenance, damaged, reserved, in_use)
     const chargingBatteries =
       allowChargingFallback && hoursUntilScheduled >= 1
         ? await prisma.batteries.count({
@@ -710,9 +714,11 @@ export const createBooking = asyncHandler(
               current_charge: {
                 gte: 90, // ✅ Pin đang sạc nhưng phải >= 90% mới đủ để đổi
               },
-              // ✅ Exclude pin đã bị reserved
+              // ✅ Explicit exclude: không đếm pin maintenance, damaged, reserved, in_use
               NOT: {
-                status: "reserved",
+                status: {
+                  in: ["maintenance", "damaged", "reserved", "in_use"],
+                },
               },
             },
           })
@@ -1302,7 +1308,7 @@ export const updateBooking = asyncHandler(
         (newScheduledTime.getTime() - now.getTime()) / (1000 * 60 * 60);
       const allowChargingFallback = hoursUntilScheduled >= 1;
 
-      // Count full batteries
+      // Count full batteries (không phải maintenance, damaged, reserved, in_use)
       const fullBatteries = await prisma.batteries.count({
         where: {
           station_id: booking.station_id,
@@ -1314,13 +1320,16 @@ export const updateBooking = asyncHandler(
           current_charge: {
             gte: 90,
           },
+          // ✅ Explicit exclude: không đếm pin maintenance, damaged, reserved, in_use
           NOT: {
-            status: "reserved",
+            status: {
+              in: ["maintenance", "damaged", "reserved", "in_use"],
+            },
           },
         },
       });
 
-      // Count charging batteries (nếu >= 1 giờ)
+      // Count charging batteries (nếu >= 1 giờ, không phải maintenance, damaged, reserved, in_use)
       const chargingBatteries =
         allowChargingFallback && hoursUntilScheduled >= 1
           ? await prisma.batteries.count({
@@ -1334,8 +1343,11 @@ export const updateBooking = asyncHandler(
                 current_charge: {
                   gte: 90,
                 },
+                // ✅ Explicit exclude: không đếm pin maintenance, damaged, reserved, in_use
                 NOT: {
-                  status: "reserved",
+                  status: {
+                    in: ["maintenance", "damaged", "reserved", "in_use"],
+                  },
                 },
               },
             })
@@ -1498,7 +1510,7 @@ export const createInstantBooking = asyncHandler(
     // Normalize battery_model for comparison (case-insensitive, trim)
     const normalizedBatteryModel = battery_model.toLowerCase().trim();
 
-    // ✅ Check availability: Pin phải có charge >= 90%, status = "full", không bị reserved
+    // ✅ Check availability: Pin phải có charge >= 90%, status = "full", không phải maintenance, damaged, reserved, in_use
     const fullBatteries = await prisma.batteries.count({
       where: {
         station_id,
@@ -1510,9 +1522,11 @@ export const createInstantBooking = asyncHandler(
         current_charge: {
           gte: 90, // ✅ Pin phải >= 90% mới đủ để đổi
         },
-        // ✅ Exclude pin đã bị reserved
+        // ✅ Explicit exclude: không đếm pin maintenance, damaged, reserved, in_use
         NOT: {
-          status: "reserved",
+          status: {
+            in: ["maintenance", "damaged", "reserved", "in_use"],
+          },
         },
       },
     });
@@ -1526,8 +1540,11 @@ export const createInstantBooking = asyncHandler(
           current_charge: {
             gte: 90,
           },
+          // ✅ Explicit exclude: không đếm pin maintenance, damaged, reserved, in_use
           NOT: {
-            status: "reserved",
+            status: {
+              in: ["maintenance", "damaged", "reserved", "in_use"],
+            },
           },
         },
         select: {

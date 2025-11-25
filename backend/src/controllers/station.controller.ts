@@ -235,6 +235,7 @@ export const getStationBatteries = asyncHandler(
       orderBy: { created_at: "desc" },
     });
 
+    // ✅ Map stations (số nhiều từ Prisma) thành station (số ít) để match với frontend interface
     const mappedBatteries = batteries.map((battery: any) => ({
       ...battery,
       capacity_kwh: battery.capacity_kwh ? Number(battery.capacity_kwh) : null,
@@ -242,7 +243,7 @@ export const getStationBatteries = asyncHandler(
       health_percentage: battery.health_percentage
         ? Number(battery.health_percentage)
         : null,
-      stations: battery.stations
+      station: battery.stations // ✅ Map stations -> station để frontend có thể dùng battery.station.name
         ? {
             ...battery.stations,
             latitude: battery.stations.latitude

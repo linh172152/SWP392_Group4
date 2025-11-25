@@ -70,9 +70,11 @@ export const getStationBatteries = asyncHandler(
       orderBy: { created_at: "desc" },
     });
 
+    // ✅ Map stations (số nhiều từ Prisma) thành station (số ít) để match với frontend interface
     const batteriesWithLabels = batteries.map(
       (battery: (typeof batteries)[number]) => ({
         ...battery,
+        station: battery.stations, // ✅ Map stations -> station để frontend có thể dùng battery.station.name
         status_label: batteryStatusLabels[battery.status] ?? battery.status,
       })
     );
@@ -190,6 +192,7 @@ export const addBattery = asyncHandler(async (req: Request, res: Response) => {
     message: warningMessage || "Battery added successfully",
     data: {
       ...battery,
+      station: battery.stations, // ✅ Map stations -> station để frontend có thể dùng battery.station.name
       status_label: batteryStatusLabels[battery.status] ?? battery.status,
       capacity_info: {
         current_count: currentBatteryCount + 1,
@@ -265,13 +268,19 @@ export const getBatteryDetails = asyncHandler(
       ...battery,
       capacity_kwh: battery.capacity_kwh ? Number(battery.capacity_kwh) : null,
       voltage: battery.voltage ? Number(battery.voltage) : null,
-      health_percentage: battery.health_percentage ? Number(battery.health_percentage) : null,
+      health_percentage: battery.health_percentage
+        ? Number(battery.health_percentage)
+        : null,
       status_label: batteryStatusLabels[battery.status] ?? battery.status,
-      stations: battery.stations
+      station: battery.stations // ✅ Map stations -> station để frontend có thể dùng battery.station.name
         ? {
             ...battery.stations,
-            latitude: battery.stations.latitude ? Number(battery.stations.latitude) : null,
-            longitude: battery.stations.longitude ? Number(battery.stations.longitude) : null,
+            latitude: battery.stations.latitude
+              ? Number(battery.stations.latitude)
+              : null,
+            longitude: battery.stations.longitude
+              ? Number(battery.stations.longitude)
+              : null,
           }
         : null,
     };
@@ -379,6 +388,7 @@ export const updateBatteryStatus = asyncHandler(
 
     const updatedBatteryWithLabel = {
       ...updatedBattery,
+      station: updatedBattery.stations, // ✅ Map stations -> station để frontend có thể dùng battery.station.name
       status_label:
         batteryStatusLabels[updatedBattery.status] ?? updatedBattery.status,
     };
