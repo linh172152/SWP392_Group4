@@ -35,6 +35,16 @@ export const getStationBatteries = asyncHandler(
       if (user?.station_id && user.role === "STAFF") {
         // ✅ Staff: Force chỉ xem pin của station mình, bỏ qua station_id trong query
         whereClause.station_id = user.station_id;
+        // ✅ Staff: Tự động filter bỏ pin "in_use" (đang gắn trên xe, không còn ở trạm)
+        // Chỉ filter nếu không có status filter cụ thể từ query, hoặc nếu status filter không phải "in_use"
+        if (!status || status !== "in_use") {
+          whereClause.status = status
+            ? status // Nếu có status filter, dùng nó (nhưng đã loại trừ "in_use" ở trên)
+            : { not: "in_use" }; // Nếu không có status filter, loại bỏ "in_use"
+        } else {
+          // Nếu staff query status=in_use, vẫn cho phép (có thể họ muốn xem)
+          whereClause.status = status;
+        }
       } else if (station_id) {
         // Admin hoặc user khác: Có thể filter theo station_id trong query
         whereClause.station_id = station_id;
@@ -45,7 +55,8 @@ export const getStationBatteries = asyncHandler(
       whereClause.station_id = station_id;
     }
 
-    if (status) {
+    // ✅ Chỉ set status nếu chưa được set ở trên (cho staff)
+    if (status && !whereClause.status) {
       whereClause.status = status;
     }
     if (model) {
@@ -261,13 +272,19 @@ export const getBatteryDetails = asyncHandler(
       ...battery,
       capacity_kwh: battery.capacity_kwh ? Number(battery.capacity_kwh) : null,
       voltage: battery.voltage ? Number(battery.voltage) : null,
-      health_percentage: battery.health_percentage ? Number(battery.health_percentage) : null,
+      health_percentage: battery.health_percentage
+        ? Number(battery.health_percentage)
+        : null,
       status_label: batteryStatusLabels[battery.status] ?? battery.status,
       stations: battery.stations
         ? {
             ...battery.stations,
-            latitude: battery.stations.latitude ? Number(battery.stations.latitude) : null,
-            longitude: battery.stations.longitude ? Number(battery.stations.longitude) : null,
+            latitude: battery.stations.latitude
+              ? Number(battery.stations.latitude)
+              : null,
+            longitude: battery.stations.longitude
+              ? Number(battery.stations.longitude)
+              : null,
           }
         : null,
     };

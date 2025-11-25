@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { Prisma } from "@prisma/client";
+import { randomUUID } from "crypto";
 import { asyncHandler, CustomError } from "../middlewares/error.middleware";
 import { prisma } from "../server";
 
@@ -171,6 +172,7 @@ export const createBatteryTransfer = asyncHandler(
 
       const transferLog = await tx.battery_transfer_logs.create({
         data: {
+          transfer_id: randomUUID(),
           battery_id: battery_id as string,
           from_station_id: battery.station_id,
           to_station_id: to_station_id as string,

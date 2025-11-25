@@ -514,8 +514,14 @@ const SwapTransactions: React.FC = () => {
     }
 
     // Validate và convert battery charge to number
-    const oldCharge = Number(oldBatteryCharge);
-    const newCharge = Number(newBatteryCharge);
+    const oldCharge =
+      oldBatteryCharge !== undefined && oldBatteryCharge !== null
+        ? Number(oldBatteryCharge)
+        : 0;
+    const newCharge =
+      newBatteryCharge !== undefined && newBatteryCharge !== null
+        ? Number(newBatteryCharge)
+        : 100;
 
     if (isNaN(oldCharge) || oldCharge < 0 || oldCharge > 100) {
       toast({
@@ -544,8 +550,8 @@ const SwapTransactions: React.FC = () => {
         new_battery_code: newBatteryCode.trim(),
         battery_model: batteryModel.trim(),
         old_battery_status: oldBatteryStatus,
-        old_battery_charge: oldCharge, // Đảm bảo là number
-        new_battery_charge: newCharge, // Đảm bảo là number
+        old_battery_charge: oldCharge, // Đảm bảo là number, không bao giờ undefined/null
+        new_battery_charge: newCharge, // Đảm bảo là number, không bao giờ undefined/null
         notes: completeNotes.trim() || undefined,
       });
 

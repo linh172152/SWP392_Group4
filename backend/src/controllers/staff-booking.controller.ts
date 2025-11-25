@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { Prisma } from "@prisma/client";
+import { Prisma, BatteryHistoryAction } from "@prisma/client";
 import type { service_packages, user_subscriptions } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
@@ -11,6 +11,7 @@ import {
   buildBookingUncheckedUpdate,
 } from "../services/booking-hold.service";
 import { decimalToNumber } from "../utils/decimal.util";
+import { randomUUID } from "crypto";
 
 type VehicleWithCurrentBattery = Prisma.vehiclesGetPayload<{
   include: {
@@ -1051,7 +1052,7 @@ export const completeBooking = asyncHandler(
       );
     }
 
-    const oldBatteryHistoryAction =
+    const oldBatteryHistoryAction: BatteryHistoryAction =
       old_battery_status === "damaged"
         ? "damaged"
         : old_battery_status === "maintenance"
@@ -1061,6 +1062,7 @@ export const completeBooking = asyncHandler(
     const result = await prisma.$transaction(async (tx) => {
       const transaction = await tx.transactions.create({
         data: {
+          transaction_id: randomUUID(),
           transaction_code: transactionCode,
           booking_id: id,
           user_id: booking.user_id,
@@ -1105,6 +1107,7 @@ export const completeBooking = asyncHandler(
       if (old_battery_status === "maintenance") {
         await tx.battery_transfer_logs.create({
           data: {
+            transfer_id: randomUUID(),
             battery_id: oldBattery.battery_id,
             from_station_id: booking.station_id,
             to_station_id: booking.station_id,
@@ -1141,6 +1144,7 @@ export const completeBooking = asyncHandler(
         data: {
           battery_id: oldBattery.battery_id,
           booking_id: booking.booking_id,
+          vehicle_id: booking.vehicle_id,
           station_id: booking.station_id,
           actor_user_id: staffId,
           action: oldBatteryHistoryAction,
@@ -1155,6 +1159,7 @@ export const completeBooking = asyncHandler(
         data: {
           battery_id: reservedBattery.battery_id,
           booking_id: booking.booking_id,
+          vehicle_id: booking.vehicle_id,
           station_id: booking.station_id,
           actor_user_id: staffId,
           action: "issued",
