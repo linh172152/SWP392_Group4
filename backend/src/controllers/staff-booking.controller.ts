@@ -238,6 +238,31 @@ export const getStationBookings = asyncHandler(
 
     const total = await prisma.bookings.count({ where: whereClause });
 
+    // Get all locked_battery_ids from bookings
+    const lockedBatteryIds = bookings
+      .map((b: any) => b.locked_battery_id)
+      .filter((id: string | null) => id !== null);
+
+    // Fetch locked batteries in one query
+    const lockedBatteriesMap = new Map();
+    if (lockedBatteryIds.length > 0) {
+      const lockedBatteries = await prisma.batteries.findMany({
+        where: {
+          battery_id: { in: lockedBatteryIds },
+        },
+        select: {
+          battery_id: true,
+          battery_code: true,
+          model: true,
+          status: true,
+          current_charge: true,
+        },
+      });
+      lockedBatteries.forEach((battery) => {
+        lockedBatteriesMap.set(battery.battery_id, battery);
+      });
+    }
+
     const mappedBookings = bookings.map((booking: any) => {
       const {
         users_bookings_user_idTousers,
@@ -291,12 +316,17 @@ export const getStationBookings = asyncHandler(
             longitude: stations.longitude ? Number(stations.longitude) : null,
           }
         : null;
+      // Get locked_battery if exists
+      const lockedBattery = booking.locked_battery_id
+        ? lockedBatteriesMap.get(booking.locked_battery_id) || null
+        : null;
       return {
         ...rest,
         user,
         vehicle,
         transaction,
         station,
+        locked_battery: lockedBattery,
       };
     });
 
@@ -411,6 +441,22 @@ export const getBookingDetails = asyncHandler(
       throw new CustomError("Booking not found", 404);
     }
 
+    // Get locked_battery if exists
+    let lockedBattery = null;
+    if (booking.locked_battery_id) {
+      const battery = await prisma.batteries.findUnique({
+        where: { battery_id: booking.locked_battery_id },
+        select: {
+          battery_id: true,
+          battery_code: true,
+          model: true,
+          status: true,
+          current_charge: true,
+        },
+      });
+      lockedBattery = battery;
+    }
+
     const {
       users_bookings_user_idTousers,
       vehicles,
@@ -471,6 +517,7 @@ export const getBookingDetails = asyncHandler(
       vehicle,
       transaction: mappedTransaction,
       station,
+      locked_battery: lockedBattery,
     };
 
     res.status(200).json({

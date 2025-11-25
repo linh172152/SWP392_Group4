@@ -17,7 +17,6 @@ import {
   History
 } from 'lucide-react';
 import { useState } from 'react';
-import NotificationBell from './NotificationBell';
 
 interface StaffLayoutProps {
   user: User;
@@ -138,9 +137,6 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ user, onLogout, children }) =
                 <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{user.email}</p>
               </div>
             </div>
-            <div className="flex items-center justify-center mb-3">
-              <NotificationBell />
-            </div>
             <Button
               variant="outline"
               size="sm"
@@ -170,7 +166,6 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ user, onLogout, children }) =
             </div>
             <div className="flex items-center space-x-2">
               <ThemeToggle />
-              <NotificationBell />
               <Avatar className="ring-2 ring-green-500/20 dark:ring-emerald-500/20">
                 <AvatarImage src={user.avatar} />
                 <AvatarFallback className="bg-gradient-to-r from-green-500 to-emerald-500 text-white">{user.name.charAt(0)}</AvatarFallback>
