@@ -422,6 +422,115 @@ export async function updateScheduleStatus(
   return res; // { success, message, data: schedule }
 }
 
+/**
+ * Lấy lịch sử giao dịch từ các bookings đã hoàn thành
+ */
+export interface TransactionHistoryItem {
+  transaction_id: string;
+  transaction_code: string;
+  booking_id: string;
+  booking_code: string;
+  user_id: string;
+  user_name: string;
+  user_phone?: string;
+  vehicle_license_plate: string;
+  amount: number;
+  payment_status: string;
+  payment_method?: string;
+  swap_at?: string;
+  created_at: string;
+  station_name?: string;
+}
+
+export interface TransactionHistoryResponse {
+  success: boolean;
+  message: string;
+  data: {
+    transactions: TransactionHistoryItem[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      pages: number;
+    };
+  };
+}
+
+export async function getTransactionHistory(params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+}): Promise<TransactionHistoryResponse> {
+  // Lấy các bookings đã completed có transaction
+  // Luôn filter status=completed để chỉ lấy các giao dịch đã hoàn thành
+  const res = await getStationBookings({
+    status: 'completed',
+    page: params?.page || 1,
+    limit: params?.limit || 10,
+  });
+  
+  // Transform bookings thành transaction history
+  if (res.success && res.data?.bookings) {
+    const completedBookings = res.data.bookings.filter(
+      (booking: StaffBooking) => booking.transaction
+    );
+    
+    const transactions: TransactionHistoryItem[] = completedBookings.map(
+      (booking: StaffBooking) => ({
+        transaction_id: booking.transaction!.transaction_id,
+        transaction_code: booking.transaction!.transaction_code,
+        booking_id: booking.booking_id,
+        booking_code: booking.booking_code,
+        user_id: booking.user_id,
+        user_name: booking.user?.full_name || 'N/A',
+        user_phone: booking.user?.phone,
+        vehicle_license_plate: booking.vehicle?.license_plate || 'N/A',
+        amount: Number(booking.transaction!.amount),
+        payment_status: booking.transaction!.payment_status,
+        swap_at: booking.transaction!.swap_at,
+        created_at: booking.transaction!.swap_at || booking.created_at,
+        station_name: booking.station?.name,
+      })
+    );
+    
+    // Filter by payment_status if provided
+    let filteredTransactions = transactions;
+    if (params?.status && params.status !== 'all') {
+      filteredTransactions = transactions.filter(
+        (t) => t.payment_status === params.status
+      );
+    }
+    
+    return {
+      success: true,
+      message: 'Lịch sử giao dịch',
+      data: {
+        transactions: filteredTransactions,
+        pagination: {
+          page: params?.page || 1,
+          limit: params?.limit || 10,
+          total: filteredTransactions.length,
+          pages: Math.ceil(filteredTransactions.length / (params?.limit || 10)),
+        },
+      },
+    };
+  }
+  
+  return {
+    success: false,
+    message: 'Không thể tải lịch sử giao dịch',
+    data: {
+      transactions: [],
+      pagination: {
+        page: params?.page || 1,
+        limit: params?.limit || 10,
+        total: 0,
+        pages: 0,
+      },
+    },
+  };
+}
+
 export default {
   // Admin operations
   getAllStaff,
@@ -444,4 +553,7 @@ export default {
   // Staff schedule operations
   getMyStaffSchedules,
   updateScheduleStatus,
+
+  // Staff transaction history
+  getTransactionHistory,
 };
