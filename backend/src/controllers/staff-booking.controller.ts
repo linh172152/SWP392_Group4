@@ -1043,6 +1043,7 @@ export const completeBooking = asyncHandler(
 
       const nowTimestamp = new Date();
 
+      // ✅ Update pin cũ: set status, station_id (luôn về trạm hiện tại), và charge
       await tx.batteries.update({
         where: { battery_id: oldBattery.battery_id },
         data: {
@@ -1053,6 +1054,7 @@ export const completeBooking = asyncHandler(
             oldBatteryStatusUpdate === "charging"
               ? null
               : oldBattery.last_charged_at,
+          updated_at: new Date(), // ✅ Đảm bảo updated_at được cập nhật
         },
       });
 
