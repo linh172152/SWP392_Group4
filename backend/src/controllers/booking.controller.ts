@@ -321,12 +321,6 @@ const reserveBatteryForBooking = async (
         current_charge: {
           gte: 90, // ✅ Pin phải >= 90% mới đủ để đổi
         },
-        // ✅ Explicit exclude: không lấy pin maintenance, damaged, reserved, in_use
-        NOT: {
-          status: {
-            in: ["maintenance", "damaged", "reserved", "in_use"],
-          },
-        },
       },
       orderBy: {
         updated_at: "asc",
@@ -690,12 +684,6 @@ export const createBooking = asyncHandler(
         status: "full",
         current_charge: {
           gte: 90, // ✅ Pin phải >= 90% mới đủ để đổi
-        },
-        // ✅ Explicit exclude: không đếm pin maintenance, damaged, reserved, in_use
-        NOT: {
-          status: {
-            in: ["maintenance", "damaged", "reserved", "in_use"],
-          },
         },
       },
     });
@@ -1522,12 +1510,6 @@ export const createInstantBooking = asyncHandler(
         current_charge: {
           gte: 90, // ✅ Pin phải >= 90% mới đủ để đổi
         },
-        // ✅ Explicit exclude: không đếm pin maintenance, damaged, reserved, in_use
-        NOT: {
-          status: {
-            in: ["maintenance", "damaged", "reserved", "in_use"],
-          },
-        },
       },
     });
 
@@ -1539,12 +1521,6 @@ export const createInstantBooking = asyncHandler(
           status: "full",
           current_charge: {
             gte: 90,
-          },
-          // ✅ Explicit exclude: không đếm pin maintenance, damaged, reserved, in_use
-          NOT: {
-            status: {
-              in: ["maintenance", "damaged", "reserved", "in_use"],
-            },
           },
         },
         select: {

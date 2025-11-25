@@ -1048,7 +1048,7 @@ export const completeBooking = asyncHandler(
         where: { battery_id: oldBattery.battery_id },
         data: {
           status: oldBatteryStatusUpdate,
-          station_id: booking.station_id,
+          station_id: booking.station_id, // ✅ Luôn set về trạm hiện tại khi trả pin về
           current_charge: oldBatteryChargeValue,
           last_charged_at:
             oldBatteryStatusUpdate === "charging"
