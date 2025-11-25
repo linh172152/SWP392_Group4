@@ -5,7 +5,7 @@ import { prisma } from "../server";
  * Optimized reusable function
  */
 export async function calculateBatteryInventory(stationId: string) {
-  const allBatteries = await prisma.battery.findMany({
+  const allBatteries = await prisma.batteries.findMany({
     where: { station_id: stationId },
     select: {
       model: true,
@@ -20,7 +20,7 @@ export async function calculateBatteryInventory(stationId: string) {
 
   // Group by model
   const batteriesByModel = allBatteries.reduce(
-    (acc, battery) => {
+    (acc: Record<string, { available: number; charging: number; total: number }>, battery: { model: string; status: string }) => {
       if (!acc[battery.model]) {
         acc[battery.model] = { available: 0, charging: 0, total: 0 };
       }
@@ -50,7 +50,7 @@ export async function calculateCapacityWarning(
   stationId: string,
   capacity: number | null
 ) {
-  const totalBatteries = await prisma.battery.count({
+  const totalBatteries = await prisma.batteries.count({
     where: { station_id: stationId },
   });
 
@@ -83,14 +83,14 @@ export async function calculateStationStats(
 ) {
   // Fetch all data in parallel
   const [allBatteries, totalBatteries] = await Promise.all([
-    prisma.battery.findMany({
+    prisma.batteries.findMany({
       where: { station_id: stationId },
       select: {
         model: true,
         status: true,
       },
     }),
-    prisma.battery.count({
+    prisma.batteries.count({
       where: { station_id: stationId },
     }),
   ]);
@@ -102,7 +102,7 @@ export async function calculateStationStats(
   > = {};
 
   const batteriesByModel = allBatteries.reduce(
-    (acc, battery) => {
+    (acc: Record<string, { available: number; charging: number; total: number }>, battery: { model: string; status: string }) => {
       if (!acc[battery.model]) {
         acc[battery.model] = { available: 0, charging: 0, total: 0 };
       }

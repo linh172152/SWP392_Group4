@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
 import {
@@ -31,7 +31,7 @@ export const getAllStations = asyncHandler(
 
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
 
-    const stations = await prisma.station.findMany({
+    const stations = await prisma.stations.findMany({
       where: whereClause,
       include: {
         batteries: {
@@ -40,7 +40,8 @@ export const getAllStations = asyncHandler(
             status: true,
           },
         },
-        staff: {
+        users: {
+          where: { role: "STAFF" },
           select: {
             user_id: true,
             full_name: true,
@@ -67,9 +68,9 @@ export const getAllStations = asyncHandler(
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     const stationsWithStats = await Promise.all(
-      stations.map(async (station) => {
-        const batteryStatusCount = station.batteries.reduce(
-          (acc, battery) => {
+      stations.map(async (station: typeof stations[number]) => {
+        const batteryStatusCount = (station.batteries || []).reduce(
+          (acc: Record<string, number>, battery: { status: string }) => {
             acc[battery.status] = (acc[battery.status] || 0) + 1;
             return acc;
           },
@@ -78,7 +79,7 @@ export const getAllStations = asyncHandler(
 
         // Calculate daily swaps (completed transactions today)
         // Use swap_completed_at if available, otherwise use swap_at
-        const dailySwaps = await prisma.transaction.count({
+        const dailySwaps = await prisma.transactions.count({
           where: {
             station_id: station.station_id,
             payment_status: "completed",
@@ -105,7 +106,7 @@ export const getAllStations = asyncHandler(
         });
 
         // Calculate daily revenue (sum of completed transactions today)
-        const dailyRevenueResult = await prisma.transaction.aggregate({
+        const dailyRevenueResult = await prisma.transactions.aggregate({
           where: {
             station_id: station.station_id,
             payment_status: "completed",
@@ -142,14 +143,14 @@ export const getAllStations = asyncHandler(
           total_batteries: station.batteries.length,
           total_bookings: station._count.bookings,
           total_transactions: station._count.transactions,
-          staff_count: station.staff.length,
+          staff_count: station.users.length,
           daily_swaps: dailySwaps,
           daily_revenue: Number(dailyRevenue),
         };
       })
     );
 
-    const total = await prisma.station.count({ where: whereClause });
+    const total = await prisma.stations.count({ where: whereClause });
 
     res.status(200).json({
       success: true,
@@ -172,7 +173,7 @@ export const getStationDetails = asyncHandler(
   async (req: Request, res: Response) => {
     const { id } = req.params;
 
-    const station = await prisma.station.findUnique({
+    const station = await prisma.stations.findUnique({
       where: { station_id: id },
       include: {
         batteries: {
@@ -186,7 +187,8 @@ export const getStationDetails = asyncHandler(
             created_at: true,
           },
         },
-        staff: {
+        users: {
+          where: { role: "STAFF" },
           select: {
             user_id: true,
             full_name: true,
@@ -201,7 +203,7 @@ export const getStationDetails = asyncHandler(
             rating: true,
             comment: true,
             created_at: true,
-            user: {
+            users: {
               select: {
                 full_name: true,
               },
@@ -222,7 +224,7 @@ export const getStationDetails = asyncHandler(
     }
 
     const batteryStatusCount = station.batteries.reduce(
-      (acc, battery) => {
+      (acc: Record<string, number>, battery: { status: string }) => {
         acc[battery.status] = (acc[battery.status] || 0) + 1;
         return acc;
       },
@@ -231,7 +233,7 @@ export const getStationDetails = asyncHandler(
 
     const avgRating =
       station.station_ratings.length > 0
-        ? station.station_ratings.reduce((sum, r) => sum + r.rating, 0) /
+        ? station.station_ratings.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) /
           station.station_ratings.length
         : 0;
 
@@ -242,7 +244,7 @@ export const getStationDetails = asyncHandler(
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     // Use swap_completed_at if available, otherwise use swap_at
-    const dailySwaps = await prisma.transaction.count({
+    const dailySwaps = await prisma.transactions.count({
       where: {
         station_id: station.station_id,
         payment_status: "completed",
@@ -268,7 +270,7 @@ export const getStationDetails = asyncHandler(
       },
     });
 
-    const dailyRevenueResult = await prisma.transaction.aggregate({
+    const dailyRevenueResult = await prisma.transactions.aggregate({
       where: {
         station_id: station.station_id,
         payment_status: "completed",
@@ -310,7 +312,7 @@ export const getStationDetails = asyncHandler(
         total_ratings: station.station_ratings.length,
         total_bookings: station._count.bookings,
         total_transactions: station._count.transactions,
-        staff_count: station.staff.length,
+          staff_count: station.users.length,
         daily_swaps: dailySwaps,
         daily_revenue: Number(dailyRevenue),
       },
@@ -350,7 +352,7 @@ export const createStation = asyncHandler(
     }
 
     // Check if station with same name already exists
-    const existingStation = await prisma.station.findFirst({
+    const existingStation = await prisma.stations.findFirst({
       where: {
         name: {
           equals: name,
@@ -363,17 +365,18 @@ export const createStation = asyncHandler(
       throw new CustomError("Station with this name already exists", 400);
     }
 
-    const station = await prisma.station.create({
+    const station = await prisma.stations.create({
       data: {
-        name,
-        address,
-        latitude: latitude ? parseFloat(latitude) : null,
-        longitude: longitude ? parseFloat(longitude) : null,
+        name: name as string,
+        address: address as string,
+        latitude: latitude ? new Prisma.Decimal(parseFloat(latitude)) : null,
+        longitude: longitude ? new Prisma.Decimal(parseFloat(longitude)) : null,
         capacity: parseInt(capacity),
-        supported_models: supported_models || [],
-        operating_hours,
-        status,
-      },
+        supported_models: (supported_models || []) as Prisma.InputJsonValue,
+        operating_hours: operating_hours as string | null,
+        status: status as string,
+        updated_at: new Date(),
+      } as Prisma.stationsUncheckedCreateInput,
     });
 
     res.status(201).json({
@@ -401,7 +404,7 @@ export const updateStation = asyncHandler(
       status,
     } = req.body;
 
-    const station = await prisma.station.findUnique({
+    const station = await prisma.stations.findUnique({
       where: { station_id: id },
     });
 
@@ -411,7 +414,7 @@ export const updateStation = asyncHandler(
 
     // If name is being updated, check for duplicates
     if (name && name !== station.name) {
-      const existingStation = await prisma.station.findFirst({
+      const existingStation = await prisma.stations.findFirst({
         where: {
           name: {
             equals: name,
@@ -456,7 +459,7 @@ export const updateStation = asyncHandler(
       updateData.operating_hours = operating_hours;
     if (status !== undefined) updateData.status = status;
 
-    const updatedStation = await prisma.station.update({
+    const updatedStation = await prisma.stations.update({
       where: { station_id: id },
       data: updateData,
       include: {
@@ -470,7 +473,7 @@ export const updateStation = asyncHandler(
           select: {
             bookings: true,
             transactions: true,
-            staff: true,
+            users: true,
           },
         },
       },
@@ -491,14 +494,14 @@ export const deleteStation = asyncHandler(
   async (req: Request, res: Response) => {
     const { id } = req.params;
 
-    const station = await prisma.station.findUnique({
+    const station = await prisma.stations.findUnique({
       where: { station_id: id },
       include: {
         _count: {
           select: {
             batteries: true,
             bookings: true,
-            staff: true,
+            users: true,
             transactions: true,
           },
         },
@@ -510,7 +513,7 @@ export const deleteStation = asyncHandler(
     }
 
     // Check if station has active bookings
-    const activeBookings = await prisma.booking.count({
+    const activeBookings = await prisma.bookings.count({
       where: {
         station_id: id,
         status: {
@@ -524,7 +527,7 @@ export const deleteStation = asyncHandler(
     }
 
     // Check if station has staff assigned
-    if (station._count.staff > 0) {
+    if (station._count.users > 0) {
       throw new CustomError(
         "Cannot delete station with assigned staff. Please reassign staff first",
         400
@@ -532,7 +535,7 @@ export const deleteStation = asyncHandler(
     }
 
     // Delete station (cascade will handle batteries if configured)
-    await prisma.station.delete({
+    await prisma.stations.delete({
       where: { station_id: id },
     });
 
@@ -565,7 +568,7 @@ export const uploadStationImage = asyncHandler(
     }
 
     // Check if station exists
-    const station = await prisma.station.findUnique({
+    const station = await prisma.stations.findUnique({
       where: { station_id: id },
     });
 
@@ -596,7 +599,7 @@ export const uploadStationImage = asyncHandler(
         bytes: result.bytes,
         // Note: To persist images array in DB, add 'images' JSON field to Station schema
         // Then uncomment this update:
-        // await prisma.station.update({
+        // await prisma.stations.update({
         //   where: { station_id: id },
         //   data: { images: images }
         // });
@@ -618,7 +621,7 @@ export const deleteStationImage = asyncHandler(
     }
 
     // Check if station exists
-    const station = await prisma.station.findUnique({
+    const station = await prisma.stations.findUnique({
       where: { station_id: id },
     });
 

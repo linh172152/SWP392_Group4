@@ -14,10 +14,10 @@ export const getMySubscriptions = asyncHandler(
       throw new CustomError("Driver not authenticated", 401);
     }
 
-    const subscriptions = await prisma.userSubscription.findMany({
+    const subscriptions = await prisma.user_subscriptions.findMany({
       where: { user_id: userId },
       include: {
-        package: {
+        service_packages: {
           select: {
             package_id: true,
             name: true,
@@ -45,10 +45,18 @@ export const getMySubscriptions = asyncHandler(
       orderBy: { created_at: "desc" },
     });
 
+    const mappedSubscriptions = subscriptions.map((sub: any) => {
+      const { service_packages, ...rest } = sub;
+      return {
+        ...rest,
+        package: service_packages || null,
+      };
+    });
+
     res.status(200).json({
       success: true,
       message: "Driver subscriptions retrieved successfully",
-      data: subscriptions,
+      data: mappedSubscriptions,
     });
   }
 );
@@ -67,7 +75,7 @@ export const subscribeToPackage = asyncHandler(
       throw new CustomError("packageId is required", 400);
     }
 
-    const servicePackage = await prisma.servicePackage.findUnique({
+    const servicePackage = await prisma.service_packages.findUnique({
       where: { package_id: packageId },
     });
 
@@ -77,7 +85,7 @@ export const subscribeToPackage = asyncHandler(
 
     const now = new Date();
 
-    const existingActive = await prisma.userSubscription.findFirst({
+    const existingActive = await prisma.user_subscriptions.findFirst({
       where: {
         user_id: userId,
         package_id: packageId,
@@ -93,7 +101,7 @@ export const subscribeToPackage = asyncHandler(
       );
     }
 
-    const wallet = await prisma.wallet.findUnique({
+    const wallet = await prisma.wallets.findUnique({
       where: { user_id: userId },
     });
 
@@ -109,7 +117,7 @@ export const subscribeToPackage = asyncHandler(
     endDate.setDate(endDate.getDate() + durationDays);
 
     const subscription = await prisma.$transaction(async (tx) => {
-      const createdSubscription = await tx.userSubscription.create({
+      const createdSubscription = await tx.user_subscriptions.create({
         data: {
           user_id: userId,
           package_id: packageId,
@@ -117,11 +125,12 @@ export const subscribeToPackage = asyncHandler(
           end_date: endDate,
           remaining_swaps: servicePackage.swap_limit ?? null,
           auto_renew: Boolean(autoRenew),
-        },
-        include: { package: true },
+          updated_at: new Date(),
+        } as Prisma.user_subscriptionsUncheckedCreateInput,
+        include: { service_packages: true },
       });
 
-      await tx.wallet.update({
+      await tx.wallets.update({
         where: { user_id: userId },
         data: {
           balance: wallet.balance.minus(servicePackage.price),
@@ -129,7 +138,7 @@ export const subscribeToPackage = asyncHandler(
         },
       });
 
-      await tx.payment.create({
+      await tx.payments.create({
         data: {
           subscription_id: createdSubscription.subscription_id,
           user_id: userId,
@@ -141,17 +150,23 @@ export const subscribeToPackage = asyncHandler(
           metadata: {
             package_name: servicePackage.name,
             duration_days: servicePackage.duration_days,
-          },
-        },
+          } as Prisma.InputJsonValue,
+        } as Prisma.paymentsUncheckedCreateInput,
       });
 
       return createdSubscription;
     });
 
+    const { service_packages, ...rest } = subscription;
+    const mappedSubscription = {
+      ...rest,
+      package: service_packages || null,
+    };
+
     res.status(201).json({
       success: true,
       message: "Subscription purchased successfully",
-      data: subscription,
+      data: mappedSubscription,
     });
   }
 );
@@ -170,10 +185,10 @@ export const cancelSubscription = asyncHandler(
       throw new CustomError("subscriptionId is required", 400);
     }
 
-    const subscription = await prisma.userSubscription.findUnique({
+    const subscription = await prisma.user_subscriptions.findUnique({
       where: { subscription_id: subscriptionId },
       include: {
-        package: true,
+        service_packages: true,
       },
     });
 
@@ -185,7 +200,7 @@ export const cancelSubscription = asyncHandler(
       throw new CustomError("Only active subscriptions can be cancelled", 400);
     }
 
-    if (!subscription.package) {
+    if (!subscription.service_packages) {
       throw new CustomError("Subscription package information not found", 500);
     }
 
@@ -198,10 +213,10 @@ export const cancelSubscription = asyncHandler(
       );
     }
 
-    const packageSwapLimit = subscription.package.swap_limit;
+    const packageSwapLimit = subscription.service_packages.swap_limit;
 
     // ✅ Lấy original amount từ payment (không phải package price)
-    const originalPayment = await prisma.payment.findFirst({
+    const originalPayment = await prisma.payments.findFirst({
       where: {
         subscription_id: subscriptionId,
         payment_type: PaymentType.SUBSCRIPTION,
@@ -232,12 +247,15 @@ export const cancelSubscription = asyncHandler(
       const daysRemaining = Math.ceil(
         (endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
       );
-      refundRatio = daysRemaining > 0 && totalDays > 0 ? daysRemaining / totalDays : 0;
+      refundRatio =
+        daysRemaining > 0 && totalDays > 0 ? daysRemaining / totalDays : 0;
     } else {
       // Gói có giới hạn: tính theo số lượt còn lại
       const remainingSwaps = subscription.remaining_swaps ?? 0;
       refundRatio =
-        packageSwapLimit > 0 ? Math.min(remainingSwaps / packageSwapLimit, 1.0) : 0;
+        packageSwapLimit > 0
+          ? Math.min(remainingSwaps / packageSwapLimit, 1.0)
+          : 0;
     }
 
     // ✅ Áp dụng phí hủy 3%
@@ -296,10 +314,10 @@ export const cancelSubscription = asyncHandler(
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      let wallet = await tx.wallet.findUnique({ where: { user_id: userId } });
+      let wallet = await tx.wallets.findUnique({ where: { user_id: userId } });
 
       if (!wallet) {
-        wallet = await tx.wallet.create({
+        wallet = await tx.wallets.create({
           data: {
             user_id: userId,
             balance: new Prisma.Decimal(0),
@@ -307,7 +325,7 @@ export const cancelSubscription = asyncHandler(
         });
       }
 
-      const updatedWallet = await tx.wallet.update({
+      const updatedWallet = await tx.wallets.update({
         where: { user_id: userId },
         data: {
           balance: wallet.balance.plus(refundAmountDecimal),
@@ -315,7 +333,7 @@ export const cancelSubscription = asyncHandler(
         },
       });
 
-      await tx.payment.update({
+      await tx.payments.update({
         where: { payment_id: originalPayment.payment_id },
         data: {
           payment_status: PAYMENT_STATUS_REFUNDED,
@@ -326,7 +344,7 @@ export const cancelSubscription = asyncHandler(
         },
       });
 
-      const refundPayment = await tx.payment.create({
+      const refundPayment = await tx.payments.create({
         data: {
           subscription_id: subscription.subscription_id,
           user_id: userId,
@@ -342,12 +360,14 @@ export const cancelSubscription = asyncHandler(
             refund_ratio: refundRatio,
             cancellation_fee_percent: 3,
             cancellation_fee_amount: originalAmount * refundRatio * 0.03,
-            minimum_refund_applied: refundAmount === 10000 && refundAmount < originalAmount * refundRatio * 0.97,
-          },
-        },
+            minimum_refund_applied:
+              refundAmount === 10000 &&
+              refundAmount < originalAmount * refundRatio * 0.97,
+          } as Prisma.InputJsonValue,
+        } as Prisma.paymentsUncheckedCreateInput,
       });
 
-      const updatedSubscription = await tx.userSubscription.update({
+      const updatedSubscription = await tx.user_subscriptions.update({
         where: { subscription_id: subscriptionId },
         data: {
           status: "cancelled",
@@ -355,7 +375,7 @@ export const cancelSubscription = asyncHandler(
           cancellation_reason: reason ?? "user_requested_cancellation",
           updated_at: now,
         },
-        include: { package: true },
+        include: { service_packages: true },
       });
 
       return {
@@ -365,19 +385,29 @@ export const cancelSubscription = asyncHandler(
       };
     });
 
+    const { service_packages, ...rest } = result.updatedSubscription;
+    const mappedSubscription = {
+      ...rest,
+      package: service_packages || null,
+    };
+
     res.status(200).json({
       success: true,
       message: "Subscription cancelled and refunded",
       data: {
-        subscription: result.updatedSubscription,
+        subscription: mappedSubscription,
         refund: {
           payment_id: result.refundPayment.payment_id,
           amount: Number(result.refundPayment.amount),
           original_amount: originalAmount,
           refund_ratio: refundRatio,
           cancellation_fee_percent: 3,
-          cancellation_fee_amount: Math.floor(originalAmount * refundRatio * 0.03),
-          minimum_refund_applied: refundAmount === 10000 && refundAmount < originalAmount * refundRatio * 0.97,
+          cancellation_fee_amount: Math.floor(
+            originalAmount * refundRatio * 0.03
+          ),
+          minimum_refund_applied:
+            refundAmount === 10000 &&
+            refundAmount < originalAmount * refundRatio * 0.97,
           payment_type: result.refundPayment.payment_type,
         },
         wallet_balance: Number(result.walletBalanceAfter),

@@ -71,80 +71,60 @@ const ReportsAnalytics: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-6">
+    <div className="container mx-auto max-w-7xl px-4 space-y-6">
       {/* Header */}
-      <div className="max-w-7xl mx-auto mb-8">
-        <Card className="border-2 border-slate-200 dark:border-slate-700 shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-white/20 rounded-xl">
-                  <BarChart3 className="h-8 w-8 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-3xl font-bold text-white">
-                    Báo Cáo & Phân Tích
-                  </CardTitle>
-                  <p className="text-blue-100 text-sm mt-1">
-                    Thống kê hiệu suất hệ thống theo thời gian thực
-                  </p>
-                </div>
-              </div>
-
-              {/* Period Selector */}
-              <div className="flex gap-2 bg-white/10 backdrop-blur-md rounded-lg p-1 border border-white/20">
-                {(["day", "week", "month"] as const).map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => setPeriod(p)}
-                    disabled={loading}
-                    className={`px-4 py-2 rounded-md font-semibold text-sm transition-all ${
-                      period === p
-                        ? "bg-white text-blue-600 shadow-md"
-                        : "text-white hover:bg-white/10"
-                    }`}
-                  >
-                    {p === "day"
-                      ? "Hôm nay"
-                      : p === "week"
-                      ? "Tuần này"
-                      : "Tháng này"}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {stats && (
-              <div className="mt-4 bg-white/10 backdrop-blur-md rounded-lg p-3 border border-white/20">
-                <div className="flex items-center gap-2 text-white">
-                  <Calendar className="h-4 w-4" />
-                  <span className="text-sm font-medium">
-                    Kỳ báo cáo: {stats.period}
-                  </span>
-                </div>
-              </div>
-            )}
-          </CardHeader>
-        </Card>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Báo Cáo & Phân Tích</h1>
+          <p className="text-muted-foreground">
+            Thống kê hiệu suất hệ thống theo thời gian thực
+          </p>
+        </div>
+        
+        {/* Period Selector */}
+        <div className="flex gap-2">
+          {(["day", "week", "month"] as const).map((p) => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p)}
+              disabled={loading}
+              className={`px-4 py-2 rounded-md font-medium transition-all ${
+                period === p
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              }`}
+            >
+              {p === "day"
+                ? "Hôm nay"
+                : p === "week"
+                ? "Tuần này"
+                : "Tháng này"}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="max-w-7xl mx-auto space-y-6">
+      {stats && (
+        <div className="bg-muted/50 rounded-lg p-4">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            <span className="text-sm font-medium">
+              Kỳ báo cáo: {stats.period}
+            </span>
+          </div>
+        </div>
+      )}
         {/* Error State */}
         {error && (
-          <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl shadow-lg">
-            <p className="text-red-700 font-semibold">⚠️ {error}</p>
+          <div className="bg-destructive/15 border border-destructive/20 p-4 rounded-lg">
+            <p className="text-destructive font-medium">{error}</p>
           </div>
         )}
 
         {/* Loading State */}
         {loading && (
-          <div className="flex justify-center items-center py-20">
-            <div className="relative">
-              <div className="animate-spin rounded-full h-16 w-16 border-4 border-indigo-200 border-t-indigo-600"></div>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <BarChart3 className="h-8 w-8 text-indigo-600" />
-              </div>
-            </div>
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
         )}
 
@@ -152,17 +132,15 @@ const ReportsAnalytics: React.FC = () => {
         {!loading && !error && stats && (
           <>
             {/* Revenue Section */}
-            <Card className="border-2 border-slate-200 dark:border-slate-700 shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-green-600 to-emerald-600 text-white">
+            <Card>
+              <CardHeader>
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-white/20 rounded-lg">
-                    <DollarSign className="h-6 w-6 text-white" />
-                  </div>
+                  <DollarSign className="h-6 w-6 text-primary" />
                   <div>
-                    <CardTitle className="text-xl font-bold text-white">
+                    <CardTitle className="text-xl font-bold">
                       Phân Tích Doanh Thu
                     </CardTitle>
-                    <p className="text-green-100 text-sm">
+                    <p className="text-muted-foreground text-sm">
                       Tổng quan hiệu suất tài chính
                     </p>
                   </div>
@@ -249,17 +227,15 @@ const ReportsAnalytics: React.FC = () => {
             </Card>
 
             {/* Bookings Section */}
-            <Card className="border-2 border-slate-200 dark:border-slate-700 shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+            <Card>
+              <CardHeader>
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-white/20 rounded-lg">
-                    <Calendar className="h-6 w-6 text-white" />
-                  </div>
+                  <Calendar className="h-6 w-6 text-primary" />
                   <div>
-                    <CardTitle className="text-xl font-bold text-white">
+                    <CardTitle className="text-xl font-bold">
                       Thống Kê Đặt Chỗ
                     </CardTitle>
-                    <p className="text-blue-100 text-sm">
+                    <p className="text-muted-foreground text-sm">
                       Chỉ số sử dụng dịch vụ
                     </p>
                   </div>
@@ -357,17 +333,15 @@ const ReportsAnalytics: React.FC = () => {
             {/* Transactions & Stations Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Transactions Section */}
-              <Card className="border-2 border-slate-200 dark:border-slate-700 shadow-lg">
-                <CardHeader className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
+              <Card>
+                <CardHeader>
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-white/20 rounded-lg">
-                      <Activity className="h-6 w-6 text-white" />
-                    </div>
+                    <Activity className="h-6 w-6 text-primary" />
                     <div>
-                      <CardTitle className="text-xl font-bold text-white">
+                      <CardTitle className="text-xl font-bold">
                         Giao Dịch
                       </CardTitle>
-                      <p className="text-indigo-100 text-sm">
+                      <p className="text-muted-foreground text-sm">
                         Tổng quan thanh toán
                       </p>
                     </div>
@@ -434,17 +408,15 @@ const ReportsAnalytics: React.FC = () => {
               {/* Stations & Users Section */}
               <div className="space-y-6">
                 {/* Stations */}
-                <Card className="border-2 border-slate-200 dark:border-slate-700 shadow-lg">
-                  <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+                <Card>
+                  <CardHeader>
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-white/20 rounded-lg">
-                        <Building className="h-6 w-6 text-white" />
-                      </div>
+                      <Building className="h-6 w-6 text-primary" />
                       <div>
-                        <CardTitle className="text-xl font-bold text-white">
+                        <CardTitle className="text-xl font-bold">
                           Trạm
                         </CardTitle>
-                        <p className="text-blue-100 text-sm">
+                        <p className="text-muted-foreground text-sm">
                           Trạng thái mạng lưới
                         </p>
                       </div>
@@ -502,17 +474,15 @@ const ReportsAnalytics: React.FC = () => {
                 </Card>
 
                 {/* Users */}
-                <Card className="border-2 border-slate-200 dark:border-slate-700 shadow-lg">
-                  <CardHeader className="bg-gradient-to-r from-slate-600 to-slate-700 text-white">
+                <Card>
+                  <CardHeader>
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-white/20 rounded-lg">
-                        <Users className="h-6 w-6 text-white" />
-                      </div>
+                      <Users className="h-6 w-6 text-primary" />
                       <div>
-                        <CardTitle className="text-xl font-bold text-white">
+                        <CardTitle className="text-xl font-bold text-black">
                           Người Dùng
                         </CardTitle>
-                        <p className="text-slate-200 text-sm">
+                        <p className="text-black-200 text-sm">
                           Tăng trưởng cộng đồng
                         </p>
                       </div>
@@ -571,17 +541,16 @@ const ReportsAnalytics: React.FC = () => {
         {!loading && !error && !stats && (
           <Card className="text-center py-12">
             <CardContent>
-              <BarChart3 className="h-16 w-16 text-slate-300 mx-auto mb-4" />
-              <p className="text-slate-500 text-lg font-medium">
+              <BarChart3 className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground text-lg font-medium">
                 Không có dữ liệu phân tích
               </p>
-              <p className="text-slate-400 text-sm mt-2">
+              <p className="text-muted-foreground/70 text-sm mt-2">
                 Thử chọn khoảng thời gian khác
               </p>
             </CardContent>
           </Card>
         )}
-      </div>
     </div>
   );
 };

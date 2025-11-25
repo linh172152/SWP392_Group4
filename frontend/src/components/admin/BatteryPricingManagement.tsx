@@ -414,7 +414,6 @@ const BatteryPricingManagement: React.FC = () => {
 
     try {
       await batteryPricingService.deleteBatteryPricing(pricingToDelete);
-      toast.success("Xóa giá pin thành công");
       fetchPricing();
       setPricingToDelete(null);
     } catch (error) {
@@ -434,7 +433,6 @@ const BatteryPricingManagement: React.FC = () => {
         transferToCancel,
         "cancelled"
       );
-      toast.success("Hủy chuyển pin thành công");
       fetchTransfers();
       setTransferToCancel(null);
     } catch (error) {
@@ -451,7 +449,6 @@ const BatteryPricingManagement: React.FC = () => {
 
     try {
       await adminBatteryService.deleteBattery(batteryToDelete.id);
-      toast.success("Xóa pin thành công");
       fetchWarehouseData();
       setBatteryToDelete(null);
     } catch (error) {
@@ -1006,9 +1003,6 @@ const BatteryPricingManagement: React.FC = () => {
                                               transfer.transfer_id,
                                               "completed"
                                             );
-                                            toast.success(
-                                              "Duyệt chuyển pin thành công"
-                                            );
                                             fetchTransfers();
                                           } catch (error) {
                                             console.error(
@@ -1514,10 +1508,8 @@ const BatteryPricingManagement: React.FC = () => {
                       editingPricing,
                       payload
                     );
-                    toast.success("Cập nhật giá pin thành công");
                   } else {
                     await batteryPricingService.createBatteryPricing(payload);
-                    toast.success("Thêm giá pin thành công");
                   }
 
                   setShowPricingForm(false);
@@ -1661,7 +1653,6 @@ const BatteryPricingManagement: React.FC = () => {
                       newTransfer
                     );
                   console.log("Create transfer response:", createResponse);
-                  toast.success("Tạo lệnh chuyển pin thành công");
 
                   setShowTransferForm(false);
                   setNewTransfer({
@@ -2016,7 +2007,6 @@ const BatteryPricingManagement: React.FC = () => {
                         selectedTransfer.transfer_id,
                         "completed"
                       );
-                      toast.success("Đã duyệt chuyển pin thành công");
                       setShowTransferDetail(false);
                       setSelectedTransfer(null);
                       fetchTransfers();
@@ -2040,7 +2030,6 @@ const BatteryPricingManagement: React.FC = () => {
                         selectedTransfer.transfer_id,
                         "cancelled"
                       );
-                      toast.success("Đã hủy chuyển pin");
                       setShowTransferDetail(false);
                       setSelectedTransfer(null);
                       fetchTransfers();
@@ -2338,7 +2327,6 @@ const BatteryPricingManagement: React.FC = () => {
                 try {
                   setLoading(true);
                   await adminBatteryService.createBattery(newBattery);
-                  toast.success("Thêm pin thành công");
                   setShowAddBatteryModal(false);
                   setNewBattery({
                     station_id: "",
@@ -2532,7 +2520,6 @@ const BatteryPricingManagement: React.FC = () => {
                     editingBattery.battery_id,
                     editBattery
                   );
-                  toast.success("Cập nhật pin thành công");
                   setShowEditBatteryModal(false);
                   setEditingBattery(null);
                   setEditBattery({

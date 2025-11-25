@@ -43,7 +43,7 @@ export const getPublicStations = asyncHandler(
 
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
 
-    const stations = await prisma.station.findMany({
+    const stations = await prisma.stations.findMany({
       where: whereClause,
       include: {
         batteries: {
@@ -70,10 +70,10 @@ export const getPublicStations = asyncHandler(
     });
 
     // Calculate average rating for each station
-    const stationsWithRating = stations.map((station) => {
+    const stationsWithRating = stations.map((station: typeof stations[number]) => {
       const avgRating =
         station.station_ratings.length > 0
-          ? station.station_ratings.reduce((sum, r) => sum + r.rating, 0) /
+          ? station.station_ratings.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) /
             station.station_ratings.length
           : 0;
 
@@ -85,7 +85,7 @@ export const getPublicStations = asyncHandler(
       };
     });
 
-    const total = await prisma.station.count({ where: whereClause });
+    const total = await prisma.stations.count({ where: whereClause });
 
     res.status(200).json({
       success: true,
@@ -110,7 +110,7 @@ export const getPublicStationDetails = asyncHandler(
   async (req: Request, res: Response) => {
     const { id } = req.params;
 
-    const station = await prisma.station.findUnique({
+    const station = await prisma.stations.findUnique({
       where: { station_id: id },
       include: {
         batteries: {
@@ -126,7 +126,7 @@ export const getPublicStationDetails = asyncHandler(
         },
         station_ratings: {
           include: {
-            user: {
+            users: {
               select: {
                 user_id: true,
                 full_name: true,
@@ -136,7 +136,8 @@ export const getPublicStationDetails = asyncHandler(
           orderBy: { created_at: "desc" },
           take: 10,
         },
-        staff: {
+        users: {
+          where: { role: "STAFF" },
           select: {
             user_id: true,
             full_name: true,
@@ -154,13 +155,13 @@ export const getPublicStationDetails = asyncHandler(
     // Calculate average rating
     const avgRating =
       station.station_ratings.length > 0
-        ? station.station_ratings.reduce((sum, r) => sum + r.rating, 0) /
+        ? station.station_ratings.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) /
           station.station_ratings.length
         : 0;
 
     // Count batteries by status
     const batteryStats = station.batteries.reduce(
-      (acc, battery) => {
+      (acc: Record<string, number>, battery: { status: string }) => {
         acc[battery.status] = (acc[battery.status] || 0) + 1;
         return acc;
       },
@@ -175,10 +176,18 @@ export const getPublicStationDetails = asyncHandler(
 
     const stationWithStats = {
       ...station,
+      latitude: station.latitude ? Number(station.latitude) : null,
+      longitude: station.longitude ? Number(station.longitude) : null,
+      batteries: station.batteries.map((b: any) => ({
+        ...b,
+        capacity_kwh: b.capacity_kwh ? Number(b.capacity_kwh) : null,
+        voltage: b.voltage ? Number(b.voltage) : null,
+        health_percentage: b.health_percentage ? Number(b.health_percentage) : null,
+      })),
       average_rating: avgRating,
       total_ratings: station.station_ratings.length,
       battery_stats: batteryStats,
-      available_batteries: station.batteries.filter((b) => b.status === "full")
+      available_batteries: station.batteries.filter((b: { status: string }) => b.status === "full")
         .length,
       battery_inventory: stationStats.batteryInventory,
       capacity_percentage: stationStats.capacityPercentage,
@@ -224,7 +233,7 @@ export const findNearbyPublicStations = asyncHandler(
       },
     };
 
-    const stations = await prisma.station.findMany({
+    const stations = await prisma.stations.findMany({
       where: whereClause,
       include: {
         batteries: {
@@ -250,7 +259,7 @@ export const findNearbyPublicStations = asyncHandler(
 
     // Calculate distance and average rating for each station
     const stationsWithDistance = await Promise.all(
-      stations.map(async (station) => {
+      stations.map(async (station: typeof stations[number]) => {
         const avgRating =
           station.station_ratings.length > 0
             ? station.station_ratings.reduce(
@@ -275,6 +284,14 @@ export const findNearbyPublicStations = asyncHandler(
 
         return {
           ...station,
+          latitude: station.latitude ? Number(station.latitude) : null,
+          longitude: station.longitude ? Number(station.longitude) : null,
+          batteries: station.batteries.map((b: any) => ({
+            ...b,
+            capacity_kwh: b.capacity_kwh ? Number(b.capacity_kwh) : null,
+            voltage: b.voltage ? Number(b.voltage) : null,
+            health_percentage: b.health_percentage ? Number(b.health_percentage) : null,
+          })),
           average_rating: avgRating,
           total_ratings: station.station_ratings.length,
           available_batteries: station.batteries.length,
@@ -289,8 +306,8 @@ export const findNearbyPublicStations = asyncHandler(
     // Filter by actual distance (within radius) and sort by distance
     // This ensures we only return stations actually within the requested radius
     const filteredStations = stationsWithDistance
-      .filter((station) => station.distance_km <= searchRadius)
-      .sort((a, b) => a.distance_km - b.distance_km);
+      .filter((station: { distance_km: number }) => station.distance_km <= searchRadius)
+      .sort((a: { distance_km: number }, b: { distance_km: number }) => a.distance_km - b.distance_km);
 
     res.status(200).json({
       success: true,

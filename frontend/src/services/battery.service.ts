@@ -21,6 +21,12 @@ export interface Battery {
     address: string;
     capacity?: number;
   };
+  stations?: {
+    station_id: string;
+    name: string;
+    address: string;
+    capacity?: number;
+  };
 }
 
 export interface AddBatteryData {
@@ -37,6 +43,7 @@ export interface UpdateBatteryData {
   status?: 'full' | 'charging' | 'in_use' | 'maintenance' | 'damaged';
   current_charge?: number;
   health_percentage?: number;
+  cycle_count?: number;
 }
 
 export interface BatteryTransferLog {
@@ -47,6 +54,7 @@ export interface BatteryTransferLog {
   transfer_reason: string;
   transferred_by: string;
   transferred_at: string;
+  transfer_status?: 'pending' | 'in_transit' | 'completed' | 'cancelled';
   notes?: string;
   from_station?: {
     station_id: string;

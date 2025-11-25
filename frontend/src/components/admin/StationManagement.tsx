@@ -165,7 +165,6 @@ const StationManagement: React.FC = () => {
 
           if (staffUpdateRes.success) {
             console.log("✅ Staff assigned to station");
-            toast.success("Tạo trạm và gán quản lý thành công");
           } else {
             console.warn(
               "⚠️ Station created but failed to assign staff:",
@@ -177,8 +176,6 @@ const StationManagement: React.FC = () => {
           console.error("❌ Failed to assign staff:", staffError);
           toast.warning("Trạm đã tạo nhưng không gán được quản lý");
         }
-      } else {
-        toast.success("Tạo trạm thành công");
       }
 
       // Refresh station list
@@ -233,7 +230,6 @@ const StationManagement: React.FC = () => {
 
             if (staffUpdateRes.success) {
               console.log("✅ New manager assigned to station");
-              toast.success("Cập nhật trạm và quản lý thành công");
             } else {
               toast.warning(
                 "Trạm đã cập nhật nhưng không gán được quản lý mới"
@@ -243,11 +239,7 @@ const StationManagement: React.FC = () => {
             console.error("❌ Failed to assign new manager:", staffError);
             toast.warning("Trạm đã cập nhật nhưng không gán được quản lý mới");
           }
-        } else {
-          toast.success("Cập nhật trạm thành công");
         }
-      } else {
-        toast.success("Cập nhật trạm thành công");
       }
 
       // Refresh station list
@@ -270,7 +262,6 @@ const StationManagement: React.FC = () => {
     try {
       const res = await deleteStation(stationToDelete);
       if (res.success) {
-        toast.success("Xóa trạm thành công");
         fetchStations();
         setStationToDelete(null);
       } else {

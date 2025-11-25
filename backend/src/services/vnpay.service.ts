@@ -1,5 +1,5 @@
 import { Prisma, PaymentType } from "@prisma/client";
-import type { Payment } from "@prisma/client";
+import type { payments } from "@prisma/client";
 import {
   generateVNPayUrl,
   verifyVNPayResponse,
@@ -55,7 +55,7 @@ export const createVNPayPayment = async (
     } = data;
 
     // Validate user
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { user_id: userId },
     });
 
@@ -85,18 +85,18 @@ export const createVNPayPayment = async (
       baseMetadata.wallet_topup_processed = false;
     }
 
-    await prisma.payment.create({
+    await prisma.payments.create({
       data: {
         user_id: userId,
-        amount: amount,
+        amount: new Prisma.Decimal(amount),
         payment_method: "vnpay",
         payment_status: "pending",
         payment_gateway_ref: orderId,
         created_at: new Date(),
         payment_type: paymentType ?? "OTHER",
-        metadata: baseMetadata,
+        metadata: baseMetadata as Prisma.InputJsonValue,
         topup_package_id: topupPackageId ?? null,
-      },
+      } as Prisma.paymentsUncheckedCreateInput,
     });
 
     // Create VNPay payment data
@@ -177,7 +177,7 @@ export const handleVNPayReturn = async (
     }
 
     // Find payment by order ID
-    const payment = await prisma.payment.findFirst({
+    const payment = await prisma.payments.findFirst({
       where: { payment_gateway_ref: response.vnp_TxnRef },
     });
 
@@ -193,7 +193,7 @@ export const handleVNPayReturn = async (
     const expectedAmount = Number(payment.amount);
 
     if (Number.isFinite(expectedAmount) && responseAmount !== expectedAmount) {
-      await prisma.payment.update({
+      await prisma.payments.update({
         where: { payment_id: payment.payment_id },
         data: {
           payment_status: "failed",
@@ -218,7 +218,7 @@ export const handleVNPayReturn = async (
     if (!isVNPaySuccess(response)) {
       const message = getVNPayResponseMessage(response.vnp_ResponseCode);
 
-      await prisma.payment.update({
+      await prisma.payments.update({
         where: { payment_id: payment.payment_id },
         data: {
           payment_status: "failed",
@@ -238,7 +238,7 @@ export const handleVNPayReturn = async (
       };
     }
 
-    const updatedPayment = await prisma.payment.update({
+    const updatedPayment = await prisma.payments.update({
       where: { payment_id: payment.payment_id },
       data: {
         payment_status: "completed",
@@ -273,8 +273,8 @@ export const handleVNPayReturn = async (
  * Handle VNPay IPN (Instant Payment Notification)
  */
 const applyWalletTopupIfNeeded = async (
-  originalPayment: Payment,
-  updatedPayment: Payment
+  originalPayment: payments,
+  updatedPayment: payments
 ) => {
   const metadata =
     (updatedPayment.metadata as Record<string, any> | null) ?? {};
@@ -298,7 +298,7 @@ const applyWalletTopupIfNeeded = async (
   await prisma.$transaction(async (tx) => {
     const actualAmountDecimal = new Prisma.Decimal(actualAmountNumber);
 
-    await tx.wallet.upsert({
+    await tx.wallets.upsert({
       where: { user_id: originalPayment.user_id },
       update: {
         balance: {
@@ -311,7 +311,7 @@ const applyWalletTopupIfNeeded = async (
       },
     });
 
-    await tx.payment.update({
+    await tx.payments.update({
       where: { payment_id: originalPayment.payment_id },
       data: {
         payment_type: "TOPUP",
@@ -336,14 +336,14 @@ export const getUserPaymentHistory = async (
   try {
     const skip = (page - 1) * limit;
 
-    const payments = await prisma.payment.findMany({
+    const payments = await prisma.payments.findMany({
       where: { user_id: userId },
       orderBy: { created_at: "desc" },
       skip,
       take: limit,
     });
 
-    const total = await prisma.payment.count({
+    const total = await prisma.payments.count({
       where: { user_id: userId },
     });
 
@@ -366,10 +366,10 @@ export const getUserPaymentHistory = async (
  */
 export const getPaymentById = async (paymentId: string) => {
   try {
-    const payment = await prisma.payment.findUnique({
+    const payment = await prisma.payments.findUnique({
       where: { payment_id: paymentId },
       include: {
-        user: {
+        users: {
           select: {
             user_id: true,
             full_name: true,

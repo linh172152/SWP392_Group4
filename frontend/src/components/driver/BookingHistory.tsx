@@ -43,10 +43,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog";
 import API_ENDPOINTS, { fetchWithAuth } from "../../config/api";
 import { BatterySpinner, BatteryLoading } from "../ui/battery-loading";
 import { ErrorDisplay } from "../ui/error-display";
 import { Skeleton } from "../ui/skeleton";
+import authService from "../../services/auth.service";
 
 interface PricingPreview {
   currency: string;
@@ -133,6 +141,13 @@ const BookingHistory: React.FC = () => {
     null
   );
   const [cancelConfirmMessage, setCancelConfirmMessage] = useState("");
+  const [voucherDialogOpen, setVoucherDialogOpen] = useState(false);
+  const [selectedBookingForVoucher, setSelectedBookingForVoucher] =
+    useState<BookingItem | null>(null);
+  const [userInfo, setUserInfo] = useState<{
+    full_name?: string;
+    phone?: string;
+  } | null>(null);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -175,7 +190,7 @@ const BookingHistory: React.FC = () => {
       case "pending":
         return "Chờ xác nhận";
       case "confirmed":
-        return "Đã xác nhận - Vui lòng đến trạm";
+        return "Đã xác nhận";
       default:
         return status;
     }
@@ -556,253 +571,28 @@ const BookingHistory: React.FC = () => {
     }
   };
 
-  const exportConfirmationVoucher = (booking: BookingItem) => {
-    // Tạo Confirmation Voucher - Phiếu xác nhận đặt chỗ để xuất trình tại trạm
-    const printWindow = window.open("", "_blank");
-    if (printWindow) {
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Phiếu xác nhận đặt chỗ - ${booking.booking_code}</title>
-          <style>
-            @media print {
-              body { margin: 0; padding: 10px; }
-              .no-print { display: none; }
-            }
-            body {
-              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-              padding: 20px;
-              max-width: 600px;
-              margin: 0 auto;
-              background: #fff;
-            }
-            .header {
-              text-align: center;
-              margin-bottom: 30px;
-              border-bottom: 3px solid #3b82f6;
-              padding-bottom: 20px;
-            }
-            .header h1 {
-              color: #1e40af;
-              margin: 0 0 10px 0;
-              font-size: 24px;
-            }
-            .booking-code-box {
-              background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
-              color: white;
-              padding: 20px;
-              border-radius: 8px;
-              margin: 20px 0;
-              text-align: center;
-              box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            }
-            .booking-code-label {
-              font-size: 14px;
-              opacity: 0.9;
-              margin-bottom: 8px;
-            }
-            .booking-code {
-              font-size: 32px;
-              font-weight: bold;
-              letter-spacing: 3px;
-              font-family: 'Courier New', monospace;
-            }
-            .status-badge {
-              display: inline-block;
-              padding: 8px 16px;
-              border-radius: 20px;
-              font-weight: bold;
-              margin-top: 10px;
-              background: #10b981;
-              color: white;
-            }
-            .section {
-              margin: 20px 0;
-              padding: 15px;
-              background: #f8fafc;
-              border-radius: 8px;
-              border-left: 4px solid #3b82f6;
-            }
-            .section h3 {
-              margin: 0 0 12px 0;
-              color: #1e40af;
-              font-size: 16px;
-            }
-            .info-row {
-              display: flex;
-              justify-content: space-between;
-              padding: 8px 0;
-              border-bottom: 1px solid #e2e8f0;
-            }
-            .info-row:last-child {
-              border-bottom: none;
-            }
-            .label {
-              font-weight: 600;
-              color: #475569;
-              min-width: 120px;
-            }
-            .value {
-              color: #1e293b;
-              text-align: right;
-              flex: 1;
-            }
-            .notice {
-              background: #fef3c7;
-              border-left: 4px solid #f59e0b;
-              padding: 15px;
-              margin: 20px 0;
-              border-radius: 6px;
-              font-size: 13px;
-              color: #92400e;
-            }
-            .notice strong {
-              display: block;
-              margin-bottom: 5px;
-              font-size: 14px;
-            }
-            .footer {
-              text-align: center;
-              margin-top: 30px;
-              padding-top: 20px;
-              border-top: 2px dashed #cbd5e1;
-              font-size: 11px;
-              color: #64748b;
-            }
-            .qr-placeholder {
-              text-align: center;
-              margin: 20px 0;
-              padding: 20px;
-              background: #f1f5f9;
-              border-radius: 8px;
-            }
-            .no-print {
-              text-align: center;
-              margin: 20px 0;
-              color: #64748b;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>PHIẾU XÁC NHẬN ĐẶT CHỖ</h1>
-            <div class="booking-code-box">
-              <div class="booking-code-label">MÃ ĐƠN HÀNG</div>
-              <div class="booking-code">${booking.booking_code}</div>
-            </div>
-            <div class="status-badge">${getStatusLabel(booking.status)}</div>
-          </div>
-          
-          <div class="section">
-            <h3>📍 Thông tin trạm</h3>
-            <div class="info-row">
-              <span class="label">Tên trạm:</span>
-              <span class="value">${booking.station?.name || "—"}</span>
-            </div>
-            <div class="info-row">
-              <span class="label">Địa chỉ:</span>
-              <span class="value">${booking.station?.address || "—"}</span>
-            </div>
-          </div>
-
-          <div class="section">
-            <h3>🚗 Thông tin xe</h3>
-            <div class="info-row">
-              <span class="label">Biển số:</span>
-              <span class="value">${
-                booking.vehicle?.license_plate || "—"
-              }</span>
-            </div>
-            <div class="info-row">
-              <span class="label">Loại xe:</span>
-              <span class="value">${booking.vehicle?.vehicle_type || "—"}</span>
-            </div>
-            ${
-              booking.vehicle?.model
-                ? `
-            <div class="info-row">
-              <span class="label">Model:</span>
-              <span class="value">${booking.vehicle.model}</span>
-            </div>
-            `
-                : ""
-            }
-          </div>
-
-          <div class="section">
-            <h3>📅 Thời gian</h3>
-            <div class="info-row">
-              <span class="label">Ngày đặt:</span>
-              <span class="value">${
-                booking.created_at
-                  ? new Date(booking.created_at).toLocaleDateString("vi-VN")
-                  : new Date(booking.scheduled_at).toLocaleDateString("vi-VN")
-              }</span>
-            </div>
-            <div class="info-row">
-              <span class="label">Giờ đặt:</span>
-              <span class="value">${
-                booking.created_at
-                  ? new Date(booking.created_at).toLocaleTimeString("vi-VN", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })
-                  : new Date(booking.scheduled_at).toLocaleTimeString("vi-VN", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })
-              }</span>
-            </div>
-            ${
-              booking.scheduled_at &&
-              booking.created_at &&
-              new Date(booking.scheduled_at).getTime() !==
-                new Date(booking.created_at).getTime()
-                ? `
-            <div class="info-row">
-              <span class="label">Thời gian hẹn:</span>
-              <span class="value">${new Date(
-                booking.scheduled_at
-              ).toLocaleString("vi-VN", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}</span>
-            </div>
-            `
-                : ""
-            }
-          </div>
-
-          <div class="notice">
-            <strong>⚠️ LƯU Ý QUAN TRỌNG</strong>
-            Vui lòng xuất trình <strong>MÃ ĐƠN HÀNG: ${
-              booking.booking_code
-            }</strong> khi đến trạm để nhân viên xác thực và thực hiện đổi pin.
-            <br><br>
-            Phiếu này có thể được lưu dưới dạng ảnh hoặc in ra để sử dụng khi không có internet.
-          </div>
-
-          <div class="footer">
-            <div>Xuất ngày: ${new Date().toLocaleString("vi-VN")}</div>
-            <div style="margin-top: 5px;">EVSwap - Hệ thống đổi pin xe điện</div>
-          </div>
-
-          <div class="no-print">
-            <p>Đang mở hộp thoại in... Nếu không tự động mở, vui lòng nhấn Ctrl+P (Windows) hoặc Cmd+P (Mac)</p>
-          </div>
-
-          <script>
-            window.onload = function() {
-              setTimeout(function() {
-                window.print();
-              }, 500);
-            }
-          </script>
-        </body>
-        </html>
-      `);
-      printWindow.document.close();
+  const exportConfirmationVoucher = async (booking: BookingItem) => {
+    setSelectedBookingForVoucher(booking);
+    setVoucherDialogOpen(true);
+    
+    // Load user info for voucher
+    try {
+      const profileData = await authService.getProfile();
+      const u = profileData.data?.user || profileData.data;
+      setUserInfo({
+        full_name: u.full_name || "",
+        phone: u.phone || "",
+      });
+    } catch (e) {
+      // Fallback to localStorage if API fails
+      const storedUser = localStorage.getItem("ev_swap_user");
+      if (storedUser) {
+        const user = JSON.parse(storedUser);
+        setUserInfo({
+          full_name: user.name || user.full_name || "",
+          phone: user.phone || "",
+        });
+      }
     }
   };
 
@@ -811,10 +601,10 @@ const BookingHistory: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="float">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-blue-900 dark:from-white dark:to-blue-100 bg-clip-text text-transparent">
-            Lịch sử Thay pin
+            Đơn đặt chỗ
           </h1>
           <p className="text-slate-600 dark:text-slate-300">
-            Xem lịch sử và chi tiết các lần thay pin
+            Quản lý và theo dõi các đơn đặt chỗ đổi pin của bạn
           </p>
         </div>
         <Button
@@ -841,44 +631,6 @@ const BookingHistory: React.FC = () => {
           variant="inline"
         />
       )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 gradient-primary rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <Calendar className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Tổng lần thay
-                </p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                  {totalBookings}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <CheckCircle className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Đã hoàn thành
-                </p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                  {completedBookings}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
       <Card className="glass-card border-0 glow">
         <CardContent className="p-4">
@@ -946,13 +698,14 @@ const BookingHistory: React.FC = () => {
               className="glass-card border-0 glow-hover"
             >
               <CardContent className="p-6">
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                  <div className="flex items-start space-x-4">
-                    <div className="p-3 gradient-primary rounded-lg shadow-lg">
+                <div className="space-y-4">
+                  {/* Header: Tên trạm và Status badges */}
+                  <div className="flex items-start space-x-3">
+                    <div className="p-3 gradient-primary rounded-lg shadow-lg flex-shrink-0">
                       <MapPin className="h-6 w-6 text-white" />
                     </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-2 flex-wrap gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center flex-wrap gap-2 mb-2">
                         <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
                           {booking.station?.name || "—"}
                         </h3>
@@ -976,45 +729,41 @@ const BookingHistory: React.FC = () => {
                           </Badge>
                         )}
                       </div>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">
+                      <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">
                         {booking.station?.address || "—"}
                       </p>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">
-                        <Car className="inline h-4 w-4 mr-1" />
-                        {booking.vehicle?.license_plate}{" "}
-                        {booking.vehicle?.model
-                          ? `(${booking.vehicle.model})`
-                          : ""}
-                      </p>
-                      {booking.vehicle?.current_battery?.battery_code && (
-                        <p className="text-sm text-slate-600 dark:text-slate-400">
-                          Mã Pin hiện tại:{" "}
-                          <span className="font-mono font-semibold text-slate-900 dark:text-white">
-                            {booking.vehicle.current_battery.battery_code}
-                          </span>
+                      <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600 dark:text-slate-400">
+                        <p className="flex items-center gap-1">
+                          <Car className="h-4 w-4" />
+                          {booking.vehicle?.license_plate}{" "}
+                          {booking.vehicle?.model
+                            ? `(${booking.vehicle.model})`
+                            : ""}
                         </p>
-                      )}
-                    </div>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">
-                      {booking.station?.address || "—"}
-                    </p>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">
-                      <Car className="inline h-4 w-4 mr-1" />
-                      {booking.vehicle?.license_plate}{" "}
-                      {booking.vehicle?.model
-                        ? `(${booking.vehicle.model})`
-                        : ""}
-                    </p>
-                    {/* Hiển thị thông tin hold_summary nếu có */}
-                    {booking.hold_summary &&
-                      (booking.status === "pending" ||
-                        booking.status === "confirmed") && (
-                        <div className="mt-2 p-2 bg-blue-50/50 dark:bg-blue-500/10 rounded-lg border border-blue-200/50 dark:border-blue-500/20">
-                          <p className="text-xs text-blue-800 dark:text-blue-300 font-medium mb-1">
-                            📌 Pin đã được giữ chỗ
+                        {booking.vehicle?.current_battery?.battery_code && (
+                          <p className="flex items-center gap-1">
+                            <Battery className="h-4 w-4" />
+                            Mã Pin:{" "}
+                            <span className="font-mono font-semibold text-slate-900 dark:text-white">
+                              {booking.vehicle.current_battery.battery_code}
+                            </span>
                           </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Hold Summary - Thông tin giữ chỗ */}
+                  {booking.hold_summary &&
+                    (booking.status === "pending" ||
+                      booking.status === "confirmed") && (
+                      <div className="p-3 bg-blue-50/50 dark:bg-blue-500/10 rounded-lg border border-blue-200/50 dark:border-blue-500/20">
+                        <p className="text-xs text-blue-800 dark:text-blue-300 font-medium mb-2">
+                          📌 Pin đã được giữ chỗ
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                           {booking.hold_summary.battery_code && (
-                            <p className="text-xs text-blue-700 dark:text-blue-400">
+                            <p className="text-blue-700 dark:text-blue-400">
                               Mã pin:{" "}
                               <span className="font-mono font-semibold">
                                 {booking.hold_summary.battery_code}
@@ -1022,7 +771,7 @@ const BookingHistory: React.FC = () => {
                             </p>
                           )}
                           {booking.hold_summary.hold_expires_at && (
-                            <p className="text-xs text-blue-700 dark:text-blue-400 mt-1">
+                            <p className="text-blue-700 dark:text-blue-400">
                               Hết hạn giữ chỗ:{" "}
                               {new Date(
                                 booking.hold_summary.hold_expires_at
@@ -1053,7 +802,7 @@ const BookingHistory: React.FC = () => {
                           )}
                           {booking.hold_summary.use_subscription &&
                             booking.hold_summary.subscription_name && (
-                              <p className="text-xs text-green-700 dark:text-green-400 mt-1">
+                              <p className="text-green-700 dark:text-green-400 sm:col-span-2">
                                 ✓ Sử dụng gói:{" "}
                                 {booking.hold_summary.subscription_name}
                                 {booking.hold_summary.subscription_unlimited
@@ -1066,7 +815,7 @@ const BookingHistory: React.FC = () => {
                             )}
                           {!booking.hold_summary.use_subscription &&
                             booking.hold_summary.wallet_amount_locked && (
-                              <p className="text-xs text-slate-700 dark:text-slate-300 mt-1">
+                              <p className="text-slate-700 dark:text-slate-300 sm:col-span-2">
                                 💰 Đã trừ:{" "}
                                 {Number(
                                   booking.hold_summary.wallet_amount_locked
@@ -1085,15 +834,16 @@ const BookingHistory: React.FC = () => {
                               </p>
                             )}
                         </div>
-                      )}
-                  </div>
+                      </div>
+                    )}
 
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                  {/* Thông tin đặt chỗ: Ngày, giờ, chi phí, mã */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-3 border-t border-slate-200 dark:border-slate-700">
                     <div>
-                      <p className="text-slate-600 dark:text-slate-400">
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">
                         Ngày đặt
                       </p>
-                      <p className="font-medium text-slate-900 dark:text-white">
+                      <p className="text-sm font-medium text-slate-900 dark:text-white">
                         {booking.created_at
                           ? new Date(booking.created_at).toLocaleDateString(
                               "vi-VN"
@@ -1104,10 +854,10 @@ const BookingHistory: React.FC = () => {
                       </p>
                     </div>
                     <div>
-                      <p className="text-slate-600 dark:text-slate-400">
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">
                         Giờ đặt
                       </p>
-                      <p className="font-medium text-slate-900 dark:text-white">
+                      <p className="text-sm font-medium text-slate-900 dark:text-white">
                         {booking.created_at
                           ? new Date(booking.created_at).toLocaleTimeString(
                               "vi-VN",
@@ -1132,10 +882,10 @@ const BookingHistory: React.FC = () => {
                         )}
                     </div>
                     <div>
-                      <p className="text-slate-600 dark:text-slate-400">
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">
                         Chi phí
                       </p>
-                      <p className="font-medium text-slate-900 dark:text-white">
+                      <p className="text-sm font-medium text-slate-900 dark:text-white">
                         {(() => {
                           const priceInfo = getDisplayPrice(booking);
                           if (priceInfo.isFree) {
@@ -1178,15 +928,17 @@ const BookingHistory: React.FC = () => {
                         )}
                     </div>
                     <div>
-                      <p className="text-slate-600 dark:text-slate-400">Mã</p>
-                      <p className="font-medium text-slate-900 dark:text-white">
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">
+                        Mã đặt chỗ
+                      </p>
+                      <p className="text-sm font-medium text-slate-900 dark:text-white font-mono">
                         {booking.booking_code}
                       </p>
                     </div>
                   </div>
 
-                  {/* Nút hành động - Sắp xếp dọc: Hủy đặt chỗ ở trên, Xuất phiếu xác nhận ở dưới */}
-                  <div className="flex flex-col gap-2">
+                  {/* Nút hành động - Căn phải */}
+                  <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t border-slate-200 dark:border-slate-700 justify-end items-end">
                     {(booking.status === "pending" ||
                       booking.status === "confirmed") &&
                       (() => {
@@ -1329,6 +1081,190 @@ const BookingHistory: React.FC = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Confirmation Voucher Dialog */}
+      <Dialog open={voucherDialogOpen} onOpenChange={setVoucherDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center text-xl font-bold text-slate-900 dark:text-white">
+              PHIẾU XÁC NHẬN ĐẶT CHỖ
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              Phiếu xác nhận để xuất trình tại trạm
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedBookingForVoucher && (
+            <div className="space-y-5 mt-4">
+              {/* Mã đặt chỗ - Phần quan trọng nhất */}
+              <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-lg p-6 text-center shadow-lg">
+                <p className="text-blue-100 text-xs mb-2 uppercase tracking-wide">
+                  Mã đơn hàng
+                </p>
+                <p className="text-white text-4xl font-bold font-mono tracking-wider">
+                  {selectedBookingForVoucher.booking_code}
+                </p>
+              </div>
+
+              {/* Thông tin cần thiết cho check-in */}
+              <div className="space-y-4">
+                {/* Thông tin tài xế */}
+                {(userInfo?.full_name || userInfo?.phone) && (
+                  <>
+                    {userInfo.full_name && (
+                      <div className="flex justify-between items-center py-2 border-b border-slate-200 dark:border-slate-700">
+                        <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                          Tài xế:
+                        </span>
+                        <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                          {userInfo.full_name}
+                        </span>
+                      </div>
+                    )}
+                    {userInfo.phone && (
+                      <div className="flex justify-between items-center py-2 border-b border-slate-200 dark:border-slate-700">
+                        <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                          Số điện thoại:
+                        </span>
+                        <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                          {userInfo.phone}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Tên trạm */}
+                <div className="flex justify-between items-center py-2 border-b border-slate-200 dark:border-slate-700">
+                  <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                    Trạm:
+                  </span>
+                  <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                    {selectedBookingForVoucher.station?.name || "—"}
+                  </span>
+                </div>
+
+                {/* Thông tin xe */}
+                {selectedBookingForVoucher.vehicle?.license_plate && (
+                  <div className="flex justify-between items-center py-2 border-b border-slate-200 dark:border-slate-700">
+                    <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                      Biển số:
+                    </span>
+                    <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                      {selectedBookingForVoucher.vehicle.license_plate}
+                    </span>
+                  </div>
+                )}
+
+                {/* Model Pin */}
+                {selectedBookingForVoucher.battery_model && (
+                  <div className="flex justify-between items-center py-2 border-b border-slate-200 dark:border-slate-700">
+                    <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                      Model Pin:
+                    </span>
+                    <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                      {selectedBookingForVoucher.battery_model}
+                    </span>
+                  </div>
+                )}
+
+                {/* Thời gian đặt - Thời gian hẹn */}
+                {(selectedBookingForVoucher.created_at ||
+                  selectedBookingForVoucher.scheduled_at) &&
+                  (() => {
+                    const createdDate = selectedBookingForVoucher.created_at
+                      ? new Date(selectedBookingForVoucher.created_at)
+                      : null;
+                    const scheduledDate = selectedBookingForVoucher.scheduled_at
+                      ? new Date(selectedBookingForVoucher.scheduled_at)
+                      : null;
+
+                    // Kiểm tra xem có cùng ngày không
+                    const isSameDay =
+                      createdDate &&
+                      scheduledDate &&
+                      createdDate.toDateString() === scheduledDate.toDateString();
+
+                    return (
+                      <div className="flex justify-between items-center py-2 border-b border-slate-200 dark:border-slate-700">
+                        <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                          Thời gian:
+                        </span>
+                        <span className="text-sm font-semibold text-slate-900 dark:text-white text-right">
+                          {isSameDay && createdDate ? (
+                            <>
+                              {createdDate.toLocaleDateString("vi-VN", {
+                                day: "2-digit",
+                                month: "2-digit",
+                                year: "numeric",
+                              })}{" "}
+                              - Đặt:{" "}
+                              {createdDate.toLocaleTimeString("vi-VN", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}{" "}
+                              - Hẹn:{" "}
+                              {scheduledDate.toLocaleTimeString("vi-VN", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </>
+                          ) : (
+                            <>
+                              {createdDate && (
+                                <span>
+                                  Đặt:{" "}
+                                  {createdDate.toLocaleString("vi-VN", {
+                                    day: "2-digit",
+                                    month: "2-digit",
+                                    year: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </span>
+                              )}
+                              {createdDate && scheduledDate && (
+                                <span className="mx-2">-</span>
+                              )}
+                              {scheduledDate && (
+                                <span>
+                                  Hẹn:{" "}
+                                  {scheduledDate.toLocaleString("vi-VN", {
+                                    day: "2-digit",
+                                    month: "2-digit",
+                                    year: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </span>
+                      </div>
+                    );
+                  })()}
+
+                {/* Instant booking badge */}
+                {selectedBookingForVoucher.is_instant && (
+                  <div className="flex justify-center py-2">
+                    <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0">
+                      Đổi pin ngay
+                    </Badge>
+                  </div>
+                )}
+              </div>
+
+              {/* Lưu ý ngắn gọn */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 text-center">
+                <p className="text-xs text-blue-800 dark:text-blue-300">
+                  Vui lòng xuất trình mã đơn hàng khi đến trạm
+                </p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -7,238 +7,34 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  user_id                 String               @id @default(uuid()) @db.Uuid
-  full_name               String               @db.VarChar(100)
-  email                   String               @unique @db.VarChar(100)
-  password_hash           String?              @db.VarChar(255)
-  phone                   String?              @db.VarChar(20)
-  avatar                  String?              @db.VarChar(255)
-  role                    UserRole             @default(DRIVER)
-  station_id              String?              @db.Uuid
-  status                  UserStatus           @default(ACTIVE)
-  created_at              DateTime             @default(now())
-  updated_at              DateTime             @updatedAt
-  last_login_at           DateTime?
-  battery_transfers       BatteryTransferLog[]
-  checked_in_bookings     Booking[]            @relation("CheckedInByStaff")
-  bookings                Booking[]
-  payments                Payment[]
-  station_ratings         StationRating[]
-  assigned_tickets        SupportTicket[]      @relation("AssignedStaff")
-  support_tickets         SupportTicket[]
-  ticket_replies          TicketReply[]
-  staff_transactions      Transaction[]        @relation("TransactionStaff")
-  transactions            Transaction[]
-  subscriptions           UserSubscription[]
-  station                 Station?             @relation(fields: [station_id], references: [station_id])
-  vehicles                Vehicle[]
-  wallet                  Wallet?
-  notifications           Notification[]
-  staff_schedules         StaffSchedule[]
-  battery_history_actions BatteryHistory[]     @relation("BatteryHistoryActor")
+model batteries {
+  battery_id                                          String                  @id @db.Uuid
+  battery_code                                        String                  @unique @db.VarChar(50)
+  station_id                                          String                  @db.Uuid
+  model                                               String                  @db.VarChar(50)
+  capacity_kwh                                        Decimal?                @db.Decimal(6, 2)
+  voltage                                             Decimal?                @db.Decimal(6, 2)
+  current_charge                                      Int                     @default(100)
+  status                                              BatteryStatus           @default(full)
+  last_charged_at                                     DateTime?
+  created_at                                          DateTime                @default(now())
+  updated_at                                          DateTime
+  health_percentage                                   Decimal?                @db.Decimal(5, 2)
+  cycle_count                                         Int?                    @default(0)
+  stations                                            stations                @relation(fields: [station_id], references: [station_id])
+  battery_history                                     battery_history[]
+  battery_transfer_logs                               battery_transfer_logs[]
+  transactions_transactions_new_battery_idTobatteries transactions[]          @relation("transactions_new_battery_idTobatteries")
+  transactions_transactions_old_battery_idTobatteries transactions[]          @relation("transactions_old_battery_idTobatteries")
+  vehicles                                            vehicles[]
 
-  @@index([station_id])
-  @@map("users")
-}
-
-model Vehicle {
-  vehicle_id         String           @id @default(uuid()) @db.Uuid
-  user_id            String           @db.Uuid
-  license_plate      String           @unique @db.VarChar(20)
-  vehicle_type       VehicleType
-  make               String?          @db.VarChar(50)
-  model              String?          @db.VarChar(50)
-  year               Int?
-  battery_model      String           @db.VarChar(50)
-  current_battery_id String?          @db.Uuid
-  created_at         DateTime         @default(now())
-  updated_at         DateTime         @updatedAt
-  bookings           Booking[]
-  transactions       Transaction[]
-  user               User             @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
-  current_battery    Battery?         @relation("VehicleCurrentBattery", fields: [current_battery_id], references: [battery_id])
-  battery_history    BatteryHistory[] @relation("BatteryHistoryVehicle")
-
-  @@index([user_id])
-  @@map("vehicles")
-}
-
-model Station {
-  station_id             String               @id @default(uuid()) @db.Uuid
-  name                   String               @db.VarChar(100)
-  address                String               @db.VarChar(255)
-  latitude               Decimal?             @db.Decimal(10, 6)
-  longitude              Decimal?             @db.Decimal(10, 6)
-  capacity               Int
-  supported_models       Json
-  operating_hours        String?              @db.VarChar(50)
-  status                 StationStatus        @default(active)
-  created_at             DateTime             @default(now())
-  updated_at             DateTime             @updatedAt
-  batteries              Battery[]
-  battery_transfers_from BatteryTransferLog[] @relation("TransferFromStation")
-  battery_transfers_to   BatteryTransferLog[] @relation("TransferToStation")
-  bookings               Booking[]
-  station_ratings        StationRating[]
-  transactions           Transaction[]
-  staff                  User[]
-  staff_schedules        StaffSchedule[]
-  battery_history        BatteryHistory[]     @relation("BatteryHistoryStation")
-  battery_pricings       BatteryPricing[]
-
-  @@map("stations")
-}
-
-model Battery {
-  battery_id        String               @id @default(uuid()) @db.Uuid
-  battery_code      String               @unique @db.VarChar(50)
-  station_id        String               @db.Uuid
-  model             String               @db.VarChar(50)
-  capacity_kwh      Decimal?             @db.Decimal(6, 2)
-  voltage           Decimal?             @db.Decimal(6, 2)
-  current_charge    Int                  @default(100)
-  health_percentage Decimal?             @db.Decimal(5, 2)
-  cycle_count       Int?                 @default(0)
-  status            BatteryStatus        @default(full)
-  last_charged_at   DateTime?
-  created_at        DateTime             @default(now())
-  updated_at        DateTime             @updatedAt
-  station           Station              @relation(fields: [station_id], references: [station_id])
-  transfer_logs     BatteryTransferLog[]
-  new_transactions  Transaction[]        @relation("NewBattery")
-  old_transactions  Transaction[]        @relation("OldBattery")
-  locked_bookings   Booking[]            @relation("BookingLockedBattery")
-  vehicle_current   Vehicle[]            @relation("VehicleCurrentBattery")
-  history_entries   BatteryHistory[]
-
+  @@index([model])
   @@index([station_id, status])
   @@index([status, current_charge])
-  @@index([model])
-  @@map("batteries")
 }
 
-model StaffSchedule {
-  schedule_id String         @id @default(uuid()) @db.Uuid
-  staff_id    String         @db.Uuid
-  station_id  String?        @db.Uuid
-  shift_date  DateTime       @db.Date
-  shift_start DateTime
-  shift_end   DateTime
-  status      ScheduleStatus @default(scheduled)
-  notes       String?
-  created_at  DateTime       @default(now())
-  updated_at  DateTime       @updatedAt
-
-  staff   User     @relation(fields: [staff_id], references: [user_id], onDelete: Cascade)
-  station Station? @relation(fields: [station_id], references: [station_id])
-
-  @@index([staff_id, shift_date])
-  @@map("staff_schedules")
-}
-
-model Booking {
-  booking_id                     String            @id @default(uuid()) @db.Uuid
-  booking_code                   String            @unique @db.VarChar(20)
-  user_id                        String            @db.Uuid
-  vehicle_id                     String            @db.Uuid
-  station_id                     String            @db.Uuid
-  battery_model                  String            @db.VarChar(50)
-  scheduled_at                   DateTime
-  status                         BookingStatus     @default(pending)
-  checked_in_at                  DateTime?
-  checked_in_by_staff_id         String?           @db.Uuid
-  is_instant                     Boolean           @default(false)
-  notes                          String?
-  locked_battery_id              String?           @db.Uuid
-  locked_subscription_id         String?           @db.Uuid
-  locked_swap_count              Int               @default(0)
-  locked_wallet_amount           Decimal           @default(0) @db.Decimal(10, 2)
-  locked_wallet_payment_id       String?           @db.Uuid
-  use_subscription               Boolean           @default(true)
-  hold_expires_at                DateTime?
-  locked_battery_previous_status BatteryStatus?
-  cancellation_reason            String?
-  cancellation_notes             String?
-  created_at                     DateTime          @default(now())
-  checked_in_by_staff            User?             @relation("CheckedInByStaff", fields: [checked_in_by_staff_id], references: [user_id])
-  station                        Station           @relation(fields: [station_id], references: [station_id])
-  user                           User              @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
-  vehicle                        Vehicle           @relation(fields: [vehicle_id], references: [vehicle_id], onDelete: Cascade)
-  transaction                    Transaction?
-  locked_battery                 Battery?          @relation("BookingLockedBattery", fields: [locked_battery_id], references: [battery_id])
-  locked_subscription            UserSubscription? @relation("BookingLockedSubscription", fields: [locked_subscription_id], references: [subscription_id])
-  locked_wallet_payment          Payment?          @relation("PaymentBookingLock", fields: [locked_wallet_payment_id], references: [payment_id])
-  battery_history                BatteryHistory[]
-
-  @@index([status, scheduled_at])
-  @@index([station_id, status])
-  @@index([user_id, status])
-  @@index([checked_in_at])
-  @@map("bookings")
-}
-
-model Transaction {
-  transaction_id        String         @id @default(uuid()) @db.Uuid
-  transaction_code      String         @unique @db.VarChar(30)
-  booking_id            String         @unique @db.Uuid
-  user_id               String         @db.Uuid
-  vehicle_id            String         @db.Uuid
-  station_id            String         @db.Uuid
-  old_battery_id        String         @db.Uuid
-  new_battery_id        String         @db.Uuid
-  staff_id              String         @db.Uuid
-  swap_at               DateTime       @default(now())
-  swap_started_at       DateTime?
-  swap_completed_at     DateTime?
-  swap_duration_minutes Int?
-  payment_status        PaymentStatus  @default(pending)
-  amount                Decimal        @default(0) @db.Decimal(10, 2)
-  notes                 String?
-  created_at            DateTime       @default(now())
-  payment               Payment?
-  station_rating        StationRating?
-  booking               Booking        @relation(fields: [booking_id], references: [booking_id], onDelete: Cascade)
-  new_battery           Battery        @relation("NewBattery", fields: [new_battery_id], references: [battery_id])
-  old_battery           Battery        @relation("OldBattery", fields: [old_battery_id], references: [battery_id])
-  staff                 User           @relation("TransactionStaff", fields: [staff_id], references: [user_id])
-  station               Station        @relation(fields: [station_id], references: [station_id])
-  user                  User           @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
-  vehicle               Vehicle        @relation(fields: [vehicle_id], references: [vehicle_id], onDelete: Cascade)
-
-  @@index([user_id, payment_status])
-  @@index([station_id, created_at])
-  @@index([payment_status])
-  @@map("transactions")
-}
-
-model Payment {
-  payment_id          String            @id @default(uuid()) @db.Uuid
-  transaction_id      String?           @unique @db.Uuid
-  subscription_id     String?           @db.Uuid
-  topup_package_id    String?           @db.Uuid
-  user_id             String            @db.Uuid
-  amount              Decimal           @db.Decimal(10, 2)
-  payment_method      PaymentMethod
-  payment_status      PaymentStatus     @default(pending)
-  payment_gateway_ref String?           @db.VarChar(100)
-  paid_at             DateTime?
-  payment_type        PaymentType       @default(OTHER)
-  metadata            Json?
-  created_at          DateTime          @default(now())
-  subscription        UserSubscription? @relation(fields: [subscription_id], references: [subscription_id], onDelete: Cascade)
-  topup_package       TopUpPackage?     @relation(fields: [topup_package_id], references: [package_id], onDelete: Cascade)
-  transaction         Transaction?      @relation(fields: [transaction_id], references: [transaction_id], onDelete: Cascade)
-  user                User              @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
-  booking_locks       Booking[]         @relation("PaymentBookingLock")
-
-  @@index([user_id, payment_status])
-  @@index([payment_status, created_at])
-  @@map("payments")
-}
-
-model BatteryHistory {
-  history_id    String               @id @default(uuid()) @db.Uuid
+model battery_history {
+  history_id    String               @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   battery_id    String               @db.Uuid
   booking_id    String?              @db.Uuid
   vehicle_id    String?              @db.Uuid
@@ -248,40 +44,288 @@ model BatteryHistory {
   notes         String?
   metadata      Json?
   created_at    DateTime             @default(now())
-  battery       Battery              @relation(fields: [battery_id], references: [battery_id], onDelete: Cascade)
-  booking       Booking?             @relation(fields: [booking_id], references: [booking_id], onDelete: Cascade)
-  vehicle       Vehicle?             @relation("BatteryHistoryVehicle", fields: [vehicle_id], references: [vehicle_id])
-  actor_user    User?                @relation("BatteryHistoryActor", fields: [actor_user_id], references: [user_id])
-  station       Station?             @relation("BatteryHistoryStation", fields: [station_id], references: [station_id])
+  users         users?               @relation(fields: [actor_user_id], references: [user_id], onUpdate: NoAction)
+  batteries     batteries            @relation(fields: [battery_id], references: [battery_id], onDelete: Cascade, onUpdate: NoAction)
+  bookings      bookings?            @relation(fields: [booking_id], references: [booking_id], onDelete: Cascade, onUpdate: NoAction)
+  vehicles      vehicles?            @relation(fields: [vehicle_id], references: [vehicle_id], onUpdate: NoAction)
 
   @@index([battery_id, created_at])
   @@index([booking_id])
-  @@map("battery_history")
 }
 
-model ServicePackage {
-  package_id           String              @id @default(uuid()) @db.Uuid
-  name                 String              @db.VarChar(100)
+model battery_pricings {
+  pricing_id    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  battery_model String   @db.VarChar(50)
+  station_id    String?  @db.Uuid
+  price         Decimal  @db.Decimal(10, 2)
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @default(now())
+  stations      stations? @relation(fields: [station_id], references: [station_id], onDelete: Cascade)
+
+  @@unique([battery_model, station_id])
+  @@index([battery_model])
+  @@index([is_active])
+}
+
+model battery_transfer_logs {
+  transfer_id                                              String          @id @db.Uuid
+  battery_id                                               String          @db.Uuid
+  from_station_id                                          String          @db.Uuid
+  to_station_id                                            String          @db.Uuid
+  transfer_reason                                          String          @db.VarChar(100)
+  transferred_by                                           String          @db.Uuid
+  transferred_at                                           DateTime        @default(now())
+  notes                                                    String?
+  transfer_status                                          TransferStatus? @default(completed)
+  batteries                                                batteries       @relation(fields: [battery_id], references: [battery_id])
+  stations_battery_transfer_logs_from_station_idTostations stations        @relation("battery_transfer_logs_from_station_idTostations", fields: [from_station_id], references: [station_id])
+  stations_battery_transfer_logs_to_station_idTostations   stations        @relation("battery_transfer_logs_to_station_idTostations", fields: [to_station_id], references: [station_id])
+  users                                                    users           @relation(fields: [transferred_by], references: [user_id])
+
+  @@index([battery_id])
+  @@index([from_station_id, transfer_status])
+  @@index([to_station_id, transfer_status])
+}
+
+model bookings {
+  booking_id                                   String            @id @db.Uuid
+  booking_code                                 String            @unique @db.VarChar(20)
+  user_id                                      String            @db.Uuid
+  vehicle_id                                   String            @db.Uuid
+  station_id                                   String            @db.Uuid
+  battery_model                                String            @db.VarChar(50)
+  scheduled_at                                 DateTime
+  status                                       BookingStatus     @default(pending)
+  checked_in_at                                DateTime?
+  checked_in_by_staff_id                       String?           @db.Uuid
+  notes                                        String?
+  created_at                                   DateTime          @default(now())
+  is_instant                                   Boolean           @default(false)
+  locked_battery_id                            String?           @db.Uuid
+  locked_subscription_id                       String?           @db.Uuid
+  locked_swap_count                            Int               @default(0)
+  locked_wallet_amount                         Decimal           @default(0) @db.Decimal(10, 2)
+  locked_wallet_payment_id                     String?           @db.Uuid
+  use_subscription                             Boolean           @default(true)
+  locked_battery_previous_status               BatteryStatus?
+  hold_expires_at                              DateTime?
+  cancellation_reason                          String?
+  cancellation_notes                           String?
+  battery_history                              battery_history[]
+  users_bookings_checked_in_by_staff_idTousers users?            @relation("bookings_checked_in_by_staff_idTousers", fields: [checked_in_by_staff_id], references: [user_id])
+  stations                                     stations          @relation(fields: [station_id], references: [station_id])
+  users_bookings_user_idTousers                users             @relation("bookings_user_idTousers", fields: [user_id], references: [user_id], onDelete: Cascade)
+  vehicles                                     vehicles          @relation(fields: [vehicle_id], references: [vehicle_id], onDelete: Cascade)
+  transactions                                 transactions?
+
+  @@index([checked_in_at])
+  @@index([is_instant])
+  @@index([station_id, status])
+  @@index([status, scheduled_at])
+  @@index([user_id, status])
+}
+
+model notifications {
+  notification_id String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id         String   @db.Uuid
+  type            String   @db.VarChar(50)
+  title           String   @db.VarChar(200)
+  message         String
+  is_read         Boolean  @default(false)
+  data            Json?
+  created_at      DateTime @default(now())
+  users           users    @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@index([created_at])
+  @@index([type])
+  @@index([user_id])
+  @@index([user_id, is_read])
+}
+
+model payments {
+  payment_id          String              @id @db.Uuid
+  transaction_id      String?             @unique @db.Uuid
+  subscription_id     String?             @db.Uuid
+  user_id             String              @db.Uuid
+  amount              Decimal             @db.Decimal(10, 2)
+  payment_method      PaymentMethod
+  payment_status      PaymentStatus       @default(pending)
+  payment_gateway_ref String?             @db.VarChar(100)
+  paid_at             DateTime?
+  created_at          DateTime            @default(now())
+  topup_package_id    String?             @db.Uuid
+  payment_type        PaymentType         @default(OTHER)
+  metadata            Json?
+  user_subscriptions  user_subscriptions? @relation(fields: [subscription_id], references: [subscription_id], onDelete: Cascade)
+  topup_packages      topup_packages?     @relation(fields: [topup_package_id], references: [package_id], onDelete: Cascade)
+  transactions        transactions?       @relation(fields: [transaction_id], references: [transaction_id], onDelete: Cascade)
+  users               users               @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@index([payment_status, created_at])
+  @@index([topup_package_id])
+  @@index([user_id, payment_status])
+}
+
+model service_packages {
+  package_id           String               @id @db.Uuid
+  name                 String               @db.VarChar(100)
   description          String?
-  price                Decimal             @db.Decimal(10, 2)
-  battery_capacity_kwh Int
+  price                Decimal              @db.Decimal(10, 2)
   swap_limit           Int?
   duration_days        Int
   battery_models       Json?
+  is_active            Boolean              @default(true)
+  created_at           DateTime             @default(now())
+  updated_at           DateTime
+  battery_capacity_kwh Int
+  billing_cycle        PackageBillingCycle  @default(monthly)
   benefits             Json?
-  billing_cycle        PackageBillingCycle @default(monthly)
   metadata             Json?
-  is_active            Boolean             @default(true)
-  created_at           DateTime            @default(now())
-  updated_at           DateTime            @updatedAt
-  subscriptions        UserSubscription[]
+  user_subscriptions   user_subscriptions[]
 
   @@index([is_active])
-  @@map("service_packages")
 }
 
-model UserSubscription {
-  subscription_id     String             @id @default(uuid()) @db.Uuid
+model staff_schedules {
+  schedule_id String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  staff_id    String         @db.Uuid
+  station_id  String?        @db.Uuid
+  shift_date  DateTime       @db.Date
+  shift_start DateTime       @db.Timestamptz(6)
+  shift_end   DateTime       @db.Timestamptz(6)
+  status      ScheduleStatus @default(scheduled)
+  notes       String?
+  created_at  DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime       @default(now()) @db.Timestamptz(6)
+  users       users          @relation(fields: [staff_id], references: [user_id], onDelete: Cascade)
+  stations    stations?      @relation(fields: [station_id], references: [station_id])
+
+  @@index([staff_id, shift_date])
+}
+
+model station_ratings {
+  rating_id      String       @id @db.Uuid
+  user_id        String       @db.Uuid
+  station_id     String       @db.Uuid
+  transaction_id String       @unique @db.Uuid
+  rating         Int
+  comment        String?
+  created_at     DateTime     @default(now())
+  updated_at     DateTime
+  stations       stations     @relation(fields: [station_id], references: [station_id])
+  transactions   transactions @relation(fields: [transaction_id], references: [transaction_id], onDelete: Cascade)
+  users          users        @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@index([station_id])
+  @@index([user_id])
+}
+
+model stations {
+  station_id                                                            String                  @id @db.Uuid
+  name                                                                  String                  @db.VarChar(100)
+  address                                                               String                  @db.VarChar(255)
+  latitude                                                              Decimal?                @db.Decimal(10, 6)
+  longitude                                                             Decimal?                @db.Decimal(10, 6)
+  capacity                                                              Int
+  supported_models                                                      Json
+  operating_hours                                                       String?                 @db.VarChar(50)
+  status                                                                StationStatus           @default(active)
+  created_at                                                            DateTime                @default(now())
+  updated_at                                                            DateTime
+  batteries                                                             batteries[]
+  battery_transfer_logs_battery_transfer_logs_from_station_idTostations battery_transfer_logs[] @relation("battery_transfer_logs_from_station_idTostations")
+  battery_transfer_logs_battery_transfer_logs_to_station_idTostations   battery_transfer_logs[] @relation("battery_transfer_logs_to_station_idTostations")
+  battery_pricings                                                      battery_pricings[]
+  bookings                                                              bookings[]
+  staff_schedules                                                       staff_schedules[]
+  station_ratings                                                       station_ratings[]
+  transactions                                                          transactions[]
+  users                                                                 users[]
+}
+
+model support_tickets {
+  ticket_id                                         String           @id @db.Uuid
+  ticket_number                                     String           @unique @db.VarChar(20)
+  user_id                                           String           @db.Uuid
+  category                                          TicketCategory
+  subject                                           String           @db.VarChar(100)
+  description                                       String
+  priority                                          TicketPriority   @default(medium)
+  status                                            TicketStatus     @default(open)
+  assigned_to_staff_id                              String?          @db.Uuid
+  resolved_at                                       DateTime?
+  created_at                                        DateTime         @default(now())
+  updated_at                                        DateTime
+  users_support_tickets_assigned_to_staff_idTousers users?           @relation("support_tickets_assigned_to_staff_idTousers", fields: [assigned_to_staff_id], references: [user_id])
+  users_support_tickets_user_idTousers              users            @relation("support_tickets_user_idTousers", fields: [user_id], references: [user_id], onDelete: Cascade)
+  ticket_replies                                    ticket_replies[]
+
+  @@index([assigned_to_staff_id, status])
+  @@index([user_id, status])
+}
+
+model ticket_replies {
+  reply_id        String          @id @db.Uuid
+  ticket_id       String          @db.Uuid
+  user_id         String          @db.Uuid
+  message         String
+  is_staff        Boolean         @default(false)
+  created_at      DateTime        @default(now())
+  support_tickets support_tickets @relation(fields: [ticket_id], references: [ticket_id], onDelete: Cascade)
+  users           users           @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+}
+
+model topup_packages {
+  package_id    String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String     @db.VarChar(100)
+  description   String?
+  topup_amount  Decimal    @db.Decimal(10, 2)
+  bonus_amount  Decimal    @db.Decimal(10, 2)
+  actual_amount Decimal    @db.Decimal(10, 2)
+  is_active     Boolean    @default(true)
+  created_at    DateTime   @default(now())
+  updated_at    DateTime   @default(now())
+  payments      payments[]
+
+  @@index([is_active])
+}
+
+model transactions {
+  transaction_id                                   String           @id @db.Uuid
+  transaction_code                                 String           @unique @db.VarChar(30)
+  booking_id                                       String           @unique @db.Uuid
+  user_id                                          String           @db.Uuid
+  vehicle_id                                       String           @db.Uuid
+  station_id                                       String           @db.Uuid
+  old_battery_id                                   String           @db.Uuid
+  new_battery_id                                   String           @db.Uuid
+  staff_id                                         String           @db.Uuid
+  swap_at                                          DateTime         @default(now())
+  swap_started_at                                  DateTime?
+  swap_completed_at                                DateTime?
+  swap_duration_minutes                            Int?
+  payment_status                                   PaymentStatus    @default(pending)
+  amount                                           Decimal          @default(0) @db.Decimal(10, 2)
+  notes                                            String?
+  created_at                                       DateTime         @default(now())
+  payments                                         payments?
+  station_ratings                                  station_ratings?
+  bookings                                         bookings         @relation(fields: [booking_id], references: [booking_id], onDelete: Cascade)
+  batteries_transactions_new_battery_idTobatteries batteries        @relation("transactions_new_battery_idTobatteries", fields: [new_battery_id], references: [battery_id])
+  batteries_transactions_old_battery_idTobatteries batteries        @relation("transactions_old_battery_idTobatteries", fields: [old_battery_id], references: [battery_id])
+  users_transactions_staff_idTousers               users            @relation("transactions_staff_idTousers", fields: [staff_id], references: [user_id])
+  stations                                         stations         @relation(fields: [station_id], references: [station_id])
+  users_transactions_user_idTousers                users            @relation("transactions_user_idTousers", fields: [user_id], references: [user_id], onDelete: Cascade)
+  vehicles                                         vehicles         @relation(fields: [vehicle_id], references: [vehicle_id], onDelete: Cascade)
+
+  @@index([payment_status])
+  @@index([station_id, created_at])
+  @@index([user_id, payment_status])
+}
+
+model user_subscriptions {
+  subscription_id     String             @id @db.Uuid
   user_id             String             @db.Uuid
   package_id          String             @db.Uuid
   start_date          DateTime
@@ -289,182 +333,83 @@ model UserSubscription {
   remaining_swaps     Int?
   status              SubscriptionStatus @default(active)
   auto_renew          Boolean            @default(false)
+  created_at          DateTime           @default(now())
+  updated_at          DateTime
   cancelled_at        DateTime?
   cancellation_reason String?
   metadata            Json?
-  created_at          DateTime           @default(now())
-  updated_at          DateTime           @updatedAt
-  payments            Payment[]
-  package             ServicePackage     @relation(fields: [package_id], references: [package_id])
-  user                User               @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
-  locked_bookings     Booking[]          @relation("BookingLockedSubscription")
+  payments            payments[]
+  service_packages    service_packages   @relation(fields: [package_id], references: [package_id])
+  users               users              @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
-  @@index([user_id, status])
   @@index([status, end_date])
-  @@map("user_subscriptions")
-}
-
-model SupportTicket {
-  ticket_id            String         @id @default(uuid()) @db.Uuid
-  ticket_number        String         @unique @db.VarChar(20)
-  user_id              String         @db.Uuid
-  category             TicketCategory
-  subject              String         @db.VarChar(100)
-  description          String
-  priority             TicketPriority @default(medium)
-  status               TicketStatus   @default(open)
-  assigned_to_staff_id String?        @db.Uuid
-  resolved_at          DateTime?
-  created_at           DateTime       @default(now())
-  updated_at           DateTime       @updatedAt
-  assigned_to_staff    User?          @relation("AssignedStaff", fields: [assigned_to_staff_id], references: [user_id])
-  user                 User           @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
-  replies              TicketReply[]
-
   @@index([user_id, status])
-  @@index([assigned_to_staff_id, status])
-  @@map("support_tickets")
 }
 
-model TicketReply {
-  reply_id   String        @id @default(uuid()) @db.Uuid
-  ticket_id  String        @db.Uuid
-  user_id    String        @db.Uuid
-  message    String
-  is_staff   Boolean       @default(false)
-  created_at DateTime      @default(now())
-  ticket     SupportTicket @relation(fields: [ticket_id], references: [ticket_id], onDelete: Cascade)
-  user       User          @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
-
-  @@map("ticket_replies")
-}
-
-model StationRating {
-  rating_id      String      @id @default(uuid()) @db.Uuid
-  user_id        String      @db.Uuid
-  station_id     String      @db.Uuid
-  transaction_id String      @unique @db.Uuid
-  rating         Int
-  comment        String?
-  created_at     DateTime    @default(now())
-  updated_at     DateTime    @updatedAt
-  station        Station     @relation(fields: [station_id], references: [station_id])
-  transaction    Transaction @relation(fields: [transaction_id], references: [transaction_id], onDelete: Cascade)
-  user           User        @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+model users {
+  user_id                                                     String                  @id @db.Uuid
+  full_name                                                   String                  @db.VarChar(100)
+  email                                                       String                  @unique @db.VarChar(100)
+  password_hash                                               String?                 @db.VarChar(255)
+  phone                                                       String?                 @db.VarChar(20)
+  avatar                                                      String?                 @db.VarChar(255)
+  role                                                        UserRole                @default(DRIVER)
+  station_id                                                  String?                 @db.Uuid
+  status                                                      UserStatus              @default(ACTIVE)
+  created_at                                                  DateTime                @default(now())
+  updated_at                                                  DateTime
+  last_login_at                                               DateTime?
+  battery_history                                             battery_history[]
+  battery_transfer_logs                                       battery_transfer_logs[]
+  bookings_bookings_checked_in_by_staff_idTousers             bookings[]              @relation("bookings_checked_in_by_staff_idTousers")
+  bookings_bookings_user_idTousers                            bookings[]              @relation("bookings_user_idTousers")
+  notifications                                               notifications[]
+  payments                                                    payments[]
+  staff_schedules                                             staff_schedules[]
+  station_ratings                                             station_ratings[]
+  support_tickets_support_tickets_assigned_to_staff_idTousers support_tickets[]       @relation("support_tickets_assigned_to_staff_idTousers")
+  support_tickets_support_tickets_user_idTousers              support_tickets[]       @relation("support_tickets_user_idTousers")
+  ticket_replies                                              ticket_replies[]
+  transactions_transactions_staff_idTousers                   transactions[]          @relation("transactions_staff_idTousers")
+  transactions_transactions_user_idTousers                    transactions[]          @relation("transactions_user_idTousers")
+  user_subscriptions                                          user_subscriptions[]
+  stations                                                    stations?               @relation(fields: [station_id], references: [station_id])
+  vehicles                                                    vehicles[]
+  wallets                                                     wallets?
 
   @@index([station_id])
+}
+
+model vehicles {
+  vehicle_id         String            @id @db.Uuid
+  user_id            String            @db.Uuid
+  license_plate      String            @unique @db.VarChar(20)
+  vehicle_type       VehicleType
+  make               String?           @db.VarChar(50)
+  model              String?           @db.VarChar(50)
+  year               Int?
+  battery_model      String            @db.VarChar(50)
+  created_at         DateTime          @default(now())
+  updated_at         DateTime
+  current_battery_id String?           @db.Uuid
+  battery_history    battery_history[]
+  bookings           bookings[]
+  transactions       transactions[]
+  batteries          batteries?        @relation(fields: [current_battery_id], references: [battery_id], onUpdate: NoAction)
+  users              users             @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
   @@index([user_id])
-  @@map("station_ratings")
 }
 
-model BatteryTransferLog {
-  transfer_id         String         @id @default(uuid()) @db.Uuid
-  battery_id          String         @db.Uuid
-  from_station_id     String         @db.Uuid
-  to_station_id       String         @db.Uuid
-  transfer_reason     String         @db.VarChar(100)
-  transferred_by      String         @db.Uuid
-  transferred_at      DateTime       @default(now())
-  notes               String?
-  transfer_status     TransferStatus @default(completed)
-  battery             Battery        @relation(fields: [battery_id], references: [battery_id])
-  from_station        Station        @relation("TransferFromStation", fields: [from_station_id], references: [station_id])
-  to_station          Station        @relation("TransferToStation", fields: [to_station_id], references: [station_id])
-  transferred_by_user User           @relation(fields: [transferred_by], references: [user_id])
-
-  @@index([battery_id])
-  @@index([from_station_id, transfer_status])
-  @@index([to_station_id, transfer_status])
-  @@map("battery_transfer_logs")
-}
-
-model Wallet {
-  wallet_id  String   @id @default(uuid()) @db.Uuid
+model wallets {
+  wallet_id  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   user_id    String   @unique @db.Uuid
   balance    Decimal  @default(0) @db.Decimal(10, 2)
   created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-  user       User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  updated_at DateTime @default(now())
+  users      users    @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
-  @@map("wallets")
-}
-
-model BatteryPricing {
-  pricing_id    String   @id @default(uuid()) @db.Uuid
-  battery_model String   @db.VarChar(50)
-  station_id    String?  @db.Uuid
-  price         Decimal  @db.Decimal(10, 2)
-  is_active     Boolean  @default(true)
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
-  station       Station? @relation(fields: [station_id], references: [station_id], onDelete: Cascade)
-
-  @@unique([battery_model, station_id])
-  @@index([is_active])
-  @@map("battery_pricings")
-}
-
-model TopUpPackage {
-  package_id    String    @id @default(uuid()) @db.Uuid
-  name          String    @db.VarChar(100)
-  description   String?
-  topup_amount  Decimal   @db.Decimal(10, 2)
-  bonus_amount  Decimal   @db.Decimal(10, 2)
-  actual_amount Decimal   @db.Decimal(10, 2)
-  is_active     Boolean   @default(true)
-  created_at    DateTime  @default(now())
-  updated_at    DateTime  @updatedAt
-  payments      Payment[]
-
-  @@index([is_active])
-  @@map("topup_packages")
-}
-
-model Notification {
-  notification_id String   @id @default(uuid()) @db.Uuid
-  user_id         String   @db.Uuid
-  type            String   @db.VarChar(50)
-  title           String   @db.VarChar(200)
-  message         String   @db.Text
-  is_read         Boolean  @default(false)
-  data            Json?
-  created_at      DateTime @default(now())
-  user            User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
-
-  @@index([user_id, is_read])
-  @@map("notifications")
-}
-
-enum UserRole {
-  DRIVER
-  STAFF
-  ADMIN
-}
-
-enum UserStatus {
-  ACTIVE
-  INACTIVE
-  BANNED
-}
-
-enum VehicleType {
-  car
-  motorbike
-}
-
-enum StationStatus {
-  active
-  maintenance
-  closed
-}
-
-enum BatteryStatus {
-  full
-  reserved
-  charging
-  in_use
-  maintenance
-  damaged
+  @@index([user_id])
 }
 
 enum BatteryHistoryAction {
@@ -477,6 +422,15 @@ enum BatteryHistoryAction {
   reassigned
 }
 
+enum BatteryStatus {
+  full
+  charging
+  in_use
+  maintenance
+  damaged
+  reserved
+}
+
 enum BookingStatus {
   pending
   confirmed
@@ -484,39 +438,38 @@ enum BookingStatus {
   cancelled
 }
 
-enum PaymentStatus {
-  pending
-  reserved
-  completed
-  failed
-  refunded
-  forfeited
-}
-
-enum TransferStatus {
-  pending
-  in_transit
-  completed
-  cancelled
+enum PackageBillingCycle {
+  monthly
+  yearly
+  custom
 }
 
 enum PaymentMethod {
   cash
-  wallet
   vnpay
   momo
   credit_card
+  wallet
+}
+
+enum PaymentStatus {
+  pending
+  completed
+  failed
+  reserved
+  refunded
+  forfeited
 }
 
 enum PaymentType {
-  TOPUP
   SWAP
-  SUBSCRIPTION
-  REFUND
-  OTHER
+  TOPUP
   PACKAGE_PURCHASE
   PACKAGE_REFUND
   PENALTY
+  OTHER
+  SUBSCRIPTION
+  REFUND
 }
 
 enum ScheduleStatus {
@@ -526,16 +479,16 @@ enum ScheduleStatus {
   cancelled
 }
 
+enum StationStatus {
+  active
+  maintenance
+  closed
+}
+
 enum SubscriptionStatus {
   active
   expired
   cancelled
-}
-
-enum PackageBillingCycle {
-  monthly
-  yearly
-  custom
 }
 
 enum TicketCategory {
@@ -558,4 +511,28 @@ enum TicketStatus {
   in_progress
   resolved
   closed
+}
+
+enum TransferStatus {
+  pending
+  in_transit
+  completed
+  cancelled
+}
+
+enum UserRole {
+  DRIVER
+  STAFF
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  BANNED
+}
+
+enum VehicleType {
+  car
+  motorbike
 }

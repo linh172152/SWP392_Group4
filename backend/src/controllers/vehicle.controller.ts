@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
 
@@ -16,17 +16,17 @@ export const getUserVehicles = asyncHandler(
       throw new CustomError("User not authenticated", 401);
     }
 
-    const vehicles = await prisma.vehicle.findMany({
+    const vehicles = await prisma.vehicles.findMany({
       where: { user_id: userId },
       include: {
-        user: {
+        users: {
           select: {
             user_id: true,
             full_name: true,
             email: true,
           },
         },
-        current_battery: {
+        batteries: {
           select: {
             battery_id: true,
             battery_code: true,
@@ -38,9 +38,9 @@ export const getUserVehicles = asyncHandler(
       orderBy: { created_at: "desc" },
     });
 
-    const vehiclesWithBattery = vehicles.map((vehicle) => ({
+    const vehiclesWithBattery = vehicles.map((vehicle: typeof vehicles[number]) => ({
       ...vehicle,
-      current_battery: vehicle.current_battery ?? null,
+      batteries: vehicle.batteries ?? null,
     }));
 
     res.status(200).json({
@@ -94,7 +94,7 @@ export const addVehicle = asyncHandler(async (req: Request, res: Response) => {
   const vehicleMake = make || brand;
 
   // Check if license plate already exists
-  const existingVehicle = await prisma.vehicle.findFirst({
+  const existingVehicle = await prisma.vehicles.findFirst({
     where: { license_plate },
   });
 
@@ -119,7 +119,7 @@ export const addVehicle = asyncHandler(async (req: Request, res: Response) => {
     );
   }
 
-  const batteryExists = await prisma.battery.findUnique({
+  const batteryExists = await prisma.batteries.findUnique({
     where: { battery_code: trimmedBatteryCode },
     select: { battery_id: true },
   });
@@ -131,7 +131,7 @@ export const addVehicle = asyncHandler(async (req: Request, res: Response) => {
     );
   }
 
-  const defaultStation = await prisma.station.findFirst({
+  const defaultStation = await prisma.stations.findFirst({
     where: { status: "active" },
     select: { station_id: true, name: true },
   });
@@ -148,14 +148,15 @@ export const addVehicle = asyncHandler(async (req: Request, res: Response) => {
   );
 
   const { createdVehicle } = await prisma.$transaction(async (tx) => {
-    const createdBattery = await tx.battery.create({
+    const createdBattery = await tx.batteries.create({
       data: {
         battery_code: trimmedBatteryCode,
         model: battery_model,
         status: "in_use",
         current_charge: 100,
         station_id: defaultStation.station_id,
-      },
+        updated_at: new Date(),
+      } as Prisma.batteriesUncheckedCreateInput,
       select: {
         battery_id: true,
         battery_code: true,
@@ -164,7 +165,7 @@ export const addVehicle = asyncHandler(async (req: Request, res: Response) => {
       },
     });
 
-    const newVehicle = await tx.vehicle.create({
+    const newVehicle = await tx.vehicles.create({
       data: {
         license_plate,
         vehicle_type: normalizedVehicleType as any,
@@ -176,14 +177,14 @@ export const addVehicle = asyncHandler(async (req: Request, res: Response) => {
         user_id: userId,
       } as any,
       include: {
-        user: {
+        users: {
           select: {
             user_id: true,
             full_name: true,
             email: true,
           },
         },
-        current_battery: {
+        batteries: {
           select: {
             battery_id: true,
             battery_code: true,
@@ -234,13 +235,13 @@ export const getVehicleDetails = asyncHandler(
       throw new CustomError("User not authenticated", 401);
     }
 
-    const vehicle = await prisma.vehicle.findFirst({
+    const vehicle = await prisma.vehicles.findFirst({
       where: {
         vehicle_id: id,
         user_id: userId,
       },
       include: {
-        user: {
+        users: {
           select: {
             user_id: true,
             full_name: true,
@@ -284,13 +285,13 @@ export const updateVehicle = asyncHandler(
       throw new CustomError("User not authenticated", 401);
     }
 
-    const vehicle = await prisma.vehicle.findFirst({
+    const vehicle = await prisma.vehicles.findFirst({
       where: {
         vehicle_id: id,
         user_id: userId,
       },
       include: {
-        current_battery: {
+        batteries: {
           select: {
             battery_code: true,
           },
@@ -322,7 +323,7 @@ export const updateVehicle = asyncHandler(
 
     // Check if new license plate already exists (if changed)
     if (license_plate && license_plate !== vehicle.license_plate) {
-      const existingVehicle = await prisma.vehicle.findFirst({
+      const existingVehicle = await prisma.vehicles.findFirst({
         where: {
           license_plate,
           vehicle_id: { not: id },
@@ -343,7 +344,7 @@ export const updateVehicle = asyncHandler(
           ? current_battery_code.trim()
           : current_battery_code;
 
-      const existingCode = vehicle.current_battery?.battery_code ?? null;
+      const existingCode = vehicle.batteries?.battery_code ?? null;
 
       if (
         (trimmedNewCode === null || trimmedNewCode === "") &&
@@ -367,7 +368,7 @@ export const updateVehicle = asyncHandler(
       }
     }
 
-    const updatedVehicle = await prisma.vehicle.update({
+    const updatedVehicle = await prisma.vehicles.update({
       where: { vehicle_id: id },
       data: {
         ...(license_plate && { license_plate }),
@@ -380,14 +381,14 @@ export const updateVehicle = asyncHandler(
         ...(battery_model !== undefined && { battery_model }),
       },
       include: {
-        user: {
+        users: {
           select: {
             user_id: true,
             full_name: true,
             email: true,
           },
         },
-        current_battery: {
+        batteries: {
           select: {
             battery_id: true,
             battery_code: true,
@@ -418,7 +419,7 @@ export const deleteVehicle = asyncHandler(
       throw new CustomError("User not authenticated", 401);
     }
 
-    const vehicle = await prisma.vehicle.findFirst({
+    const vehicle = await prisma.vehicles.findFirst({
       where: {
         vehicle_id: id,
         user_id: userId,
@@ -430,7 +431,7 @@ export const deleteVehicle = asyncHandler(
     }
 
     // Check if vehicle has active bookings
-    const activeBookings = await prisma.booking.findFirst({
+    const activeBookings = await prisma.bookings.findFirst({
       where: {
         vehicle_id: id,
         status: { in: ["pending", "confirmed"] },
@@ -441,7 +442,7 @@ export const deleteVehicle = asyncHandler(
       throw new CustomError("Cannot delete vehicle with active bookings", 400);
     }
 
-    await prisma.vehicle.delete({
+    await prisma.vehicles.delete({
       where: { vehicle_id: id },
     });
 

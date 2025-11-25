@@ -18,13 +18,13 @@ export const getWalletBalance = asyncHandler(
     }
 
     // Get or create wallet
-    let wallet = await prisma.wallet.findUnique({
+    let wallet = await prisma.wallets.findUnique({
       where: { user_id: userId },
     });
 
     // If wallet doesn't exist, create it
     if (!wallet) {
-      wallet = await prisma.wallet.create({
+      wallet = await prisma.wallets.create({
         data: {
           user_id: userId,
           balance: 0,
@@ -58,19 +58,19 @@ export const getWalletTransactions = asyncHandler(
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
 
     // Get payment transactions related to wallet
-    const payments = await prisma.payment.findMany({
+    const payments = await prisma.payments.findMany({
       where: {
         user_id: userId,
         // Include all payment methods (wallet, vnpay, cash, etc.)
       },
       include: {
-        transaction: {
+        transactions: {
           select: {
             transaction_code: true,
-            booking: {
+            bookings: {
               select: {
                 booking_code: true,
-                station: {
+                stations: {
                   select: {
                     name: true,
                   },
@@ -79,18 +79,18 @@ export const getWalletTransactions = asyncHandler(
             },
           },
         },
-        topup_package: {
+        topup_packages: {
           select: {
             name: true,
           },
         },
-        subscription: {
+        user_subscriptions: {
           select: {
             subscription_id: true,
             status: true,
             start_date: true,
             end_date: true,
-            package: {
+            service_packages: {
               select: {
                 package_id: true,
                 name: true,
@@ -106,18 +106,49 @@ export const getWalletTransactions = asyncHandler(
       take: parseInt(limit as string),
     });
 
-    const total = await prisma.payment.count({
+    const total = await prisma.payments.count({
       where: {
         user_id: userId,
         // Include all payment methods
       },
     });
 
+    const mappedPayments = payments.map((payment: any) => {
+      const { transactions, user_subscriptions, ...rest } = payment;
+      const transaction = transactions
+        ? {
+            ...transactions,
+            booking: transactions.bookings
+              ? {
+                  ...transactions.bookings,
+                  station: transactions.bookings.stations || null,
+                }
+              : null,
+          }
+        : null;
+      const subscription = user_subscriptions
+        ? {
+            ...user_subscriptions,
+            package: user_subscriptions.service_packages || null,
+          }
+        : null;
+      // Remove service_packages field if it exists
+      if (subscription && (subscription as any).service_packages) {
+        delete (subscription as any).service_packages;
+      }
+      return {
+        ...rest,
+        amount: Number(payment.amount),
+        transaction,
+        subscription,
+      };
+    });
+
     res.status(200).json({
       success: true,
       message: "Wallet transactions retrieved successfully",
       data: {
-        transactions: payments,
+        transactions: mappedPayments,
         pagination: {
           page: parseInt(page as string),
           limit: parseInt(limit as string),
@@ -166,7 +197,7 @@ export const topUpWallet = asyncHandler(async (req: Request, res: Response) => {
   }
 
   // Get topup package
-  const topupPackage = await prisma.topUpPackage.findUnique({
+  const topupPackage = await prisma.topup_packages.findUnique({
     where: { package_id },
   });
 

@@ -23,7 +23,7 @@ export const findNearbyStations = asyncHandler(
     const searchRadius = parseFloat(radius as string);
 
     // Simple bounding box search (for production, use PostGIS or similar)
-    const stations = await prisma.station.findMany({
+    const stations = await prisma.stations.findMany({
       where: {
         status: "active",
         latitude: {
@@ -90,6 +90,16 @@ export const findNearbyStations = asyncHandler(
 
         return {
           ...station,
+          latitude: station.latitude ? Number(station.latitude) : null,
+          longitude: station.longitude ? Number(station.longitude) : null,
+          batteries: station.batteries.map((b: any) => ({
+            ...b,
+            capacity_kwh: b.capacity_kwh ? Number(b.capacity_kwh) : null,
+            voltage: b.voltage ? Number(b.voltage) : null,
+            health_percentage: b.health_percentage
+              ? Number(b.health_percentage)
+              : null,
+          })),
           average_rating: avgRating,
           available_batteries: station.batteries.length,
           distance_km: distance,
@@ -118,7 +128,7 @@ export const getStationDetails = asyncHandler(
   async (req: Request, res: Response) => {
     const { id } = req.params;
 
-    const station = await prisma.station.findUnique({
+    const station = await prisma.stations.findUnique({
       where: { station_id: id },
       include: {
         batteries: {
@@ -134,7 +144,7 @@ export const getStationDetails = asyncHandler(
         },
         station_ratings: {
           include: {
-            user: {
+            users: {
               select: {
                 user_id: true,
                 full_name: true,
@@ -142,7 +152,7 @@ export const getStationDetails = asyncHandler(
             },
           },
         },
-        staff: {
+        users: {
           select: {
             user_id: true,
             full_name: true,
@@ -159,8 +169,10 @@ export const getStationDetails = asyncHandler(
     // Calculate average rating
     const avgRating =
       station.station_ratings.length > 0
-        ? station.station_ratings.reduce((sum, r) => sum + r.rating, 0) /
-          station.station_ratings.length
+        ? station.station_ratings.reduce(
+            (sum: number, r: { rating: number }) => sum + r.rating,
+            0
+          ) / station.station_ratings.length
         : 0;
 
     // ✅ Optimized: Calculate battery inventory and capacity warning in one go
@@ -171,6 +183,16 @@ export const getStationDetails = asyncHandler(
 
     const stationWithRating = {
       ...station,
+      latitude: station.latitude ? Number(station.latitude) : null,
+      longitude: station.longitude ? Number(station.longitude) : null,
+      batteries: station.batteries.map((b: any) => ({
+        ...b,
+        capacity_kwh: b.capacity_kwh ? Number(b.capacity_kwh) : null,
+        voltage: b.voltage ? Number(b.voltage) : null,
+        health_percentage: b.health_percentage
+          ? Number(b.health_percentage)
+          : null,
+      })),
       average_rating: avgRating,
       total_ratings: station.station_ratings.length,
       capacity_percentage: stationStats.capacityPercentage,
@@ -199,10 +221,10 @@ export const getStationBatteries = asyncHandler(
       whereClause.status = status;
     }
 
-    const batteries = await prisma.battery.findMany({
+    const batteries = await prisma.batteries.findMany({
       where: whereClause,
       include: {
-        station: {
+        stations: {
           select: {
             station_id: true,
             name: true,
@@ -213,10 +235,30 @@ export const getStationBatteries = asyncHandler(
       orderBy: { created_at: "desc" },
     });
 
+    const mappedBatteries = batteries.map((battery: any) => ({
+      ...battery,
+      capacity_kwh: battery.capacity_kwh ? Number(battery.capacity_kwh) : null,
+      voltage: battery.voltage ? Number(battery.voltage) : null,
+      health_percentage: battery.health_percentage
+        ? Number(battery.health_percentage)
+        : null,
+      stations: battery.stations
+        ? {
+            ...battery.stations,
+            latitude: battery.stations.latitude
+              ? Number(battery.stations.latitude)
+              : null,
+            longitude: battery.stations.longitude
+              ? Number(battery.stations.longitude)
+              : null,
+          }
+        : null,
+    }));
+
     res.status(200).json({
       success: true,
       message: "Station batteries retrieved successfully",
-      data: batteries,
+      data: mappedBatteries,
     });
   }
 );
@@ -257,7 +299,7 @@ export const searchStations = asyncHandler(
       };
     }
 
-    const stations = await prisma.station.findMany({
+    const stations = await prisma.stations.findMany({
       where: whereClause,
       include: {
         batteries: {

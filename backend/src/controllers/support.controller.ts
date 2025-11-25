@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { Prisma } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
 import { prisma } from "../server";
@@ -31,23 +32,23 @@ export const getUserTickets = asyncHandler(
 
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
 
-    const tickets = await prisma.supportTicket.findMany({
+    const tickets = await prisma.support_tickets.findMany({
       where: whereClause,
       include: {
-        assigned_to_staff: {
+        users_support_tickets_assigned_to_staff_idTousers: {
           select: {
             user_id: true,
             full_name: true,
             email: true,
           },
         },
-        replies: {
+        ticket_replies: {
           select: {
             reply_id: true,
             message: true,
             is_staff: true,
             created_at: true,
-            user: {
+            users: {
               select: {
                 user_id: true,
                 full_name: true,
@@ -63,7 +64,7 @@ export const getUserTickets = asyncHandler(
       take: parseInt(limit as string),
     });
 
-    const total = await prisma.supportTicket.count({ where: whereClause });
+    const total = await prisma.support_tickets.count({ where: whereClause });
 
     res.status(200).json({
       success: true,
@@ -103,18 +104,19 @@ export const createSupportTicket = asyncHandler(
     // Generate ticket number
     const ticketNumber = `TKT${Date.now()}${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
 
-    const ticket = await prisma.supportTicket.create({
+    const ticket = await prisma.support_tickets.create({
       data: {
         ticket_number: ticketNumber,
         user_id: userId,
-        category,
-        subject,
-        description,
-        priority,
+        category: category as string,
+        subject: subject as string,
+        description: description as string,
+        priority: priority as string,
         status: "open",
-      },
+        updated_at: new Date(),
+      } as Prisma.support_ticketsUncheckedCreateInput,
       include: {
-        user: {
+        users_support_tickets_user_idTousers: {
           select: {
             user_id: true,
             full_name: true,
@@ -145,13 +147,13 @@ export const getTicketDetails = asyncHandler(
       throw new CustomError("User not authenticated", 401);
     }
 
-    const ticket = await prisma.supportTicket.findFirst({
+    const ticket = await prisma.support_tickets.findFirst({
       where: {
         ticket_id: id,
         user_id: userId,
       },
       include: {
-        user: {
+        users_support_tickets_user_idTousers: {
           select: {
             user_id: true,
             full_name: true,
@@ -159,7 +161,7 @@ export const getTicketDetails = asyncHandler(
             phone: true,
           },
         },
-        assigned_to_staff: {
+        users_support_tickets_assigned_to_staff_idTousers: {
           select: {
             user_id: true,
             full_name: true,
@@ -167,9 +169,9 @@ export const getTicketDetails = asyncHandler(
             phone: true,
           },
         },
-        replies: {
+        ticket_replies: {
           include: {
-            user: {
+            users: {
               select: {
                 user_id: true,
                 full_name: true,
@@ -207,7 +209,7 @@ export const updateTicket = asyncHandler(
       throw new CustomError("User not authenticated", 401);
     }
 
-    const ticket = await prisma.supportTicket.findFirst({
+    const ticket = await prisma.support_tickets.findFirst({
       where: {
         ticket_id: id,
         user_id: userId,
@@ -219,7 +221,7 @@ export const updateTicket = asyncHandler(
       throw new CustomError("Ticket not found or cannot be updated", 404);
     }
 
-    const updatedTicket = await prisma.supportTicket.update({
+    const updatedTicket = await prisma.support_tickets.update({
       where: { ticket_id: id },
       data: {
         subject,
@@ -227,14 +229,14 @@ export const updateTicket = asyncHandler(
         priority,
       },
       include: {
-        user: {
+        users_support_tickets_user_idTousers: {
           select: {
             user_id: true,
             full_name: true,
             email: true,
           },
         },
-        assigned_to_staff: {
+        users_support_tickets_assigned_to_staff_idTousers: {
           select: {
             user_id: true,
             full_name: true,
@@ -266,7 +268,7 @@ export const getTicketReplies = asyncHandler(
     }
 
     // Check if ticket belongs to user
-    const ticket = await prisma.supportTicket.findFirst({
+    const ticket = await prisma.support_tickets.findFirst({
       where: {
         ticket_id: id,
         user_id: userId,
@@ -279,10 +281,10 @@ export const getTicketReplies = asyncHandler(
 
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
 
-    const replies = await prisma.ticketReply.findMany({
+    const replies = await prisma.ticket_replies.findMany({
       where: { ticket_id: id },
       include: {
-        user: {
+        users: {
           select: {
             user_id: true,
             full_name: true,
@@ -295,7 +297,7 @@ export const getTicketReplies = asyncHandler(
       take: parseInt(limit as string),
     });
 
-    const total = await prisma.ticketReply.count({
+    const total = await prisma.ticket_replies.count({
       where: { ticket_id: id },
     });
 
@@ -335,10 +337,10 @@ export const adminListTickets = asyncHandler(
     const skip = (Math.max(1, parseInt(page as string, 10)) - 1) * take;
 
     const [tickets, total] = await prisma.$transaction([
-      prisma.supportTicket.findMany({
+      prisma.support_tickets.findMany({
         where: whereClause,
         include: {
-          user: {
+          users_support_tickets_user_idTousers: {
             select: {
               user_id: true,
               full_name: true,
@@ -346,7 +348,7 @@ export const adminListTickets = asyncHandler(
               phone: true,
             },
           },
-          assigned_to_staff: {
+          users_support_tickets_assigned_to_staff_idTousers: {
             select: {
               user_id: true,
               full_name: true,
@@ -358,7 +360,7 @@ export const adminListTickets = asyncHandler(
         skip,
         take,
       }),
-      prisma.supportTicket.count({ where: whereClause }),
+      prisma.support_tickets.count({ where: whereClause }),
     ]);
 
     res.status(200).json({
@@ -384,10 +386,10 @@ export const adminGetTicketDetails = asyncHandler(
   async (req: Request, res: Response) => {
     const { id } = req.params;
 
-    const ticket = await prisma.supportTicket.findUnique({
+    const ticket = await prisma.support_tickets.findUnique({
       where: { ticket_id: id },
       include: {
-        user: {
+        users_support_tickets_user_idTousers: {
           select: {
             user_id: true,
             full_name: true,
@@ -395,16 +397,16 @@ export const adminGetTicketDetails = asyncHandler(
             phone: true,
           },
         },
-        assigned_to_staff: {
+        users_support_tickets_assigned_to_staff_idTousers: {
           select: {
             user_id: true,
             full_name: true,
             email: true,
           },
         },
-        replies: {
+        ticket_replies: {
           include: {
-            user: {
+            users: {
               select: {
                 user_id: true,
                 full_name: true,
@@ -446,7 +448,7 @@ export const adminAssignTicket = asyncHandler(
       throw new CustomError("staff_id is required", 400);
     }
 
-    const staff = await prisma.user.findFirst({
+    const staff = await prisma.users.findFirst({
       where: { user_id: staff_id, role: "STAFF" },
     });
 
@@ -454,7 +456,7 @@ export const adminAssignTicket = asyncHandler(
       throw new CustomError("Staff not found", 404);
     }
 
-    const ticket = await prisma.supportTicket.findUnique({
+    const ticket = await prisma.support_tickets.findUnique({
       where: { ticket_id: id },
     });
 
@@ -462,14 +464,14 @@ export const adminAssignTicket = asyncHandler(
       throw new CustomError("Ticket not found", 404);
     }
 
-    const updated = await prisma.supportTicket.update({
+    const updated = await prisma.support_tickets.update({
       where: { ticket_id: id },
       data: {
         assigned_to_staff_id: staff_id,
         status: ticket.status === "open" ? "in_progress" : ticket.status,
       },
       include: {
-        assigned_to_staff: {
+        users_support_tickets_assigned_to_staff_idTousers: {
           select: {
             user_id: true,
             full_name: true,
@@ -509,7 +511,7 @@ export const adminUpdateTicketStatus = asyncHandler(
       throw new CustomError("Invalid ticket status", 400);
     }
 
-    const updated = await prisma.supportTicket.update({
+    const updated = await prisma.support_tickets.update({
       where: { ticket_id: id },
       data: { status },
     });
@@ -539,7 +541,7 @@ export const adminReplyTicket = asyncHandler(
       throw new CustomError("message is required", 400);
     }
 
-    const ticket = await prisma.supportTicket.findUnique({
+    const ticket = await prisma.support_tickets.findUnique({
       where: { ticket_id: id },
     });
 
@@ -547,15 +549,15 @@ export const adminReplyTicket = asyncHandler(
       throw new CustomError("Ticket not found", 404);
     }
 
-    const reply = await prisma.ticketReply.create({
+    const reply = await prisma.ticket_replies.create({
       data: {
         ticket_id: id,
         user_id: adminId,
-        message,
+        message: message as string,
         is_staff: true,
-      },
+      } as Prisma.ticket_repliesUncheckedCreateInput,
       include: {
-        user: {
+        users: {
           select: {
             user_id: true,
             full_name: true,
@@ -591,7 +593,7 @@ export const addTicketReply = asyncHandler(
     }
 
     // Check if ticket belongs to user
-    const ticket = await prisma.supportTicket.findFirst({
+    const ticket = await prisma.support_tickets.findFirst({
       where: {
         ticket_id: id,
         user_id: userId,
@@ -608,22 +610,22 @@ export const addTicketReply = asyncHandler(
     }
 
     // Get user role to determine if reply is from staff
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { user_id: userId },
       select: { role: true },
     });
 
     const isStaff = user?.role === "STAFF" || user?.role === "ADMIN";
 
-    const reply = await prisma.ticketReply.create({
+    const reply = await prisma.ticket_replies.create({
       data: {
         ticket_id: id,
         user_id: userId,
-        message,
+        message: message as string,
         is_staff: isStaff,
-      },
+      } as Prisma.ticket_repliesUncheckedCreateInput,
       include: {
-        user: {
+        users: {
           select: {
             user_id: true,
             full_name: true,
@@ -635,7 +637,7 @@ export const addTicketReply = asyncHandler(
 
     // If user is staff, update ticket status to in_progress
     if (isStaff && ticket.status === "open") {
-      await prisma.supportTicket.update({
+      await prisma.support_tickets.update({
         where: { ticket_id: id },
         data: { status: "in_progress" },
       });
@@ -660,7 +662,7 @@ export const closeTicket = asyncHandler(async (req: Request, res: Response) => {
     throw new CustomError("User not authenticated", 401);
   }
 
-  const ticket = await prisma.supportTicket.findFirst({
+  const ticket = await prisma.support_tickets.findFirst({
     where: {
       ticket_id: id,
       user_id: userId,
@@ -672,21 +674,21 @@ export const closeTicket = asyncHandler(async (req: Request, res: Response) => {
     throw new CustomError("Ticket not found or cannot be closed", 404);
   }
 
-  const updatedTicket = await prisma.supportTicket.update({
+  const updatedTicket = await prisma.support_tickets.update({
     where: { ticket_id: id },
     data: {
       status: "closed",
       resolved_at: new Date(),
     },
     include: {
-      user: {
+      users_support_tickets_user_idTousers: {
         select: {
           user_id: true,
           full_name: true,
           email: true,
         },
       },
-      assigned_to_staff: {
+      users_support_tickets_assigned_to_staff_idTousers: {
         select: {
           user_id: true,
           full_name: true,

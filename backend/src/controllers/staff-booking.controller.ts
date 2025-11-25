@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { PrismaClient, Prisma } from "@prisma/client";
-import type { ServicePackage, UserSubscription } from "@prisma/client";
+import type { service_packages, user_subscriptions } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
 import { notificationService } from "../server";
@@ -13,9 +13,9 @@ import {
 
 const prisma = new PrismaClient();
 
-type VehicleWithCurrentBattery = Prisma.VehicleGetPayload<{
+type VehicleWithCurrentBattery = Prisma.vehiclesGetPayload<{
   include: {
-    current_battery: {
+    batteries: {
       select: {
         battery_id: true;
         battery_code: true;
@@ -28,7 +28,7 @@ type VehicleWithCurrentBattery = Prisma.VehicleGetPayload<{
 const normalizeBatteryModel = (value: string): string =>
   value.trim().toLowerCase();
 
-const extractPackageModels = (pkg: ServicePackage | null): string[] => {
+const extractPackageModels = (pkg: service_packages | null): string[] => {
   if (!pkg || pkg.battery_models === null || pkg.battery_models === undefined) {
     return [];
   }
@@ -63,7 +63,7 @@ const extractPackageModels = (pkg: ServicePackage | null): string[] => {
 const getBatteryCapacityByModel = async (
   batteryModel: string
 ): Promise<number | null> => {
-  const battery = await prisma.battery.findFirst({
+  const battery = await prisma.batteries.findFirst({
     where: {
       model: {
         equals: batteryModel,
@@ -85,10 +85,12 @@ const getBatteryCapacityByModel = async (
 };
 
 const doesSubscriptionCoverModel = async (
-  subscription: UserSubscription & { package: ServicePackage | null },
+  subscription: user_subscriptions & {
+    service_packages: service_packages | null;
+  },
   batteryModel: string
 ): Promise<boolean> => {
-  const pkg = subscription.package;
+  const pkg = subscription.service_packages;
   if (!pkg) {
     return false;
   }
@@ -141,7 +143,7 @@ export const getStationBookings = asyncHandler(
     }
 
     // Get staff's station
-    const staff = await prisma.user.findUnique({
+    const staff = await prisma.users.findUnique({
       where: { user_id: staffId },
       select: { station_id: true },
     });
@@ -157,10 +159,10 @@ export const getStationBookings = asyncHandler(
 
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
 
-    const bookings = await prisma.booking.findMany({
+    const bookings = await prisma.bookings.findMany({
       where: whereClause,
       include: {
-        user: {
+        users_bookings_user_idTousers: {
           select: {
             user_id: true,
             full_name: true,
@@ -168,14 +170,14 @@ export const getStationBookings = asyncHandler(
             phone: true,
           },
         },
-        vehicle: {
+        vehicles: {
           select: {
             vehicle_id: true,
             license_plate: true,
             vehicle_type: true,
             model: true,
             make: true,
-            current_battery: {
+            batteries: {
               select: {
                 battery_id: true,
                 battery_code: true,
@@ -186,23 +188,16 @@ export const getStationBookings = asyncHandler(
             },
           },
         },
-        locked_battery: {
-          select: {
-            battery_id: true,
-            battery_code: true,
-            model: true,
-            status: true,
-            current_charge: true,
-          },
-        },
-        station: {
+        stations: {
           select: {
             station_id: true,
             name: true,
             address: true,
+            latitude: true,
+            longitude: true,
           },
         },
-        transaction: {
+        transactions: {
           select: {
             transaction_id: true,
             transaction_code: true,
@@ -211,7 +206,7 @@ export const getStationBookings = asyncHandler(
             swap_at: true,
             swap_started_at: true,
             swap_completed_at: true,
-            old_battery: {
+            batteries_transactions_old_battery_idTobatteries: {
               select: {
                 battery_id: true,
                 battery_code: true,
@@ -219,7 +214,7 @@ export const getStationBookings = asyncHandler(
                 current_charge: true,
               },
             },
-            new_battery: {
+            batteries_transactions_new_battery_idTobatteries: {
               select: {
                 battery_id: true,
                 battery_code: true,
@@ -229,7 +224,7 @@ export const getStationBookings = asyncHandler(
             },
           },
         },
-        checked_in_by_staff: {
+        users_bookings_checked_in_by_staff_idTousers: {
           select: {
             user_id: true,
             full_name: true,
@@ -242,13 +237,75 @@ export const getStationBookings = asyncHandler(
       take: parseInt(limit as string),
     });
 
-    const total = await prisma.booking.count({ where: whereClause });
+    const total = await prisma.bookings.count({ where: whereClause });
+
+    const mappedBookings = bookings.map((booking: any) => {
+      const {
+        users_bookings_user_idTousers,
+        vehicles,
+        transactions,
+        stations,
+        ...rest
+      } = booking;
+      const user = users_bookings_user_idTousers || null;
+      const vehicle = vehicles
+        ? {
+            ...vehicles,
+            current_battery: (vehicles as any).batteries || null,
+          }
+        : null;
+      // Remove batteries field if it exists
+      if (vehicle && (vehicle as any).batteries) {
+        delete (vehicle as any).batteries;
+      }
+      const transaction = transactions
+        ? {
+            ...transactions,
+            amount: Number(transactions.amount),
+            old_battery:
+              (transactions as any)
+                .batteries_transactions_old_battery_idTobatteries || null,
+            new_battery:
+              (transactions as any)
+                .batteries_transactions_new_battery_idTobatteries || null,
+          }
+        : null;
+      // Remove old battery fields if they exist
+      if (transaction) {
+        if (
+          (transaction as any).batteries_transactions_old_battery_idTobatteries
+        ) {
+          delete (transaction as any)
+            .batteries_transactions_old_battery_idTobatteries;
+        }
+        if (
+          (transaction as any).batteries_transactions_new_battery_idTobatteries
+        ) {
+          delete (transaction as any)
+            .batteries_transactions_new_battery_idTobatteries;
+        }
+      }
+      const station = stations
+        ? {
+            ...stations,
+            latitude: stations.latitude ? Number(stations.latitude) : null,
+            longitude: stations.longitude ? Number(stations.longitude) : null,
+          }
+        : null;
+      return {
+        ...rest,
+        user,
+        vehicle,
+        transaction,
+        station,
+      };
+    });
 
     res.status(200).json({
       success: true,
       message: "Station bookings retrieved successfully",
       data: {
-        bookings,
+        bookings: mappedBookings,
         pagination: {
           page: parseInt(page as string),
           limit: parseInt(limit as string),
@@ -273,7 +330,7 @@ export const getBookingDetails = asyncHandler(
     }
 
     // Get staff's station
-    const staff = await prisma.user.findUnique({
+    const staff = await prisma.users.findUnique({
       where: { user_id: staffId },
       select: { station_id: true },
     });
@@ -282,13 +339,13 @@ export const getBookingDetails = asyncHandler(
       throw new CustomError("Staff not assigned to any station", 400);
     }
 
-    const booking = await prisma.booking.findFirst({
+    const booking = await prisma.bookings.findFirst({
       where: {
         booking_id: id,
         station_id: staff.station_id,
       },
       include: {
-        user: {
+        users_bookings_user_idTousers: {
           select: {
             user_id: true,
             full_name: true,
@@ -296,7 +353,7 @@ export const getBookingDetails = asyncHandler(
             phone: true,
           },
         },
-        vehicle: {
+        vehicles: {
           select: {
             vehicle_id: true,
             license_plate: true,
@@ -306,7 +363,7 @@ export const getBookingDetails = asyncHandler(
             year: true,
             battery_model: true,
             current_battery_id: true,
-            current_battery: {
+            batteries: {
               select: {
                 battery_id: true,
                 battery_code: true,
@@ -317,7 +374,7 @@ export const getBookingDetails = asyncHandler(
             },
           },
         },
-        station: {
+        stations: {
           select: {
             station_id: true,
             name: true,
@@ -327,7 +384,7 @@ export const getBookingDetails = asyncHandler(
             operating_hours: true,
           },
         },
-        transaction: {
+        transactions: {
           select: {
             transaction_id: true,
             transaction_code: true,
@@ -340,7 +397,7 @@ export const getBookingDetails = asyncHandler(
             notes: true,
           },
         },
-        checked_in_by_staff: {
+        users_bookings_checked_in_by_staff_idTousers: {
           select: {
             user_id: true,
             full_name: true,
@@ -355,10 +412,72 @@ export const getBookingDetails = asyncHandler(
       throw new CustomError("Booking not found", 404);
     }
 
+    const {
+      users_bookings_user_idTousers,
+      vehicles,
+      transactions,
+      stations,
+      ...rest
+    } = booking;
+    const user = users_bookings_user_idTousers || null;
+    const vehicle = vehicles
+      ? {
+          ...vehicles,
+          current_battery: (vehicles as any).batteries || null,
+        }
+      : null;
+    // Remove batteries field if it exists
+    if (vehicle && (vehicle as any).batteries) {
+      delete (vehicle as any).batteries;
+    }
+    const mappedTransaction = transactions
+      ? {
+          ...transactions,
+          amount: Number(transactions.amount),
+          old_battery:
+            (transactions as any)
+              .batteries_transactions_old_battery_idTobatteries || null,
+          new_battery:
+            (transactions as any)
+              .batteries_transactions_new_battery_idTobatteries || null,
+        }
+      : null;
+    const station = stations
+      ? {
+          ...stations,
+          latitude: stations.latitude ? Number(stations.latitude) : null,
+          longitude: stations.longitude ? Number(stations.longitude) : null,
+        }
+      : null;
+    // Remove old battery fields if they exist
+    if (mappedTransaction) {
+      if (
+        (mappedTransaction as any)
+          .batteries_transactions_old_battery_idTobatteries
+      ) {
+        delete (mappedTransaction as any)
+          .batteries_transactions_old_battery_idTobatteries;
+      }
+      if (
+        (mappedTransaction as any)
+          .batteries_transactions_new_battery_idTobatteries
+      ) {
+        delete (mappedTransaction as any)
+          .batteries_transactions_new_battery_idTobatteries;
+      }
+    }
+    const mappedBooking = {
+      ...rest,
+      user,
+      vehicle,
+      transaction: mappedTransaction,
+      station,
+    };
+
     res.status(200).json({
       success: true,
       message: "Booking details retrieved successfully",
-      data: booking,
+      data: mappedBooking,
     });
   }
 );
@@ -375,13 +494,13 @@ export const confirmBooking = asyncHandler(
       throw new CustomError("Staff not authenticated", 401);
     }
 
-    const booking = await prisma.booking.findUnique({
+    const booking = await prisma.bookings.findUnique({
       where: { booking_id: id },
       include: {
-        station: {
+        stations: {
           select: { station_id: true },
         },
-        user: {
+        users_bookings_user_idTousers: {
           select: {
             user_id: true,
             full_name: true,
@@ -397,7 +516,7 @@ export const confirmBooking = asyncHandler(
     }
 
     // Check if staff belongs to the station
-    const staff = await prisma.user.findUnique({
+    const staff = await prisma.users.findUnique({
       where: { user_id: staffId },
       select: { station_id: true },
     });
@@ -435,15 +554,15 @@ export const confirmBooking = asyncHandler(
     // Việc check availability đã được làm khi tạo booking rồi
 
     // ✅ Chỉ đổi status, KHÔNG set checked_in_at (sẽ set khi complete)
-    const updatedBooking = await prisma.booking.update({
+    const updatedBooking = await prisma.bookings.update({
       where: { booking_id: id },
       data: {
         status: "confirmed",
         // ✅ KHÔNG set checked_in_at và checked_in_by_staff_id ở đây
         // Sẽ set khi completeBooking (khi driver thực sự đến đổi pin)
-      } as any,
+      },
       include: {
-        user: {
+        users_bookings_user_idTousers: {
           select: {
             user_id: true,
             full_name: true,
@@ -451,7 +570,7 @@ export const confirmBooking = asyncHandler(
             phone: true,
           },
         },
-        vehicle: {
+        vehicles: {
           select: {
             vehicle_id: true,
             license_plate: true,
@@ -459,14 +578,14 @@ export const confirmBooking = asyncHandler(
             model: true,
           },
         },
-        station: {
+        stations: {
           select: {
             station_id: true,
             name: true,
             address: true,
           },
         },
-        checked_in_by_staff: {
+        users_bookings_checked_in_by_staff_idTousers: {
           select: {
             user_id: true,
             full_name: true,
@@ -482,12 +601,12 @@ export const confirmBooking = asyncHandler(
         type: "booking_confirmed",
         userId: booking.user_id,
         title: "Đặt chỗ đã được xác nhận",
-        message: `Đặt chỗ của bạn tại ${updatedBooking.station.name} lúc ${new Date(booking.scheduled_at).toLocaleString("vi-VN")} đã được xác nhận. Vui lòng đến trạm.`,
+        message: `Đặt chỗ của bạn tại ${updatedBooking.stations.name} lúc ${new Date(booking.scheduled_at).toLocaleString("vi-VN")} đã được xác nhận. Vui lòng đến trạm.`,
         data: {
           booking_id: booking.booking_id,
           booking_code: booking.booking_code,
-          station_name: updatedBooking.station.name,
-          station_address: updatedBooking.station.address,
+          station_name: updatedBooking.stations.name,
+          station_address: updatedBooking.stations.address,
           scheduled_at: booking.scheduled_at,
         },
       });
@@ -495,129 +614,23 @@ export const confirmBooking = asyncHandler(
       console.error("Failed to send notification:", error);
     }
 
+    const mappedBooking = {
+      ...updatedBooking,
+      user: updatedBooking.users_bookings_user_idTousers || null,
+      vehicle: updatedBooking.vehicles
+        ? {
+            ...updatedBooking.vehicles,
+            current_battery: (updatedBooking.vehicles as any).batteries || null,
+          }
+        : null,
+    };
+
     res.status(200).json({
       success: true,
       message: "Booking confirmed successfully",
       data: {
-        booking: updatedBooking,
+        booking: mappedBooking,
         message: "Đã xác nhận. User có thể đến đổi pin.",
-      },
-    });
-  }
-);
-
-/**
- * Verify PIN code for booking
- */
-export const verifyPinCode = asyncHandler(
-  async (req: Request, res: Response) => {
-    const staffId = req.user?.userId;
-    const { id } = req.params;
-    const { pin_code } = req.body;
-
-    if (!staffId) {
-      throw new CustomError("Staff not authenticated", 401);
-    }
-
-    if (!pin_code) {
-      throw new CustomError("PIN code is required", 400);
-    }
-
-    // Get staff's station
-    const staff = await prisma.user.findUnique({
-      where: { user_id: staffId },
-      select: { station_id: true },
-    });
-
-    if (!staff?.station_id) {
-      throw new CustomError("Staff not assigned to any station", 400);
-    }
-
-    const booking = await prisma.booking.findFirst({
-      where: {
-        booking_id: id,
-        station_id: staff.station_id,
-        status: "confirmed",
-      },
-      include: {
-        user: {
-          select: {
-            user_id: true,
-            full_name: true,
-            email: true,
-            phone: true,
-          },
-        },
-        vehicle: {
-          select: {
-            vehicle_id: true,
-            license_plate: true,
-            vehicle_type: true,
-            model: true,
-          },
-        },
-        station: {
-          select: {
-            station_id: true,
-            name: true,
-            address: true,
-          },
-        },
-      },
-    });
-
-    if (!booking) {
-      throw new CustomError("Booking not found or not confirmed", 404);
-    }
-
-    // Verify PIN code
-    if ((booking as any).pin_code !== pin_code) {
-      throw new CustomError("Invalid PIN code", 400);
-    }
-
-    // Check if PIN has already been verified
-    if ((booking as any).pin_verified_at) {
-      throw new CustomError("PIN code has already been verified", 400);
-    }
-
-    // Update booking with PIN verification
-    const updatedBooking = await prisma.booking.update({
-      where: { booking_id: id },
-      data: {
-        pin_verified_at: new Date(),
-      } as any,
-      include: {
-        user: {
-          select: {
-            user_id: true,
-            full_name: true,
-            email: true,
-            phone: true,
-          },
-        },
-        vehicle: {
-          select: {
-            vehicle_id: true,
-            license_plate: true,
-            vehicle_type: true,
-            model: true,
-          },
-        },
-        station: {
-          select: {
-            station_id: true,
-            name: true,
-            address: true,
-          },
-        },
-      },
-    });
-
-    res.status(200).json({
-      success: true,
-      message: "PIN code verified successfully",
-      data: {
-        booking: updatedBooking,
       },
     });
   }
@@ -681,10 +694,10 @@ export const completeBooking = asyncHandler(
       "New battery charge"
     );
 
-    const booking = await prisma.booking.findUnique({
+    const booking = await prisma.bookings.findUnique({
       where: { booking_id: id },
       include: {
-        station: {
+        stations: {
           select: { station_id: true, name: true },
         },
       },
@@ -706,7 +719,7 @@ export const completeBooking = asyncHandler(
     // ✅ Bỏ check PIN - không cần PIN nữa (đã verify SĐT khi confirm)
 
     // Check if staff belongs to the station
-    const staff = await prisma.user.findUnique({
+    const staff = await prisma.users.findUnique({
       where: { user_id: staffId },
       select: { station_id: true },
     });
@@ -728,10 +741,10 @@ export const completeBooking = asyncHandler(
       throw new CustomError("Battery model is required", 400);
     }
 
-    const vehicle = (await prisma.vehicle.findUnique({
+    const vehicle = (await prisma.vehicles.findUnique({
       where: { vehicle_id: booking.vehicle_id },
       include: {
-        current_battery: {
+        batteries: {
           select: {
             battery_id: true,
             battery_code: true,
@@ -760,8 +773,8 @@ export const completeBooking = asyncHandler(
       use_subscription: bookingHold.use_subscription,
     };
 
-    type SubscriptionWithPackage = Prisma.UserSubscriptionGetPayload<{
-      include: { package: true };
+    type SubscriptionWithPackage = Prisma.user_subscriptionsGetPayload<{
+      include: { service_packages: true };
     }>;
 
     // ✅ Pin đã được lock từ lúc driver đặt booking
@@ -773,7 +786,7 @@ export const completeBooking = asyncHandler(
       );
     }
 
-    const reservedBattery = await prisma.battery.findUnique({
+    const reservedBattery = await prisma.batteries.findUnique({
       where: { battery_id: holdInfo.locked_battery_id },
     });
 
@@ -823,14 +836,14 @@ export const completeBooking = asyncHandler(
     const trimmedOldBatteryCode = old_battery_code.trim();
 
     // ✅ Tìm hoặc tạo pin cũ (nếu không tồn tại - trường hợp pin mới từ hãng chưa được tạo trong DB)
-    let oldBattery = await prisma.battery.findUnique({
+    let oldBattery = await prisma.batteries.findUnique({
       where: { battery_code: trimmedOldBatteryCode },
     });
 
     if (!oldBattery) {
       // Pin cũ không tồn tại → Có thể là pin mới từ hãng chưa được tạo trong DB
       // Kiểm tra xem pin này có phải là pin hiện tại của xe không
-      const vehicleCurrentBattery = (vehicle as any).current_battery;
+      const vehicleCurrentBattery = vehicle.batteries;
       if (vehicleCurrentBattery?.battery_code === trimmedOldBatteryCode) {
         // Pin này đã được link với xe nhưng không tìm thấy trong DB → Lỗi dữ liệu
         throw new CustomError(
@@ -845,7 +858,7 @@ export const completeBooking = asyncHandler(
         `[completeBooking] ⚠️ Old battery "${trimmedOldBatteryCode}" not found. Creating new battery...`
       );
 
-      const defaultStation = await prisma.station.findFirst({
+      const defaultStation = await prisma.stations.findFirst({
         where: { status: "active" },
         select: { station_id: true },
       });
@@ -857,14 +870,15 @@ export const completeBooking = asyncHandler(
         );
       }
 
-      oldBattery = await prisma.battery.create({
+      oldBattery = await prisma.batteries.create({
         data: {
           battery_code: trimmedOldBatteryCode,
           model: vehicle.battery_model,
           status: "in_use", // Pin đang gắn trên xe
           current_charge: oldBatteryChargeValue || 100,
           station_id: defaultStation.station_id, // Sẽ được update về trạm hiện tại sau khi swap
-        },
+          updated_at: new Date(),
+        } as Prisma.batteriesUncheckedCreateInput,
       });
 
       console.log(
@@ -872,23 +886,23 @@ export const completeBooking = asyncHandler(
       );
 
       // Update vehicle với pin mới được tạo
-      await prisma.vehicle.update({
+      await prisma.vehicles.update({
         where: { vehicle_id: vehicle.vehicle_id },
-        data: { current_battery_id: oldBattery.battery_id } as any,
+        data: { current_battery_id: oldBattery.battery_id },
       });
 
-      // Reload vehicle để có current_battery mới
-      const updatedVehicle = await prisma.vehicle.findUnique({
+      // Reload vehicle để có batteries mới
+      const updatedVehicle = await prisma.vehicles.findUnique({
         where: { vehicle_id: vehicle.vehicle_id },
         include: {
-          current_battery: {
+          batteries: {
             select: {
               battery_id: true,
               battery_code: true,
               status: true,
             },
-          } as any,
-        } as any,
+          },
+        },
       });
 
       if (updatedVehicle) {
@@ -898,7 +912,7 @@ export const completeBooking = asyncHandler(
 
     // ✅ Validate: Old battery code must match vehicle's current battery
     const vehicleCurrentBatteryId =
-      vehicle.current_battery?.battery_id ?? vehicle.current_battery_id;
+      vehicle.batteries?.battery_id ?? vehicle.current_battery_id;
 
     if (!vehicleCurrentBatteryId) {
       throw new CustomError(
@@ -909,7 +923,7 @@ export const completeBooking = asyncHandler(
 
     if (vehicleCurrentBatteryId !== oldBattery.battery_id) {
       const vehicleCurrentBatteryCode =
-        (vehicle as any).current_battery?.battery_code || "chưa có";
+        vehicle.batteries?.battery_code || "chưa có";
       throw new CustomError(
         `Mã pin cũ "${old_battery_code}" không khớp với pin hiện tại của xe. Pin hiện tại của xe là: ${vehicleCurrentBatteryCode}.`,
         400
@@ -933,9 +947,9 @@ export const completeBooking = asyncHandler(
         );
       }
 
-      subscriptionRecord = (await prisma.userSubscription.findUnique({
+      subscriptionRecord = (await prisma.user_subscriptions.findUnique({
         where: { subscription_id: holdInfo.locked_subscription_id },
-        include: { package: true },
+        include: { service_packages: true },
       })) as SubscriptionWithPackage | null;
 
       if (!subscriptionRecord) {
@@ -999,7 +1013,7 @@ export const completeBooking = asyncHandler(
           : "returned";
 
     const result = await prisma.$transaction(async (tx) => {
-      const transaction = await tx.transaction.create({
+      const transaction = await tx.transactions.create({
         data: {
           transaction_code: transactionCode,
           booking_id: id,
@@ -1015,8 +1029,9 @@ export const completeBooking = asyncHandler(
           swap_duration_minutes: 0,
           payment_status: "completed",
           amount: transactionAmountDecimal,
-          notes,
-        },
+          notes: notes || null,
+          created_at: new Date(),
+        } as Prisma.transactionsUncheckedCreateInput,
       });
 
       const oldBatteryStatusUpdate =
@@ -1028,7 +1043,7 @@ export const completeBooking = asyncHandler(
 
       const nowTimestamp = new Date();
 
-      await tx.battery.update({
+      await tx.batteries.update({
         where: { battery_id: oldBattery.battery_id },
         data: {
           status: oldBatteryStatusUpdate,
@@ -1042,20 +1057,21 @@ export const completeBooking = asyncHandler(
       });
 
       if (old_battery_status === "maintenance") {
-        await tx.batteryTransferLog.create({
+        await tx.battery_transfer_logs.create({
           data: {
             battery_id: oldBattery.battery_id,
             from_station_id: booking.station_id,
             to_station_id: booking.station_id,
             transfer_reason: "manufacturer_service",
             transferred_by: staffId,
-            transfer_status: "in_transit" as any,
+            transfer_status: "in_transit",
             notes: `Pin ${oldBattery.battery_code} gửi về hãng bảo trì sau booking ${booking.booking_code}.`,
-          },
+            transferred_at: new Date(),
+          } as Prisma.battery_transfer_logsUncheckedCreateInput,
         });
       }
 
-      await tx.battery.update({
+      await tx.batteries.update({
         where: { battery_id: reservedBattery.battery_id },
         data: {
           status: "in_use",
@@ -1067,15 +1083,15 @@ export const completeBooking = asyncHandler(
         },
       });
 
-      await tx.vehicle.update({
+      await tx.vehicles.update({
         where: { vehicle_id: vehicle.vehicle_id },
         data: {
           current_battery_id: reservedBattery.battery_id,
           battery_model: finalBatteryModel,
-        } as any,
+        },
       });
 
-      await (tx as any).batteryHistory.create({
+      await tx.battery_history.create({
         data: {
           battery_id: oldBattery.battery_id,
           booking_id: booking.booking_id,
@@ -1089,7 +1105,7 @@ export const completeBooking = asyncHandler(
         },
       });
 
-      await (tx as any).batteryHistory.create({
+      await tx.battery_history.create({
         data: {
           battery_id: reservedBattery.battery_id,
           booking_id: booking.booking_id,
@@ -1109,7 +1125,7 @@ export const completeBooking = asyncHandler(
         notes: "booking_completed",
       });
 
-      const bookingUpdateData: Prisma.BookingUncheckedUpdateInput = {
+      const bookingUpdateData: Prisma.bookingsUncheckedUpdateInput = {
         ...buildBookingUncheckedUpdate(consume.bookingUpdate),
         status: "completed",
         battery_model: finalBatteryModel,
@@ -1118,14 +1134,14 @@ export const completeBooking = asyncHandler(
         checked_in_by_staff_id: staffId,
       };
 
-      const updatedBooking = await tx.booking.update({
+      const updatedBooking = await tx.bookings.update({
         where: { booking_id: id },
         data: bookingUpdateData,
       });
 
       const walletAfterRow = holdInfo.use_subscription
         ? null
-        : await tx.wallet.findUnique({
+        : await tx.wallets.findUnique({
             where: { user_id: booking.user_id },
             select: { balance: true },
           });
@@ -1156,7 +1172,7 @@ export const completeBooking = asyncHandler(
           userId: booking.user_id,
           title: "Đổi pin bằng gói đăng ký",
           message: `Đã hoàn tất đổi pin bằng gói "${
-            subscriptionRecord.package?.name ?? "Subscription"
+            subscriptionRecord.service_packages?.name ?? "Subscription"
           }". ${remainingText}`,
           data: {
             subscription_id: subscriptionRecord.subscription_id,
@@ -1199,10 +1215,10 @@ export const completeBooking = asyncHandler(
       holdInfo.use_subscription && subscriptionRecord
         ? subscriptionUnlimited
           ? `Đổi pin hoàn tất bằng gói "${
-              subscriptionRecord.package?.name ?? "Subscription"
+              subscriptionRecord.service_packages?.name ?? "Subscription"
             }" (không giới hạn lượt).`
           : `Đổi pin hoàn tất bằng gói "${
-              subscriptionRecord.package?.name ?? "Subscription"
+              subscriptionRecord.service_packages?.name ?? "Subscription"
             }". Bạn còn ${subscriptionRemainingAfter ?? 0} lượt.`
         : result.transactionAmount > 0
           ? `Đổi pin sử dụng số tiền đã giữ ${result.transactionAmount.toLocaleString(
@@ -1237,7 +1253,8 @@ export const completeBooking = asyncHandler(
           holdInfo.use_subscription && subscriptionRecord
             ? {
                 subscription_id: subscriptionRecord.subscription_id,
-                subscription_name: subscriptionRecord.package?.name ?? null,
+                subscription_name:
+                  subscriptionRecord.service_packages?.name ?? null,
                 remaining_swaps: subscriptionRemainingAfter,
                 unlimited: subscriptionUnlimited,
               }
@@ -1268,7 +1285,7 @@ export const cancelBooking = asyncHandler(
     }
 
     // Check if staff belongs to a station
-    const staff = await prisma.user.findUnique({
+    const staff = await prisma.users.findUnique({
       where: { user_id: staffId },
       select: { station_id: true },
     });
@@ -1277,20 +1294,20 @@ export const cancelBooking = asyncHandler(
       throw new CustomError("Staff not assigned to any station", 400);
     }
 
-    const booking = await prisma.booking.findFirst({
+    const booking = await prisma.bookings.findFirst({
       where: {
         booking_id: id,
         station_id: staff.station_id,
       },
       include: {
-        user: {
+        users_bookings_user_idTousers: {
           select: {
             user_id: true,
             full_name: true,
             email: true,
           },
         },
-        vehicle: {
+        vehicles: {
           select: {
             vehicle_id: true,
             license_plate: true,
@@ -1298,7 +1315,7 @@ export const cancelBooking = asyncHandler(
             model: true,
           },
         },
-        station: {
+        stations: {
           select: {
             station_id: true,
             name: true,
@@ -1340,7 +1357,7 @@ export const cancelBooking = asyncHandler(
         notes: releaseNote,
       });
 
-      const bookingUpdateData: Prisma.BookingUncheckedUpdateInput = {
+      const bookingUpdateData: Prisma.bookingsUncheckedUpdateInput = {
         ...buildBookingUncheckedUpdate(release.bookingUpdate),
         status: "cancelled",
         notes: reasonNote
@@ -1348,18 +1365,18 @@ export const cancelBooking = asyncHandler(
           : booking.notes,
       };
 
-      const updatedBooking = await tx.booking.update({
+      const updatedBooking = await tx.bookings.update({
         where: { booking_id: id },
         data: bookingUpdateData,
         include: {
-          user: {
+          users_bookings_user_idTousers: {
             select: {
               user_id: true,
               full_name: true,
               email: true,
             },
           },
-          vehicle: {
+          vehicles: {
             select: {
               vehicle_id: true,
               license_plate: true,
@@ -1367,7 +1384,7 @@ export const cancelBooking = asyncHandler(
               model: true,
             },
           },
-          station: {
+          stations: {
             select: {
               station_id: true,
               name: true,
@@ -1384,11 +1401,23 @@ export const cancelBooking = asyncHandler(
       ? `Booking cancelled by staff. Reason: ${reasonNote}`
       : "Booking cancelled by staff.";
 
+    const mappedBooking = {
+      ...result.updatedBooking,
+      user: result.updatedBooking.users_bookings_user_idTousers || null,
+      vehicle: result.updatedBooking.vehicles
+        ? {
+            ...result.updatedBooking.vehicles,
+            current_battery:
+              (result.updatedBooking.vehicles as any).batteries || null,
+          }
+        : null,
+    };
+
     res.status(200).json({
       success: true,
       message: responseMessage,
       data: {
-        booking: result.updatedBooking,
+        booking: mappedBooking,
         wallet_refund_amount: result.release.walletRefundAmount,
         battery_released_id: result.release.batteryReleasedId,
       },
@@ -1409,7 +1438,7 @@ export const getAvailableBatteries = asyncHandler(
     }
 
     // Get staff's station
-    const staff = await prisma.user.findUnique({
+    const staff = await prisma.users.findUnique({
       where: { user_id: staffId },
       select: { station_id: true },
     });
@@ -1419,7 +1448,7 @@ export const getAvailableBatteries = asyncHandler(
     }
 
     // Get booking details
-    const booking = await prisma.booking.findUnique({
+    const booking = await prisma.bookings.findUnique({
       where: { booking_id: id },
       select: {
         booking_id: true,
@@ -1464,7 +1493,7 @@ export const getAvailableBatteries = asyncHandler(
     }
 
     // Get available batteries
-    const batteries = await prisma.battery.findMany({
+    const batteries = await prisma.batteries.findMany({
       where: whereClause,
       select: {
         battery_id: true,
