@@ -10,7 +10,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
-import { Battery, CreditCard, Edit, Save, Camera, Loader2 } from "lucide-react";
+import { Edit, Save, Camera, Loader2 } from "lucide-react";
 import API_ENDPOINTS, { fetchWithAuth } from "../../config/api";
 import authService from "../../services/auth.service";
 
@@ -24,9 +24,6 @@ const DriverProfile: React.FC = () => {
     email: "",
     phone: "",
     avatar: "",
-    totalSwaps: 0,
-    monthlySwaps: 0,
-    monthlyCost: 0,
   });
 
   const loadProfile = async () => {
@@ -37,71 +34,12 @@ const DriverProfile: React.FC = () => {
       // Load user profile
       const profileData = await authService.getProfile();
       const u = profileData.data?.user || profileData.data;
-      setProfile((p) => ({
-        ...p,
+      setProfile({
         name: u.full_name || "",
         email: u.email || "",
         phone: u.phone || "",
         avatar: u.avatar || "",
-      }));
-
-      // Load statistics
-      try {
-        const statsRes = await fetchWithAuth(
-          `${API_ENDPOINTS.DRIVER.TRANSACTIONS}/stats?period=30`
-        );
-        const statsData = await statsRes.json();
-        if (statsRes.ok && statsData.success) {
-          // Get current month stats
-          const now = new Date();
-          const currentMonthStart = new Date(
-            now.getFullYear(),
-            now.getMonth(),
-            1
-          );
-
-          // Load all transactions to calculate monthly stats
-          const transactionsRes = await fetchWithAuth(
-            `${API_ENDPOINTS.DRIVER.TRANSACTIONS}?limit=1000`
-          );
-          const transactionsData = await transactionsRes.json();
-
-          if (transactionsRes.ok && transactionsData.success) {
-            const transactions =
-              transactionsData.data?.transactions ||
-              transactionsData.data ||
-              [];
-
-            // Calculate total swaps (all time)
-            const totalSwaps = transactions.length;
-
-            // Calculate monthly swaps and cost
-            const monthlyTransactions = transactions.filter((t: any) => {
-              const swapDate = new Date(t.swap_at || t.created_at);
-              return swapDate >= currentMonthStart;
-            });
-
-            const monthlySwaps = monthlyTransactions.length;
-            const monthlyCost = monthlyTransactions.reduce(
-              (sum: number, t: any) => {
-                const amount = t.payment?.amount || 0;
-                return sum + Number(amount);
-              },
-              0
-            );
-
-            setProfile((p) => ({
-              ...p,
-              totalSwaps,
-              monthlySwaps,
-              monthlyCost,
-            }));
-          }
-        }
-      } catch (statsError) {
-        console.error("Error loading statistics:", statsError);
-        // Don't show error for stats, just use defaults
-      }
+      });
     } catch (e: any) {
       setError(e.message || "Có lỗi xảy ra");
     } finally {
@@ -204,28 +142,9 @@ const DriverProfile: React.FC = () => {
             <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
               {profile.name || "—"}
             </h2>
-            <p className="text-slate-600 dark:text-slate-400 mb-6">
+            <p className="text-slate-600 dark:text-slate-400">
               {profile.email || "—"}
             </p>
-
-            <div className="grid grid-cols-2 gap-4 text-center">
-              <div>
-                <div className="text-2xl font-bold text-slate-900 dark:text-white">
-                  {profile.totalSwaps}
-                </div>
-                <div className="text-xs text-slate-600 dark:text-slate-400">
-                  Tổng lần thay
-                </div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                  {profile.monthlySwaps}
-                </div>
-                <div className="text-xs text-slate-600 dark:text-slate-400">
-                  Tháng này
-                </div>
-              </div>
-            </div>
           </CardContent>
         </Card>
 
@@ -288,44 +207,6 @@ const DriverProfile: React.FC = () => {
                   }
                   className="glass border-slate-200/50 dark:border-slate-700/50"
                 />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 gradient-primary rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <Battery className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Lần thay tháng này
-                </p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                  {profile.monthlySwaps}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <CreditCard className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Chi phí tháng này
-                </p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                  {Number(profile.monthlyCost).toLocaleString("vi-VN")} đ
-                </p>
               </div>
             </div>
           </CardContent>

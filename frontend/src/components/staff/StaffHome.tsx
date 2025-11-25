@@ -45,7 +45,6 @@ const StaffHome: React.FC = () => {
   
   // Auto-refresh state
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
-  const [autoRefreshInterval, setAutoRefreshInterval] = useState<ReturnType<typeof setInterval> | null>(null);
   const [lastRefreshTime, setLastRefreshTime] = useState<Date>(new Date());
   
   const { toast } = useToast();
@@ -134,32 +133,18 @@ const StaffHome: React.FC = () => {
 
   // Auto-refresh setup
   useEffect(() => {
-    let interval: ReturnType<typeof setInterval> | null = null;
-    
-    if (autoRefreshEnabled) {
-      interval = setInterval(() => {
-        loadData(true);
-      }, 30000); // Refresh every 30 seconds
+    if (!autoRefreshEnabled) return;
 
-      setAutoRefreshInterval(interval);
-    }
+    const interval = setInterval(() => {
+      loadData(true);
+    }, 30000); // Refresh every 30 seconds
 
+    // Cleanup function - xóa interval khi component unmount hoặc autoRefreshEnabled thay đổi
     return () => {
-      if (interval) {
-        clearInterval(interval);
-      }
+      clearInterval(interval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRefreshEnabled]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (autoRefreshInterval) {
-        clearInterval(autoRefreshInterval);
-      }
-    };
-  }, [autoRefreshInterval]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -217,18 +202,22 @@ const StaffHome: React.FC = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="float">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-green-900 dark:from-white dark:to-green-100 bg-clip-text text-transparent">Tổng quan trạm</h1>
-          <p className="text-slate-600 dark:text-slate-300">{stationName} - Bảng điều khiển vận hành thời gian thực</p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 dark:from-green-400 dark:via-emerald-400 dark:to-teal-400 bg-clip-text text-transparent mb-2">
+            Tổng quan trạm
+          </h1>
+          <p className="text-slate-600 dark:text-slate-400 text-lg">
+            {stationName} • Bảng điều khiển vận hành thời gian thực
+          </p>
         </div>
         <div className="flex gap-3">
           <Button 
             variant="outline" 
             size="sm"
-            className="glass border-slate-200/50 dark:border-slate-700/50 hover:bg-slate-50/50 dark:hover:bg-slate-500/10"
+            className="glass border-slate-200/50 dark:border-slate-700/50 hover:bg-slate-50/50 dark:hover:bg-slate-500/10 shadow-sm"
             onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
             title={autoRefreshEnabled ? 'Tắt tự động làm mới' : 'Bật tự động làm mới'}
           >
@@ -246,166 +235,339 @@ const StaffHome: React.FC = () => {
           </Button>
           <Button 
             variant="outline" 
-            className="glass border-green-200/50 dark:border-emerald-400/30 hover:bg-green-50/50 dark:hover:bg-emerald-500/10"
+            className="glass border-green-200/50 dark:border-emerald-400/30 hover:bg-green-50/50 dark:hover:bg-emerald-500/10 shadow-sm"
             onClick={() => loadData(false)}
             disabled={loading || refreshing}
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${(loading || refreshing) ? 'animate-spin' : ''}`} />
-            Làm mới dữ liệu
+            Làm mới
           </Button>
         </div>
       </div>
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <Battery className="h-5 w-5 text-white" />
-              </div>
+      {/* Key Metrics - Redesigned */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <Card className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Pin khả dụng</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{availableBatteries}/{totalBatteries}</p>
+                <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Pin khả dụng</p>
+                <p className="text-3xl font-bold text-green-600 dark:text-green-400">
+                  {availableBatteries}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  / {totalBatteries} tổng số
+                </p>
+              </div>
+              <div className="p-4 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <Battery className="h-6 w-6 text-white" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-orange-500 to-yellow-500 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <Users className="h-5 w-5 text-white" />
-              </div>
+        <Card className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Hàng đợi hiện tại</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{currentQueue}</p>
+                <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Hàng đợi</p>
+                <p className="text-3xl font-bold text-orange-600 dark:text-orange-400">
+                  {currentQueue}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  đang chờ xử lý
+                </p>
+              </div>
+              <div className="p-4 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <Users className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Đang sạc</p>
+                <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+                  {chargingBatteries}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  pin đang sạc
+                </p>
+              </div>
+              <div className="p-4 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <Activity className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Sử dụng</p>
+                <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">
+                  {batteryUtilization}%
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  tỷ lệ sử dụng
+                </p>
+              </div>
+              <div className="p-4 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <TrendingUp className="h-6 w-6 text-white" />
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Battery Status */}
-      <Card className="glass-card border-0 glow">
-        <CardHeader>
-          <CardTitle className="text-slate-900 dark:text-white">Tổng quan trạng thái pin</CardTitle>
-          <CardDescription className="text-slate-600 dark:text-slate-400">Phân tích kho hiện tại</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {totalBatteries === 0 ? (
-            <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-4">
-              Chưa có dữ liệu pin
-            </p>
-          ) : (
-            <>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Khả dụng</span>
-                  <span className="text-sm font-bold text-green-600 dark:text-green-400">{availableBatteries}</span>
-                </div>
-                <Progress value={(availableBatteries / totalBatteries) * 100} className="h-2" />
+      {/* Two Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Battery Status - Redesigned */}
+        <Card className="glass-card border-0 shadow-xl">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg">
+                <Battery className="h-5 w-5 text-white" />
               </div>
-
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Đang sạc</span>
-                  <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{chargingBatteries}</span>
-                </div>
-                <Progress value={(chargingBatteries / totalBatteries) * 100} className="h-2" />
+              <div>
+                <CardTitle className="text-xl text-slate-900 dark:text-white">Trạng thái pin</CardTitle>
+                <CardDescription className="text-slate-600 dark:text-slate-400">Phân tích kho hiện tại</CardDescription>
               </div>
-
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Bảo trì</span>
-                  <span className="text-sm font-bold text-yellow-600 dark:text-yellow-400">{maintenanceBatteries}</span>
-                </div>
-                <Progress value={(maintenanceBatteries / totalBatteries) * 100} className="h-2" />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {totalBatteries === 0 ? (
+              <div className="text-center py-8">
+                <Battery className="h-12 w-12 mx-auto mb-3 text-slate-400" />
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  Chưa có dữ liệu pin
+                </p>
               </div>
+            ) : (
+              <>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Khả dụng</span>
+                      </div>
+                      <span className="text-sm font-bold text-green-600 dark:text-green-400">{availableBatteries}</span>
+                    </div>
+                    <Progress 
+                      value={(availableBatteries / totalBatteries) * 100} 
+                      className="h-3 bg-slate-200 dark:bg-slate-700"
+                    />
+                  </div>
 
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Hỏng</span>
-                  <span className="text-sm font-bold text-red-600 dark:text-red-400">{damagedBatteries}</span>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Đang sạc</span>
+                      </div>
+                      <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{chargingBatteries}</span>
+                    </div>
+                    <Progress 
+                      value={(chargingBatteries / totalBatteries) * 100} 
+                      className="h-3 bg-slate-200 dark:bg-slate-700"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Bảo trì</span>
+                      </div>
+                      <span className="text-sm font-bold text-yellow-600 dark:text-yellow-400">{maintenanceBatteries}</span>
+                    </div>
+                    <Progress 
+                      value={(maintenanceBatteries / totalBatteries) * 100} 
+                      className="h-3 bg-slate-200 dark:bg-slate-700"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Hỏng</span>
+                      </div>
+                      <span className="text-sm font-bold text-red-600 dark:text-red-400">{damagedBatteries}</span>
+                    </div>
+                    <Progress 
+                      value={(damagedBatteries / totalBatteries) * 100} 
+                      className="h-3 bg-slate-200 dark:bg-slate-700"
+                    />
+                  </div>
                 </div>
-                <Progress value={(damagedBatteries / totalBatteries) * 100} className="h-2" />
-              </div>
 
-              <div className="pt-4 border-t border-slate-200/50 dark:border-slate-700/50">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="font-medium text-slate-700 dark:text-slate-300">Tỷ lệ sử dụng pin</span>
-                  <span className="font-bold text-slate-900 dark:text-white">{batteryUtilization}%</span>
+                <div className="pt-4 border-t border-slate-200/50 dark:border-slate-700/50 mt-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Tổng số pin</span>
+                    <span className="text-lg font-bold text-slate-900 dark:text-white">{totalBatteries}</span>
+                  </div>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Pending Bookings - New Section */}
+        <Card className="glass-card border-0 shadow-xl">
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-orange-500 to-amber-600 rounded-lg">
+                  <Clock className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl text-slate-900 dark:text-white">Hàng đợi</CardTitle>
+                  <CardDescription className="text-slate-600 dark:text-slate-400">
+                    {pendingBookings.length > 0 ? `${pendingBookings.length} booking đang chờ` : 'Không có booking nào'}
+                  </CardDescription>
                 </div>
               </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Recent Transactions */}
-      <Card className="glass-card border-0 glow">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-slate-900 dark:text-white">Giao dịch gần đây</CardTitle>
-              <CardDescription className="text-slate-600 dark:text-slate-400">
-                Các hoạt động thay pin mới nhất
-                {autoRefreshEnabled && (
-                  <span className="ml-2 text-xs text-green-600 dark:text-green-400">
-                    • Tự động làm mới mỗi 30s
-                  </span>
+              {pendingBookings.length > 0 && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="glass border-green-200/50 dark:border-emerald-400/30 hover:bg-green-50/50 dark:hover:bg-emerald-500/10"
+                  onClick={() => window.location.href = '/staff/transactions?status=pending'}
+                >
+                  Xem tất cả
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {pendingBookings.length === 0 ? (
+              <div className="text-center py-8">
+                <CheckCircle className="h-12 w-12 mx-auto mb-3 text-green-400" />
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  Không có booking nào đang chờ
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                {pendingBookings.slice(0, 5).map((booking) => (
+                  <div 
+                    key={booking.booking_id} 
+                    className="flex items-center justify-between p-4 bg-gradient-to-r from-orange-50/50 to-amber-50/50 dark:from-orange-900/20 dark:to-amber-900/20 rounded-lg border border-orange-200/50 dark:border-orange-700/50 hover:shadow-md transition-all duration-300"
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="p-2 bg-gradient-to-br from-orange-500 to-amber-600 rounded-lg flex-shrink-0">
+                        <Clock className="h-4 w-4 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-slate-900 dark:text-white truncate">
+                          {booking.user?.full_name || 'Khách hàng'}
+                        </h4>
+                        <p className="text-xs text-slate-600 dark:text-slate-400 truncate">
+                          {booking.booking_code} • {booking.vehicle?.license_plate || 'N/A'}
+                        </p>
+                        <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
+                          {formatDate(booking.scheduled_at)} • {formatTime(booking.scheduled_at)}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge className="bg-orange-500/20 text-orange-700 dark:text-orange-400 border-orange-300 dark:border-orange-600">
+                      Chờ xử lý
+                    </Badge>
+                  </div>
+                ))}
+                {pendingBookings.length > 5 && (
+                  <p className="text-xs text-center text-slate-500 dark:text-slate-400 pt-2">
+                    +{pendingBookings.length - 5} booking khác
+                  </p>
                 )}
-              </CardDescription>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent Transactions - Redesigned */}
+      <Card className="glass-card border-0 shadow-xl">
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-lg">
+                <Zap className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-xl text-slate-900 dark:text-white">Giao dịch gần đây</CardTitle>
+                <CardDescription className="text-slate-600 dark:text-slate-400">
+                  Các hoạt động thay pin mới nhất
+                  {autoRefreshEnabled && (
+                    <span className="ml-2 text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                      <Activity className="h-3 w-3 animate-pulse" />
+                      Tự động làm mới
+                    </span>
+                  )}
+                </CardDescription>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="glass border-green-200/50 dark:border-emerald-400/30 hover:bg-green-50/50 dark:hover:bg-emerald-500/10"
-                onClick={() => window.location.href = '/staff/transactions'}
-              >
-                Xem tất cả
-              </Button>
-            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="glass border-green-200/50 dark:border-emerald-400/30 hover:bg-green-50/50 dark:hover:bg-emerald-500/10 shadow-sm"
+              onClick={() => window.location.href = '/staff/transactions'}
+            >
+              Xem tất cả
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
           {recentBookings.length === 0 ? (
-            <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-4">
-              Chưa có giao dịch nào
-            </p>
+            <div className="text-center py-12">
+              <Zap className="h-12 w-12 mx-auto mb-3 text-slate-400" />
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Chưa có giao dịch nào
+              </p>
+            </div>
           ) : (
             <>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {recentBookings.map((booking) => (
-                  <div key={booking.booking_id} className="flex items-center justify-between p-4 glass rounded-lg glow-hover group">
-                    <div className="flex items-center space-x-4">
-                      <div className="p-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg group-hover:scale-110 transition-transform duration-300">
+                  <div 
+                    key={booking.booking_id} 
+                    className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50/50 to-cyan-50/50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-lg border border-blue-200/50 dark:border-blue-700/50 hover:shadow-md transition-all duration-300 group"
+                  >
+                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                      <div className="p-3 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
                         <Zap className="h-5 w-5 text-white" />
                       </div>
-                      <div>
-                        <h4 className="font-semibold text-slate-900 dark:text-white">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-slate-900 dark:text-white mb-1">
                           {booking.user?.full_name || 'Khách hàng'}
                         </h4>
-                        <p className="text-sm text-slate-600 dark:text-slate-400">
-                          {booking.vehicle?.license_plate || booking.vehicle?.model || 'N/A'}
-                        </p>
+                        <div className="flex items-center gap-3 text-xs text-slate-600 dark:text-slate-400">
+                          <span>{booking.booking_code}</span>
+                          <span>•</span>
+                          <span>{booking.vehicle?.license_plate || booking.vehicle?.model || 'N/A'}</span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-2 text-xs text-slate-500 dark:text-slate-500">
+                          <Clock className="h-3 w-3" />
+                          <span>{formatDate(booking.scheduled_at)} • {formatTime(booking.scheduled_at)}</span>
+                          {calculateDuration(booking) !== '-' && (
+                            <>
+                              <span>•</span>
+                              <span>{calculateDuration(booking)}</span>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
 
-                    <div className="text-center">
-                      <p className="text-sm font-medium text-slate-900 dark:text-white">
-                        {formatTime(booking.scheduled_at)}
-                      </p>
-                      <p className="text-xs text-slate-600 dark:text-slate-400">
-                        {calculateDuration(booking)}
-                      </p>
-                    </div>
-
-                    <Badge className={getStatusColor(booking.status)}>
-                      {booking.status === 'completed' && <CheckCircle className="mr-1 h-3 w-3" />}
-                      {booking.status === 'confirmed' && <Clock className="mr-1 h-3 w-3" />}
+                    <Badge className={`${getStatusColor(booking.status)} flex items-center gap-1 flex-shrink-0`}>
+                      {booking.status === 'completed' && <CheckCircle className="h-3 w-3" />}
+                      {booking.status === 'confirmed' && <Clock className="h-3 w-3" />}
                       {getStatusText(booking.status)}
                     </Badge>
                   </div>

@@ -1,11 +1,23 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
-import { Progress } from '../ui/progress';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../ui/card";
+import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
+import { Progress } from "../ui/progress";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 import {
   Dialog,
   DialogContent,
@@ -13,11 +25,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '../ui/dialog';
-import { 
-  Battery, 
-  Plus, 
-  Search, 
+} from "../ui/dialog";
+import {
+  Battery,
+  Plus,
+  Search,
   Filter,
   Zap,
   AlertTriangle,
@@ -34,8 +46,8 @@ import {
   Activity,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
-} from 'lucide-react';
+  ArrowDown,
+} from "lucide-react";
 import {
   Pagination,
   PaginationContent,
@@ -44,7 +56,7 @@ import {
   PaginationNext,
   PaginationPrevious,
   PaginationEllipsis,
-} from '../ui/pagination';
+} from "../ui/pagination";
 import {
   Battery as BatteryType,
   getStationBatteries,
@@ -52,14 +64,20 @@ import {
   updateBatteryStatus,
   UpdateBatteryData,
   getBatteryHistory,
-  BatteryTransferLog
-} from '../../services/battery.service';
-import { useToast } from '../../hooks/use-toast';
-import { parseError, logError } from '../../utils/errorHandler';
-import AddBatteryDialog from './AddBatteryDialog';
+  BatteryTransferLog,
+} from "../../services/battery.service";
+import { useToast } from "../../hooks/use-toast";
+import { parseError, logError } from "../../utils/errorHandler";
+import AddBatteryDialog from "./AddBatteryDialog";
 
-type SortField = 'battery_code' | 'model' | 'status' | 'current_charge' | 'created_at' | 'health_percentage';
-type SortOrder = 'asc' | 'desc';
+type SortField =
+  | "battery_code"
+  | "model"
+  | "status"
+  | "current_charge"
+  | "created_at"
+  | "health_percentage";
+type SortOrder = "asc" | "desc";
 
 const BatteryInventory: React.FC = () => {
   const [allBatteries, setAllBatteries] = useState<BatteryType[]>([]); // All batteries from API
@@ -67,38 +85,44 @@ const BatteryInventory: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(''); // Debounced search để tối ưu performance
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [modelFilter, setModelFilter] = useState('all');
-  
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(""); // Debounced search để tối ưu performance
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [modelFilter, setModelFilter] = useState("all");
+
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(12);
-  
+
   // Sorting states
-  const [sortField, setSortField] = useState<SortField>('created_at');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
-  
+  const [sortField, setSortField] = useState<SortField>("created_at");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+
   // Dialog states
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [selectedBattery, setSelectedBattery] = useState<BatteryType | null>(null);
+  const [selectedBattery, setSelectedBattery] = useState<BatteryType | null>(
+    null
+  );
   const [editLoading, setEditLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteConfirmed, setDeleteConfirmed] = useState(false);
-  const [batteryHistory, setBatteryHistory] = useState<BatteryTransferLog[]>([]);
+  const [batteryHistory, setBatteryHistory] = useState<BatteryTransferLog[]>(
+    []
+  );
   const [loadingHistory, setLoadingHistory] = useState(false);
-  const [editFormData, setEditFormData] = useState<UpdateBatteryData & { cycle_count?: number }>({
-    status: 'full',
+  const [editFormData, setEditFormData] = useState<
+    UpdateBatteryData & { cycle_count?: number }
+  >({
+    status: "full",
     current_charge: 100,
     health_percentage: undefined,
     cycle_count: undefined,
   });
-  
+
   const { toast } = useToast();
 
   // Fetch batteries
@@ -106,10 +130,10 @@ const BatteryInventory: React.FC = () => {
     try {
       setRefreshing(true);
       const response = await getStationBatteries({
-        status: statusFilter !== 'all' ? statusFilter : undefined,
-        model: modelFilter !== 'all' ? modelFilter : undefined,
+        status: statusFilter !== "all" ? statusFilter : undefined,
+        model: modelFilter !== "all" ? modelFilter : undefined,
       });
-      
+
       if (response.success && response.data) {
         setAllBatteries(response.data);
         // ✅ Không gọi applyFiltersAndSort ở đây, để useEffect tự động xử lý
@@ -120,9 +144,9 @@ const BatteryInventory: React.FC = () => {
       }
     } catch (error: any) {
       toast({
-        title: 'Lỗi',
-        description: error.message || 'Không thể tải danh sách pin',
-        variant: 'destructive',
+        title: "Lỗi",
+        description: error.message || "Không thể tải danh sách pin",
+        variant: "destructive",
       });
       setAllBatteries([]); // Set empty array khi có lỗi
     } finally {
@@ -148,92 +172,109 @@ const BatteryInventory: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Apply filters, search, sorting and pagination khi có thay đổi
-  useEffect(() => {
-    // Sử dụng debouncedSearchTerm thay vì searchTerm trực tiếp
+  // Memoize filtered, sorted and paginated batteries
+  const filteredSortedBatteries = useMemo(() => {
     let processed = [...allBatteries];
-    
+
+    // ✅ Filter bỏ pin đang gắn trên xe (in_use) - không còn ở trạm
+    processed = processed.filter((b) => b.status !== "in_use");
+
     // Apply search với debounced term
     if (debouncedSearchTerm.trim()) {
       const searchLower = debouncedSearchTerm.toLowerCase();
-      processed = processed.filter(b => 
-        b.battery_code.toLowerCase().includes(searchLower) ||
-        b.model.toLowerCase().includes(searchLower) ||
-        b.station?.name.toLowerCase().includes(searchLower)
+      processed = processed.filter(
+        (b) =>
+          b.battery_code.toLowerCase().includes(searchLower) ||
+          b.model.toLowerCase().includes(searchLower) ||
+          b.stations?.name.toLowerCase().includes(searchLower)
       );
     }
-    
+
     // Apply sorting
     processed.sort((a, b) => {
       let aValue: any;
       let bValue: any;
-      
+
       switch (sortField) {
-        case 'battery_code':
-          aValue = a.battery_code || '';
-          bValue = b.battery_code || '';
+        case "battery_code":
+          aValue = a.battery_code || "";
+          bValue = b.battery_code || "";
           break;
-        case 'model':
-          aValue = a.model || '';
-          bValue = b.model || '';
+        case "model":
+          aValue = a.model || "";
+          bValue = b.model || "";
           break;
-        case 'status':
-          aValue = a.status || '';
-          bValue = b.status || '';
+        case "status":
+          aValue = a.status || "";
+          bValue = b.status || "";
           break;
-        case 'current_charge':
+        case "current_charge":
           aValue = a.current_charge || 0;
           bValue = b.current_charge || 0;
           break;
-        case 'health_percentage':
+        case "health_percentage":
           aValue = a.health_percentage || 0;
           bValue = b.health_percentage || 0;
           break;
-        case 'created_at':
+        case "created_at":
           aValue = new Date(a.created_at).getTime();
           bValue = new Date(b.created_at).getTime();
           break;
         default:
           return 0;
       }
-      
-      if (sortOrder === 'asc') {
+
+      if (sortOrder === "asc") {
         return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
       } else {
         return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
       }
     });
-    
-    // Apply pagination
-    const totalPages = Math.ceil(processed.length / pageSize);
+
+    return processed;
+  }, [allBatteries, debouncedSearchTerm, sortField, sortOrder]);
+
+  // Memoize paginated batteries
+  const paginatedBatteries = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;
     const endIndex = startIndex + pageSize;
-    const paginated = processed.slice(startIndex, endIndex);
-    
-    setBatteries(paginated);
+    return filteredSortedBatteries.slice(startIndex, endIndex);
+  }, [filteredSortedBatteries, currentPage, pageSize]);
+
+  // Update total pages and items when filtered data changes
+  useEffect(() => {
+    const totalPages = Math.ceil(filteredSortedBatteries.length / pageSize);
     setTotalPages(totalPages);
-    setTotalItems(processed.length);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearchTerm, sortField, sortOrder, currentPage, pageSize, allBatteries]);
+    setTotalItems(filteredSortedBatteries.length);
+    setBatteries(paginatedBatteries);
+  }, [filteredSortedBatteries, paginatedBatteries, pageSize]);
 
-  // Handle sort change
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortOrder('desc');
-    }
-  };
+  // Memoize event handlers
+  const handleSort = useCallback(
+    (field: SortField) => {
+      if (sortField === field) {
+        setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+      } else {
+        setSortField(field);
+        setSortOrder("desc");
+      }
+    },
+    [sortField, sortOrder]
+  );
 
-  const getSortIcon = (field: SortField) => {
-    if (sortField !== field) {
-      return <ArrowUpDown className="h-4 w-4 text-gray-400" />;
-    }
-    return sortOrder === 'asc' 
-      ? <ArrowUp className="h-4 w-4 text-blue-600" />
-      : <ArrowDown className="h-4 w-4 text-blue-600" />;
-  };
+  const getSortIcon = useCallback(
+    (field: SortField) => {
+      if (sortField !== field) {
+        return <ArrowUpDown className="h-4 w-4 text-gray-400" />;
+      }
+      return sortOrder === "asc" ? (
+        <ArrowUp className="h-4 w-4 text-blue-600" />
+      ) : (
+        <ArrowDown className="h-4 w-4 text-blue-600" />
+      );
+    },
+    [sortField, sortOrder]
+  );
 
   // Dialog handlers
   const handleViewDetail = async (battery: BatteryType) => {
@@ -289,13 +330,16 @@ const BatteryInventory: React.FC = () => {
       if (editFormData.cycle_count !== undefined) {
         (updateData as any).cycle_count = editFormData.cycle_count;
       }
-      
-      const response = await updateBatteryStatus(selectedBattery.battery_id, updateData);
+
+      const response = await updateBatteryStatus(
+        selectedBattery.battery_id,
+        updateData
+      );
 
       if (response.success) {
         toast({
-          title: 'Thành công',
-          description: 'Đã cập nhật thông tin pin',
+          title: "Thành công",
+          description: "Đã cập nhật thông tin pin",
         });
         fetchBatteries();
         setEditDialogOpen(false);
@@ -303,11 +347,11 @@ const BatteryInventory: React.FC = () => {
     } catch (error: any) {
       logError(error, "BatteryInventory.handleEditSubmit");
       const errorInfo = parseError(error);
-      
+
       toast({
         title: errorInfo.title,
         description: errorInfo.description,
-        variant: 'destructive',
+        variant: "destructive",
       });
     } finally {
       setEditLoading(false);
@@ -324,8 +368,8 @@ const BatteryInventory: React.FC = () => {
 
       if (response.success) {
         toast({
-          title: 'Thành công',
-          description: 'Đã xóa pin thành công',
+          title: "Thành công",
+          description: "Đã xóa pin thành công",
         });
         fetchBatteries();
         setDeleteDialogOpen(false);
@@ -333,12 +377,12 @@ const BatteryInventory: React.FC = () => {
     } catch (error: any) {
       logError(error, "BatteryInventory.handleDeleteConfirm");
       const errorInfo = parseError(error);
-      
+
       setDeleteError(errorInfo.description);
       toast({
         title: errorInfo.title,
         description: errorInfo.description,
-        variant: 'destructive',
+        variant: "destructive",
       });
     } finally {
       setDeleteLoading(false);
@@ -347,54 +391,90 @@ const BatteryInventory: React.FC = () => {
 
   const getDetailStatusColor = (status: string) => {
     switch (status) {
-      case 'full': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-      case 'charging': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
-      case 'in_use': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
-      case 'maintenance': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
-      case 'damaged': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
+      case "full":
+        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
+      case "charging":
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
+      case "in_use":
+        return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200";
+      case "maintenance":
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
+      case "damaged":
+        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
+      default:
+        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200";
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'full': return <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />;
-      case 'reserved': return <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" />;
-      case 'charging': return <Zap className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />;
-      case 'in_use': return <Battery className="h-4 w-4 text-purple-600 dark:text-purple-400" />;
-      case 'maintenance': return <Wrench className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />;
-      case 'damaged': return <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />;
-      default: return <Battery className="h-4 w-4 text-slate-600 dark:text-slate-400" />;
+      case "full":
+        return (
+          <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+        );
+      case "reserved":
+        return <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" />;
+      case "charging":
+        return <Zap className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />;
+      case "in_use":
+        return (
+          <Battery className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+        );
+      case "maintenance":
+        return (
+          <Wrench className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+        );
+      case "damaged":
+        return (
+          <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+        );
+      default:
+        return (
+          <Battery className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+        );
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'full': return 'bg-green-50/80 dark:bg-green-500/10 text-green-800 dark:text-green-400 border-green-200/50 dark:border-green-500/20';
-      case 'charging': return 'bg-blue-50/80 dark:bg-blue-500/10 text-blue-800 dark:text-blue-400 border-blue-200/50 dark:border-blue-500/20';
-      case 'in_use': return 'bg-purple-50/80 dark:bg-purple-500/10 text-purple-800 dark:text-purple-400 border-purple-200/50 dark:border-purple-500/20';
-      case 'maintenance': return 'bg-yellow-50/80 dark:bg-yellow-500/10 text-yellow-800 dark:text-yellow-400 border-yellow-200/50 dark:border-yellow-500/20';
-      case 'damaged': return 'bg-red-50/80 dark:bg-red-500/10 text-red-800 dark:text-red-400 border-red-200/50 dark:border-red-500/20';
-      default: return 'bg-slate-50/80 dark:bg-slate-500/10 text-slate-800 dark:text-slate-400 border-slate-200/50 dark:border-slate-500/20';
+      case "full":
+        return "bg-green-50/80 dark:bg-green-500/10 text-green-800 dark:text-green-400 border-green-200/50 dark:border-green-500/20";
+      case "charging":
+        return "bg-blue-50/80 dark:bg-blue-500/10 text-blue-800 dark:text-blue-400 border-blue-200/50 dark:border-blue-500/20";
+      case "in_use":
+        return "bg-purple-50/80 dark:bg-purple-500/10 text-purple-800 dark:text-purple-400 border-purple-200/50 dark:border-purple-500/20";
+      case "maintenance":
+        return "bg-yellow-50/80 dark:bg-yellow-500/10 text-yellow-800 dark:text-yellow-400 border-yellow-200/50 dark:border-yellow-500/20";
+      case "damaged":
+        return "bg-red-50/80 dark:bg-red-500/10 text-red-800 dark:text-red-400 border-red-200/50 dark:border-red-500/20";
+      default:
+        return "bg-slate-50/80 dark:bg-slate-500/10 text-slate-800 dark:text-slate-400 border-slate-200/50 dark:border-slate-500/20";
     }
   };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'full': return 'Đầy';
-      case 'reserved': return 'Đã giữ chỗ';
-      case 'charging': return 'Đang sạc';
-      case 'in_use': return 'Đang dùng';
-      case 'maintenance': return 'Bảo trì';
-      case 'damaged': return 'Hỏng';
-      default: return status;
+      case "full":
+        return "Đầy";
+      case "reserved":
+        return "Đã giữ chỗ";
+      case "charging":
+        return "Đang sạc";
+      case "in_use":
+        return "Đang dùng";
+      case "maintenance":
+        return "Bảo trì";
+      case "damaged":
+        return "Hỏng";
+      default:
+        return status;
     }
   };
 
   const getChargeColor = (charge: number) => {
-    if (charge >= 80) return 'text-green-600 dark:text-green-400';
-    if (charge >= 40) return 'text-yellow-600 dark:text-yellow-400';
-    return 'text-red-600 dark:text-red-400';
+    if (charge >= 80) return "text-green-600 dark:text-green-400";
+    if (charge >= 40) return "text-yellow-600 dark:text-yellow-400";
+    return "text-red-600 dark:text-red-400";
   };
 
   // Pagination states
@@ -402,12 +482,16 @@ const BatteryInventory: React.FC = () => {
   const [totalItems, setTotalItems] = useState(0);
 
   const totalBatteries = allBatteries.length;
-  const fullBatteries = allBatteries.filter(b => b.status === 'full').length;
-  const chargingBatteries = allBatteries.filter(b => b.status === 'charging').length;
-  const maintenanceBatteries = allBatteries.filter(b => b.status === 'maintenance' || b.status === 'damaged').length;
+  const fullBatteries = allBatteries.filter((b) => b.status === "full").length;
+  const chargingBatteries = allBatteries.filter(
+    (b) => b.status === "charging"
+  ).length;
+  const maintenanceBatteries = allBatteries.filter(
+    (b) => b.status === "maintenance" || b.status === "damaged"
+  ).length;
 
   // Get unique models for filter (from all batteries, not just paginated ones)
-  const uniqueModels = Array.from(new Set(allBatteries.map(b => b.model)));
+  const uniqueModels = Array.from(new Set(allBatteries.map((b) => b.model)));
 
   if (loading) {
     return (
@@ -422,12 +506,16 @@ const BatteryInventory: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="float">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-green-900 dark:from-white dark:to-green-100 bg-clip-text text-transparent">Kho Pin</h1>
-          <p className="text-slate-600 dark:text-slate-300">Quản lý và theo dõi tình trạng kho pin</p>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-green-900 dark:from-white dark:to-green-100 bg-clip-text text-transparent">
+            Kho Pin
+          </h1>
+          <p className="text-slate-600 dark:text-slate-300">
+            Quản lý và theo dõi tình trạng kho pin
+          </p>
         </div>
         <div className="flex gap-3">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             className="glass border-green-200/50 dark:border-emerald-400/30 hover:bg-green-50/50 dark:hover:bg-emerald-500/10"
             onClick={fetchBatteries}
             disabled={refreshing}
@@ -439,7 +527,7 @@ const BatteryInventory: React.FC = () => {
             )}
             Làm mới
           </Button>
-          <Button 
+          <Button
             className="bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg hover:shadow-xl transition-all duration-300"
             onClick={() => setAddDialogOpen(true)}
           >
@@ -458,8 +546,12 @@ const BatteryInventory: React.FC = () => {
                 <Battery className="h-5 w-5 text-white" />
               </div>
               <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Tổng pin</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{totalBatteries}</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  Tổng pin
+                </p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {totalBatteries}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -472,8 +564,12 @@ const BatteryInventory: React.FC = () => {
                 <CheckCircle className="h-5 w-5 text-white" />
               </div>
               <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Đầy</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{fullBatteries}</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  Đầy
+                </p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {fullBatteries}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -486,8 +582,12 @@ const BatteryInventory: React.FC = () => {
                 <Zap className="h-5 w-5 text-white" />
               </div>
               <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Đang sạc</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{chargingBatteries}</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  Đang sạc
+                </p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {chargingBatteries}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -500,8 +600,12 @@ const BatteryInventory: React.FC = () => {
                 <Wrench className="h-5 w-5 text-white" />
               </div>
               <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Bảo trì</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{maintenanceBatteries}</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  Bảo trì
+                </p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {maintenanceBatteries}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -542,15 +646,20 @@ const BatteryInventory: React.FC = () => {
               </SelectTrigger>
               <SelectContent className="glass-card border-0">
                 <SelectItem value="all">Tất cả model</SelectItem>
-                {uniqueModels.map(model => (
-                  <SelectItem key={model} value={model}>{model}</SelectItem>
+                {uniqueModels.map((model) => (
+                  <SelectItem key={model} value={model}>
+                    {model}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <Select value={String(pageSize)} onValueChange={(value) => {
-              setPageSize(Number(value));
-              setCurrentPage(1);
-            }}>
+            <Select
+              value={String(pageSize)}
+              onValueChange={(value) => {
+                setPageSize(Number(value));
+                setCurrentPage(1);
+              }}
+            >
               <SelectTrigger className="w-full md:w-32 glass border-slate-200/50 dark:border-slate-700/50">
                 <SelectValue />
               </SelectTrigger>
@@ -571,39 +680,39 @@ const BatteryInventory: React.FC = () => {
           <div className="flex items-center justify-between text-sm text-slate-600 dark:text-slate-400">
             <div className="flex items-center gap-4">
               <button
-                onClick={() => handleSort('battery_code')}
+                onClick={() => handleSort("battery_code")}
                 className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
               >
                 Mã pin
-                {getSortIcon('battery_code')}
+                {getSortIcon("battery_code")}
               </button>
               <button
-                onClick={() => handleSort('model')}
+                onClick={() => handleSort("model")}
                 className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
               >
                 Model
-                {getSortIcon('model')}
+                {getSortIcon("model")}
               </button>
               <button
-                onClick={() => handleSort('status')}
+                onClick={() => handleSort("status")}
                 className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
               >
                 Trạng thái
-                {getSortIcon('status')}
+                {getSortIcon("status")}
               </button>
               <button
-                onClick={() => handleSort('current_charge')}
+                onClick={() => handleSort("current_charge")}
                 className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
               >
                 Mức sạc
-                {getSortIcon('current_charge')}
+                {getSortIcon("current_charge")}
               </button>
               <button
-                onClick={() => handleSort('created_at')}
+                onClick={() => handleSort("created_at")}
                 className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
               >
                 Ngày thêm
-                {getSortIcon('created_at')}
+                {getSortIcon("created_at")}
               </button>
             </div>
             <div className="text-xs">
@@ -616,27 +725,46 @@ const BatteryInventory: React.FC = () => {
       {/* Battery Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {batteries.map((battery) => (
-          <Card key={battery.battery_id} className="glass-card border-0 glow-hover group">
+          <Card
+            key={battery.battery_id}
+            className="glass-card border-0 glow-hover group"
+          >
             <CardContent className="p-6">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{battery.battery_code}</h3>
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                    {battery.battery_code}
+                  </h3>
                   <Badge className={getStatusColor(battery.status)}>
                     {getStatusIcon(battery.status)}
-                    <span className="ml-1">{getStatusLabel(battery.status)}</span>
+                    <span className="ml-1">
+                      {getStatusLabel(battery.status)}
+                    </span>
                   </Badge>
                 </div>
 
                 <div className="space-y-3">
                   <div className="flex justify-between text-sm">
-                    <span className="text-slate-600 dark:text-slate-400">Model</span>
-                    <span className="font-medium text-slate-900 dark:text-white">{battery.model}</span>
+                    <span className="text-slate-600 dark:text-slate-400">
+                      Model
+                    </span>
+                    <span className="font-medium text-slate-900 dark:text-white">
+                      {battery.model}
+                    </span>
                   </div>
 
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-slate-600 dark:text-slate-400">Mức sạc hiện tại</span>
-                      <span className={`font-medium ${getChargeColor(battery.current_charge)}`}>{battery.current_charge}%</span>
+                      <span className="text-slate-600 dark:text-slate-400">
+                        Mức sạc hiện tại
+                      </span>
+                      <span
+                        className={`font-medium ${getChargeColor(
+                          battery.current_charge
+                        )}`}
+                      >
+                        {battery.current_charge}%
+                      </span>
                     </div>
                     <Progress value={battery.current_charge} className="h-2" />
                   </div>
@@ -644,25 +772,39 @@ const BatteryInventory: React.FC = () => {
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     {battery.capacity_kwh && (
                       <div>
-                        <p className="text-slate-600 dark:text-slate-400">Dung lượng</p>
-                        <p className="font-medium text-slate-900 dark:text-white">{battery.capacity_kwh} kWh</p>
+                        <p className="text-slate-600 dark:text-slate-400">
+                          Dung lượng
+                        </p>
+                        <p className="font-medium text-slate-900 dark:text-white">
+                          {battery.capacity_kwh} kWh
+                        </p>
                       </div>
                     )}
                     {battery.voltage && (
                       <div>
-                        <p className="text-slate-600 dark:text-slate-400">Điện áp</p>
-                        <p className="font-medium text-slate-900 dark:text-white">{battery.voltage}V</p>
+                        <p className="text-slate-600 dark:text-slate-400">
+                          Điện áp
+                        </p>
+                        <p className="font-medium text-slate-900 dark:text-white">
+                          {battery.voltage}V
+                        </p>
                       </div>
                     )}
                     <div>
                       <p className="text-slate-600 dark:text-slate-400">Trạm</p>
-                      <p className="font-medium text-slate-900 dark:text-white">{battery.station?.name || 'N/A'}</p>
+                      <p className="font-medium text-slate-900 dark:text-white">
+                        {battery.stations?.name || "N/A"}
+                      </p>
                     </div>
                     {battery.last_charged_at && (
                       <div>
-                        <p className="text-slate-600 dark:text-slate-400">Sạc lần cuối</p>
+                        <p className="text-slate-600 dark:text-slate-400">
+                          Sạc lần cuối
+                        </p>
                         <p className="font-medium text-slate-900 dark:text-white">
-                          {new Date(battery.last_charged_at).toLocaleDateString('vi-VN')}
+                          {new Date(battery.last_charged_at).toLocaleDateString(
+                            "vi-VN"
+                          )}
                         </p>
                       </div>
                     )}
@@ -670,27 +812,27 @@ const BatteryInventory: React.FC = () => {
                 </div>
 
                 <div className="flex gap-2 pt-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="flex-1 glass border-blue-300/50 hover:bg-blue-50 dark:border-blue-700/50 dark:hover:bg-blue-900/20"
                     onClick={() => handleViewDetail(battery)}
                   >
                     <Eye className="mr-2 h-4 w-4" />
                     Chi tiết
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="flex-1 glass border-green-300/50 hover:bg-green-50 dark:border-green-700/50 dark:hover:bg-green-900/20"
                     onClick={() => handleEdit(battery)}
                   >
                     <Edit className="mr-2 h-4 w-4" />
                     Sửa
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="glass border-red-300/50 hover:bg-red-50 dark:border-red-700/50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400"
                     onClick={() => handleDelete(battery)}
                   >
@@ -708,14 +850,14 @@ const BatteryInventory: React.FC = () => {
           <CardContent className="p-12 text-center">
             <Battery className="h-12 w-12 text-slate-400 dark:text-slate-500 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
-              {searchTerm || statusFilter !== 'all' || modelFilter !== 'all'
-                ? 'Không tìm thấy pin'
-                : 'Chưa có pin nào'}
+              {searchTerm || statusFilter !== "all" || modelFilter !== "all"
+                ? "Không tìm thấy pin"
+                : "Chưa có pin nào"}
             </h3>
             <p className="text-slate-600 dark:text-slate-400">
-              {searchTerm || statusFilter !== 'all' || modelFilter !== 'all'
-                ? 'Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm'
-                : 'Thêm pin mới để bắt đầu quản lý kho'}
+              {searchTerm || statusFilter !== "all" || modelFilter !== "all"
+                ? "Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm"
+                : "Thêm pin mới để bắt đầu quản lý kho"}
             </p>
           </CardContent>
         </Card>
@@ -729,11 +871,17 @@ const BatteryInventory: React.FC = () => {
               <PaginationContent>
                 <PaginationItem>
                   <PaginationPrevious
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.max(1, prev - 1))
+                    }
+                    className={
+                      currentPage === 1
+                        ? "pointer-events-none opacity-50"
+                        : "cursor-pointer"
+                    }
                   />
                 </PaginationItem>
-                
+
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   let pageNum: number;
                   if (totalPages <= 5) {
@@ -745,7 +893,7 @@ const BatteryInventory: React.FC = () => {
                   } else {
                     pageNum = currentPage - 2 + i;
                   }
-                  
+
                   return (
                     <PaginationItem key={pageNum}>
                       <PaginationLink
@@ -758,17 +906,23 @@ const BatteryInventory: React.FC = () => {
                     </PaginationItem>
                   );
                 })}
-                
+
                 {totalPages > 5 && currentPage < totalPages - 2 && (
                   <PaginationItem>
                     <PaginationEllipsis />
                   </PaginationItem>
                 )}
-                
+
                 <PaginationItem>
                   <PaginationNext
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                    }
+                    className={
+                      currentPage === totalPages
+                        ? "pointer-events-none opacity-50"
+                        : "cursor-pointer"
+                    }
                   />
                 </PaginationItem>
               </PaginationContent>
@@ -823,8 +977,12 @@ const BatteryInventory: React.FC = () => {
                 </div>
 
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
-                  <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Model</div>
-                  <p className="font-semibold text-gray-900 dark:text-white">{selectedBattery.model}</p>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                    Model
+                  </div>
+                  <p className="font-semibold text-gray-900 dark:text-white">
+                    {selectedBattery.model}
+                  </p>
                 </div>
 
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
@@ -839,7 +997,9 @@ const BatteryInventory: React.FC = () => {
 
                 {selectedBattery.capacity_kwh && (
                   <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
-                    <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Dung lượng</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Dung lượng
+                    </div>
                     <p className="font-semibold text-gray-900 dark:text-white">
                       {selectedBattery.capacity_kwh} kWh
                     </p>
@@ -848,7 +1008,9 @@ const BatteryInventory: React.FC = () => {
 
                 {selectedBattery.voltage && (
                   <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
-                    <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Điện áp</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Điện áp
+                    </div>
                     <p className="font-semibold text-gray-900 dark:text-white">
                       {selectedBattery.voltage} V
                     </p>
@@ -866,12 +1028,14 @@ const BatteryInventory: React.FC = () => {
                         <div
                           className={`h-2 rounded-full transition-all ${
                             selectedBattery.health_percentage >= 80
-                              ? 'bg-green-500'
+                              ? "bg-green-500"
                               : selectedBattery.health_percentage >= 50
-                              ? 'bg-yellow-500'
-                              : 'bg-red-500'
+                              ? "bg-yellow-500"
+                              : "bg-red-500"
                           }`}
-                          style={{ width: `${selectedBattery.health_percentage}%` }}
+                          style={{
+                            width: `${selectedBattery.health_percentage}%`,
+                          }}
                         />
                       </div>
                       <span className="font-semibold text-gray-900 dark:text-white">
@@ -881,25 +1045,30 @@ const BatteryInventory: React.FC = () => {
                   </div>
                 )}
 
-                {(selectedBattery as any).cycle_count !== undefined && (selectedBattery as any).cycle_count !== null && (
-                  <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
-                    <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Số chu kỳ</div>
-                    <p className="font-semibold text-gray-900 dark:text-white">
-                      {(selectedBattery as any).cycle_count}
-                    </p>
-                  </div>
-                )}
+                {(selectedBattery as any).cycle_count !== undefined &&
+                  (selectedBattery as any).cycle_count !== null && (
+                    <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                      <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                        Số chu kỳ
+                      </div>
+                      <p className="font-semibold text-gray-900 dark:text-white">
+                        {(selectedBattery as any).cycle_count}
+                      </p>
+                    </div>
+                  )}
               </div>
 
-              {selectedBattery.station && (
+              {selectedBattery.stations && (
                 <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
                   <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300 mb-2">
                     <MapPin className="h-4 w-4" />
                     <span className="font-semibold">Trạm</span>
                   </div>
-                  <p className="text-gray-900 dark:text-white font-medium">{selectedBattery.station.name}</p>
+                  <p className="text-gray-900 dark:text-white font-medium">
+                    {selectedBattery.stations.name}
+                  </p>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    {selectedBattery.station.address}
+                    {selectedBattery.stations.address}
                   </p>
                 </div>
               )}
@@ -912,7 +1081,9 @@ const BatteryInventory: React.FC = () => {
                       <span>Sạc lần cuối</span>
                     </div>
                     <p className="text-gray-900 dark:text-white">
-                      {new Date(selectedBattery.last_charged_at).toLocaleString('vi-VN')}
+                      {new Date(selectedBattery.last_charged_at).toLocaleString(
+                        "vi-VN"
+                      )}
                     </p>
                   </div>
                 )}
@@ -922,7 +1093,9 @@ const BatteryInventory: React.FC = () => {
                     <span>Ngày thêm</span>
                   </div>
                   <p className="text-gray-900 dark:text-white">
-                    {new Date(selectedBattery.created_at).toLocaleDateString('vi-VN')}
+                    {new Date(selectedBattery.created_at).toLocaleDateString(
+                      "vi-VN"
+                    )}
                   </p>
                 </div>
               </div>
@@ -940,24 +1113,32 @@ const BatteryInventory: React.FC = () => {
                 ) : batteryHistory.length > 0 ? (
                   <div className="space-y-3 max-h-64 overflow-y-auto">
                     {batteryHistory.map((log) => (
-                      <div key={log.transfer_id} className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3 text-sm">
+                      <div
+                        key={log.transfer_id}
+                        className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3 text-sm"
+                      >
                         <div className="flex items-center justify-between mb-2">
                           <span className="font-medium text-gray-900 dark:text-white">
-                            {new Date(log.transferred_at).toLocaleString('vi-VN')}
+                            {new Date(log.transferred_at).toLocaleString(
+                              "vi-VN"
+                            )}
                           </span>
                           <Badge variant="outline" className="text-xs">
-                            {log.transfer_status || 'completed'}
+                            {log.transfer_status || "completed"}
                           </Badge>
                         </div>
                         <div className="space-y-1 text-gray-600 dark:text-gray-400">
                           <p>
-                            <span className="font-medium">Từ:</span> {log.from_station?.name || 'N/A'}
+                            <span className="font-medium">Từ:</span>{" "}
+                            {log.from_station?.name || "N/A"}
                           </p>
                           <p>
-                            <span className="font-medium">Đến:</span> {log.to_station?.name || 'N/A'}
+                            <span className="font-medium">Đến:</span>{" "}
+                            {log.to_station?.name || "N/A"}
                           </p>
                           <p>
-                            <span className="font-medium">Lý do:</span> {log.transfer_reason}
+                            <span className="font-medium">Lý do:</span>{" "}
+                            {log.transfer_reason}
                           </p>
                           {log.notes && (
                             <p className="text-xs italic mt-1">{log.notes}</p>
@@ -995,7 +1176,7 @@ const BatteryInventory: React.FC = () => {
                 </Label>
                 <Input
                   id="battery_code"
-                  value={selectedBattery?.battery_code || ''}
+                  value={selectedBattery?.battery_code || ""}
                   disabled
                   className="col-span-3 bg-slate-50 dark:bg-slate-800"
                 />
@@ -1007,7 +1188,7 @@ const BatteryInventory: React.FC = () => {
                 </Label>
                 <Input
                   id="model"
-                  value={selectedBattery?.model || ''}
+                  value={selectedBattery?.model || ""}
                   disabled
                   className="col-span-3 bg-slate-50 dark:bg-slate-800"
                 />
@@ -1019,7 +1200,9 @@ const BatteryInventory: React.FC = () => {
                 </Label>
                 <Select
                   value={editFormData.status}
-                  onValueChange={(value: any) => setEditFormData({ ...editFormData, status: value })}
+                  onValueChange={(value: any) =>
+                    setEditFormData({ ...editFormData, status: value })
+                  }
                   disabled={editLoading}
                 >
                   <SelectTrigger className="col-span-3 bg-white dark:bg-slate-900 border-gray-300 dark:border-slate-600">
@@ -1046,10 +1229,17 @@ const BatteryInventory: React.FC = () => {
                     min={0}
                     max={100}
                     value={editFormData.current_charge}
-                    onChange={(e) => setEditFormData({ ...editFormData, current_charge: Number(e.target.value) })}
+                    onChange={(e) =>
+                      setEditFormData({
+                        ...editFormData,
+                        current_charge: Number(e.target.value),
+                      })
+                    }
                     disabled={editLoading}
                   />
-                  <p className="text-xs text-gray-500 mt-1">Giá trị từ 0 đến 100</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Giá trị từ 0 đến 100
+                  </p>
                 </div>
               </div>
 
@@ -1063,12 +1253,21 @@ const BatteryInventory: React.FC = () => {
                     type="number"
                     min={0}
                     max={100}
-                    value={editFormData.health_percentage || ''}
-                    onChange={(e) => setEditFormData({ ...editFormData, health_percentage: e.target.value ? Number(e.target.value) : undefined })}
+                    value={editFormData.health_percentage || ""}
+                    onChange={(e) =>
+                      setEditFormData({
+                        ...editFormData,
+                        health_percentage: e.target.value
+                          ? Number(e.target.value)
+                          : undefined,
+                      })
+                    }
                     disabled={editLoading}
                     placeholder="Không bắt buộc"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Tình trạng sức khỏe pin (0-100%)</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Tình trạng sức khỏe pin (0-100%)
+                  </p>
                 </div>
               </div>
 
@@ -1081,12 +1280,21 @@ const BatteryInventory: React.FC = () => {
                     id="cycle_count"
                     type="number"
                     min={0}
-                    value={editFormData.cycle_count || ''}
-                    onChange={(e) => setEditFormData({ ...editFormData, cycle_count: e.target.value ? Number(e.target.value) : undefined })}
+                    value={editFormData.cycle_count || ""}
+                    onChange={(e) =>
+                      setEditFormData({
+                        ...editFormData,
+                        cycle_count: e.target.value
+                          ? Number(e.target.value)
+                          : undefined,
+                      })
+                    }
                     disabled={editLoading}
                     placeholder="Không bắt buộc"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Số lần sạc/xả đã thực hiện</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Số lần sạc/xả đã thực hiện
+                  </p>
                 </div>
               </div>
             </div>
@@ -1101,7 +1309,9 @@ const BatteryInventory: React.FC = () => {
                 Hủy
               </Button>
               <Button type="submit" disabled={editLoading}>
-                {editLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {editLoading && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
                 Lưu thay đổi
               </Button>
             </DialogFooter>
@@ -1118,7 +1328,8 @@ const BatteryInventory: React.FC = () => {
               Xác nhận Xóa Pin
             </DialogTitle>
             <DialogDescription>
-              Hành động này không thể hoàn tác. Pin sẽ bị xóa vĩnh viễn khỏi hệ thống.
+              Hành động này không thể hoàn tác. Pin sẽ bị xóa vĩnh viễn khỏi hệ
+              thống.
             </DialogDescription>
           </DialogHeader>
 
@@ -1151,7 +1362,8 @@ const BatteryInventory: React.FC = () => {
                         Cảnh báo: Xóa pin
                       </p>
                       <p className="text-sm text-red-700 dark:text-red-300">
-                        Bạn sắp xóa pin này khỏi hệ thống. Hành động này không thể hoàn tác.
+                        Bạn sắp xóa pin này khỏi hệ thống. Hành động này không
+                        thể hoàn tác.
                       </p>
                     </div>
                   </div>
@@ -1160,25 +1372,33 @@ const BatteryInventory: React.FC = () => {
 
               <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4 space-y-3">
                 <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Mã Pin</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Mã Pin
+                  </p>
                   <p className="font-semibold text-lg text-gray-900 dark:text-white">
                     {selectedBattery.battery_code}
                   </p>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Model</p>
-                    <p className="font-medium text-gray-900 dark:text-white">{selectedBattery.model}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Model
+                    </p>
+                    <p className="font-medium text-gray-900 dark:text-white">
+                      {selectedBattery.model}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Trạng thái</p>
-                    <Badge 
-                      variant="outline" 
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Trạng thái
+                    </p>
+                    <Badge
+                      variant="outline"
                       className={
-                        selectedBattery.status === 'damaged' 
-                          ? 'border-red-500 text-red-700' 
-                          : 'border-gray-300 text-gray-700'
+                        selectedBattery.status === "damaged"
+                          ? "border-red-500 text-red-700"
+                          : "border-gray-300 text-gray-700"
                       }
                     >
                       {getStatusLabel(selectedBattery.status)}
@@ -1186,17 +1406,22 @@ const BatteryInventory: React.FC = () => {
                   </div>
                 </div>
 
-                {selectedBattery.station && (
+                {selectedBattery.stations && (
                   <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Trạm</p>
-                    <p className="font-medium text-gray-900 dark:text-white">{selectedBattery.station.name}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Trạm
+                    </p>
+                    <p className="font-medium text-gray-900 dark:text-white">
+                      {selectedBattery.stations.name}
+                    </p>
                   </div>
                 )}
               </div>
 
               <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
                 <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                  💡 <strong>Lưu ý:</strong> Chỉ nên xóa pin khi đã hỏng không sửa được hoặc không còn sử dụng.
+                  💡 <strong>Lưu ý:</strong> Chỉ nên xóa pin khi đã hỏng không
+                  sửa được hoặc không còn sử dụng.
                 </p>
               </div>
 
@@ -1211,11 +1436,15 @@ const BatteryInventory: React.FC = () => {
                     disabled={deleteLoading}
                     className="mt-1 h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer"
                   />
-                  <label 
-                    htmlFor="delete-confirm" 
+                  <label
+                    htmlFor="delete-confirm"
                     className="text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer select-none"
                   >
-                    Tôi xác nhận muốn xóa vĩnh viễn pin <strong className="text-red-600 dark:text-red-400">{selectedBattery?.battery_code}</strong> khỏi hệ thống
+                    Tôi xác nhận muốn xóa vĩnh viễn pin{" "}
+                    <strong className="text-red-600 dark:text-red-400">
+                      {selectedBattery?.battery_code}
+                    </strong>{" "}
+                    khỏi hệ thống
                   </label>
                 </div>
               )}

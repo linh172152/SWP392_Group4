@@ -51,6 +51,16 @@ export interface Booking {
     full_name: string;
     email: string;
   };
+  // Fields from instant booking response
+  use_subscription?: boolean;
+  subscription_unlimited?: boolean;
+  subscription_remaining_after?: number | null;
+  subscription_name?: string;
+  wallet_balance_after?: number | null;
+  locked_wallet_amount?: number;
+  hold_expires_at?: string;
+  reservation_expires_at?: string;
+  message?: string;
 }
 
 export interface CreateBookingData {
@@ -170,6 +180,8 @@ export const bookingService = {
           : true,
     };
 
+    console.log('📤 [CREATE BOOKING REQUEST]', requestData);
+
     const response = await fetch(API_ENDPOINTS.DRIVER.BOOKINGS, {
       method: "POST",
       headers: getAuthHeaders(),
@@ -179,7 +191,18 @@ export const bookingService = {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.message || "Không thể tạo đặt chỗ");
+      console.error('❌ [BACKEND ERROR - CREATE BOOKING]', {
+        status: response.status,
+        statusText: response.statusText,
+        error: data,
+        errorMessage: data.message,
+        errorDetails: JSON.stringify(data, null, 2),
+        requestData: requestData
+      });
+      // Hiển thị error message chi tiết từ backend
+      const errorMessage = data.message || data.error || data.error?.message || "Không thể tạo đặt chỗ";
+      console.error('❌ [BACKEND ERROR MESSAGE]', errorMessage);
+      throw new Error(errorMessage);
     }
 
     // Response có thể chứa hold_summary và pricing_preview
@@ -199,6 +222,8 @@ export const bookingService = {
           : true,
     };
 
+    console.log('📤 [CREATE INSTANT BOOKING REQUEST]', requestData);
+
     const response = await fetch(`${API_ENDPOINTS.DRIVER.BOOKINGS}/instant`, {
       method: "POST",
       headers: getAuthHeaders(),
@@ -208,7 +233,14 @@ export const bookingService = {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.message || "Không thể tạo đặt chỗ đổi pin ngay");
+      console.error('❌ [CREATE INSTANT BOOKING ERROR]', {
+        status: response.status,
+        statusText: response.statusText,
+        error: data
+      });
+      // Hiển thị error message chi tiết từ backend
+      const errorMessage = data.message || data.error || "Không thể tạo đặt chỗ đổi pin ngay";
+      throw new Error(errorMessage);
     }
 
     return data.data;

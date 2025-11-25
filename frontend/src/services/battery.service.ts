@@ -21,6 +21,12 @@ export interface Battery {
     address: string;
     capacity?: number;
   };
+  stations?: {
+    station_id: string;
+    name: string;
+    address: string;
+    capacity?: number;
+  };
 }
 
 export interface AddBatteryData {

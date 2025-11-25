@@ -13,9 +13,11 @@ import {
   Settings,
   Menu,
   X,
-  Calendar
+  Calendar,
+  History
 } from 'lucide-react';
 import { useState } from 'react';
+import NotificationBell from './NotificationBell';
 
 interface StaffLayoutProps {
   user: User;
@@ -27,6 +29,7 @@ const navigation = [
   { name: 'Tổng quan', href: '/staff/home', icon: Home },
   { name: 'Kho pin', href: '/staff/inventory', icon: Battery },
   { name: 'Giao dịch thay pin', href: '/staff/transactions', icon: Zap },
+  { name: 'Lịch sử giao dịch', href: '/staff/history', icon: History },
   { name: 'Lịch làm việc', href: '/staff/schedule', icon: Calendar },
   { name: 'Hồ sơ cá nhân', href: '/staff/profile', icon: Users },
 ];
@@ -135,6 +138,9 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ user, onLogout, children }) =
                 <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{user.email}</p>
               </div>
             </div>
+            <div className="flex items-center justify-center mb-3">
+              <NotificationBell />
+            </div>
             <Button
               variant="outline"
               size="sm"
@@ -164,6 +170,7 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ user, onLogout, children }) =
             </div>
             <div className="flex items-center space-x-2">
               <ThemeToggle />
+              <NotificationBell />
               <Avatar className="ring-2 ring-green-500/20 dark:ring-emerald-500/20">
                 <AvatarImage src={user.avatar} />
                 <AvatarFallback className="bg-gradient-to-r from-green-500 to-emerald-500 text-white">{user.name.charAt(0)}</AvatarFallback>
