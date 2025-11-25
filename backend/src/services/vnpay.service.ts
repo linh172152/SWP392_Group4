@@ -11,6 +11,7 @@ import {
 } from "../utils/vnpay.util";
 import { vnpayConfig } from "../config/vnpay.config";
 import crypto from "crypto-js";
+import { randomUUID } from "crypto";
 import { CustomError } from "../middlewares/error.middleware";
 import { prisma } from "../server";
 
@@ -87,6 +88,7 @@ export const createVNPayPayment = async (
 
     await prisma.payments.create({
       data: {
+        payment_id: randomUUID(), // ✅ Generate UUID for payment_id
         user_id: userId,
         amount: new Prisma.Decimal(amount),
         payment_method: "vnpay",

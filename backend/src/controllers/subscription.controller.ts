@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { randomUUID } from "crypto";
 import { prisma } from "../server";
 import { PaymentStatus, PaymentType, Prisma } from "@prisma/client";
 import { asyncHandler, CustomError } from "../middlewares/error.middleware";
@@ -140,6 +141,7 @@ export const subscribeToPackage = asyncHandler(
 
       await tx.payments.create({
         data: {
+          payment_id: randomUUID(), // ✅ Generate UUID for payment_id
           subscription_id: createdSubscription.subscription_id,
           user_id: userId,
           amount: servicePackage.price,
@@ -346,6 +348,7 @@ export const cancelSubscription = asyncHandler(
 
       const refundPayment = await tx.payments.create({
         data: {
+          payment_id: randomUUID(), // ✅ Generate UUID for payment_id
           subscription_id: subscription.subscription_id,
           user_id: userId,
           amount: refundAmountDecimal,

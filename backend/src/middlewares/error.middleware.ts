@@ -170,7 +170,20 @@ export const errorHandler = (
   // Prisma Client Validation Error
   if (error.name === "PrismaClientValidationError") {
     statusCode = 400;
-    message = "Dữ liệu không hợp lệ. Vui lòng kiểm tra lại thông tin.";
+    // ✅ Hiển thị message chi tiết hơn trong development
+    if (process.env.NODE_ENV === "development") {
+      message = `Dữ liệu không hợp lệ: ${error.message}`;
+    } else {
+      message = "Dữ liệu không hợp lệ. Vui lòng kiểm tra lại thông tin.";
+    }
+    // Log chi tiết để debug
+    console.error("Prisma Validation Error:", {
+      message: error.message,
+      stack: error.stack,
+      url: req.url,
+      method: req.method,
+      body: req.body,
+    });
   }
 
   // Prisma Client Initialization Error (connection issues)

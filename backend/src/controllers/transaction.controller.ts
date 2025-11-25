@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { randomUUID } from "crypto";
 import { PrismaClient, Prisma } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
@@ -431,6 +432,7 @@ export const payTransaction = asyncHandler(
     // Create payment record
     const payment = await prisma.payments.create({
       data: {
+        payment_id: randomUUID(), // ✅ Generate UUID for payment_id
         transaction_id: id,
         user_id: userId,
         amount: transaction.amount,

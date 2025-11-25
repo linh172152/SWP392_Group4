@@ -1,7 +1,9 @@
 import { Request, Response } from "express";
+import { randomUUID } from "crypto";
 import {
   Prisma,
   BatteryStatus,
+  BatteryHistoryAction,
   PaymentStatus,
   PaymentType,
 } from "@prisma/client";
@@ -396,7 +398,7 @@ const createBatteryHistoryEntry = async (
     bookingId: string;
     stationId: string;
     actorUserId: string;
-    action?: string;
+    action?: BatteryHistoryAction;
     notes?: string;
   }
 ) => {
@@ -405,11 +407,11 @@ const createBatteryHistoryEntry = async (
     bookingId,
     stationId,
     actorUserId,
-    action = "reserved",
+    action = BatteryHistoryAction.reserved,
     notes,
   } = params;
 
-  await (tx as any).batteryHistory.create({
+  await tx.battery_history.create({
     data: {
       battery_id: batteryId,
       booking_id: bookingId,
@@ -669,6 +671,19 @@ export const createBooking = asyncHandler(
     }
 
     const normalizedBatteryModel = battery_model.trim();
+
+    // ✅ Validate battery_model length (max 50 chars per schema)
+    if (normalizedBatteryModel.length > 50) {
+      throw new CustomError(
+        `Battery model name quá dài (tối đa 50 ký tự). Hiện tại: ${normalizedBatteryModel.length} ký tự.`,
+        400
+      );
+    }
+
+    if (normalizedBatteryModel.length === 0) {
+      throw new CustomError("Battery model không được để trống", 400);
+    }
+
     const useSubscription = useSubscriptionInput !== false;
     const allowChargingFallback =
       (scheduledTime.getTime() - now.getTime()) / (1000 * 60 * 60) >= 1;
@@ -755,6 +770,14 @@ export const createBooking = asyncHandler(
     const timestamp = Date.now().toString().slice(-10);
     const random = Math.random().toString(36).substr(2, 2).toUpperCase();
     const bookingCode = `BK${timestamp}${random}`;
+
+    // ✅ Validate booking_code length (max 20 chars per schema)
+    if (bookingCode.length > 20) {
+      throw new CustomError(
+        `Booking code quá dài (tối đa 20 ký tự). Hiện tại: ${bookingCode.length} ký tự.`,
+        500
+      );
+    }
     const holdExpiresAt = new Date(
       scheduledTime.getTime() + HOLD_GRACE_MINUTES * 60 * 1000
     );
@@ -895,6 +918,7 @@ export const createBooking = asyncHandler(
 
         const holdPayment = await tx.payments.create({
           data: {
+            payment_id: randomUUID(), // ✅ Generate UUID for payment_id
             user_id: userId,
             amount: basePriceDecimal,
             payment_method: "wallet",
@@ -912,11 +936,12 @@ export const createBooking = asyncHandler(
       }
 
       const bookingData = {
+        booking_id: randomUUID(), // ✅ Generate UUID for booking_id
         booking_code: bookingCode,
         user_id: userId,
         vehicle_id,
         station_id,
-        battery_model: normalizedBatteryModel,
+        battery_model: battery_model.trim(), // ✅ Lưu giá trị gốc (trim để loại bỏ khoảng trắng thừa)
         scheduled_at: scheduledTime,
         notes: notes ?? null,
         status: "pending",
@@ -950,8 +975,6 @@ export const createBooking = asyncHandler(
               make: true,
               model: true,
               year: true,
-            },
-            include: {
               batteries: {
                 select: {
                   battery_id: true,
@@ -1733,6 +1756,7 @@ export const createInstantBooking = asyncHandler(
 
         const holdPayment = await tx.payments.create({
           data: {
+            payment_id: randomUUID(), // ✅ Generate UUID for payment_id
             user_id: userId,
             amount: basePriceDecimal,
             payment_method: "wallet",
@@ -1751,6 +1775,7 @@ export const createInstantBooking = asyncHandler(
       }
 
       const bookingData = {
+        booking_id: randomUUID(), // ✅ Generate UUID for booking_id
         booking_code: bookingCode,
         user_id: userId,
         vehicle_id,
