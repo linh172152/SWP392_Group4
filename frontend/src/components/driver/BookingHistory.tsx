@@ -1146,36 +1146,26 @@ const BookingHistory: React.FC = () => {
 
                 {/* Thông tin xe */}
                 {selectedBookingForVoucher.vehicle?.license_plate && (
-                  <>
-                    <div className="flex justify-between items-center py-2 border-b border-slate-200 dark:border-slate-700">
-                      <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
-                        Biển số:
-                      </span>
-                      <span className="text-sm font-semibold text-slate-900 dark:text-white">
-                        {selectedBookingForVoucher.vehicle.license_plate}
-                      </span>
-                    </div>
-                    {selectedBookingForVoucher.vehicle.vehicle_type && (
-                      <div className="flex justify-between items-center py-2 border-b border-slate-200 dark:border-slate-700">
-                        <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
-                          Loại xe:
-                        </span>
-                        <span className="text-sm font-semibold text-slate-900 dark:text-white">
-                          {selectedBookingForVoucher.vehicle.vehicle_type}
-                        </span>
-                      </div>
-                    )}
-                    {selectedBookingForVoucher.vehicle.model && (
-                      <div className="flex justify-between items-center py-2 border-b border-slate-200 dark:border-slate-700">
-                        <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
-                          Model:
-                        </span>
-                        <span className="text-sm font-semibold text-slate-900 dark:text-white">
-                          {selectedBookingForVoucher.vehicle.model}
-                        </span>
-                      </div>
-                    )}
-                  </>
+                  <div className="flex justify-between items-center py-2 border-b border-slate-200 dark:border-slate-700">
+                    <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                      Biển số:
+                    </span>
+                    <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                      {selectedBookingForVoucher.vehicle.license_plate}
+                    </span>
+                  </div>
+                )}
+
+                {/* Model Pin */}
+                {selectedBookingForVoucher.battery_model && (
+                  <div className="flex justify-between items-center py-2 border-b border-slate-200 dark:border-slate-700">
+                    <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                      Model Pin:
+                    </span>
+                    <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                      {selectedBookingForVoucher.battery_model}
+                    </span>
+                  </div>
                 )}
 
                 {/* Thời gian đặt - Thời gian hẹn */}
