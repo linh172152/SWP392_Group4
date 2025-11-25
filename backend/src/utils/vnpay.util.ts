@@ -45,6 +45,11 @@ export const generateVNPayUrl = (paymentData: VNPayPaymentData): string => {
     ipAddress,
   } = paymentData;
 
+  // Validate amount
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error("Invalid payment amount");
+  }
+
   // Create date in VNPay format (ICT time)
   const now = moment().tz("Asia/Ho_Chi_Minh");
   const createDate = formatVNPayTime(now);
@@ -55,7 +60,7 @@ export const generateVNPayUrl = (paymentData: VNPayPaymentData): string => {
   );
 
   // Convert amount to VNPay format (multiply by 100)
-  const vnpAmount = (amount * 100).toString();
+  const vnpAmount = Math.round(amount * 100).toString();
 
   // Create order info: normalize to ASCII and replace non-alphanumeric with underscores
   const orderInfo =

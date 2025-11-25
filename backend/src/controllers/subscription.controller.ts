@@ -1,7 +1,9 @@
 import { Request, Response } from "express";
 import { prisma } from "../server";
 import { PaymentStatus, PaymentType, Prisma } from "@prisma/client";
+import { randomUUID } from "crypto";
 import { asyncHandler, CustomError } from "../middlewares/error.middleware";
+import { decimalToNumber } from "../utils/decimal.util";
 
 const PAYMENT_STATUS_REFUNDED = "refunded" as unknown as PaymentStatus;
 const PAYMENT_STATUS_COMPLETED = "completed" as unknown as PaymentStatus;
@@ -140,6 +142,7 @@ export const subscribeToPackage = asyncHandler(
 
       await tx.payments.create({
         data: {
+          payment_id: randomUUID(),
           subscription_id: createdSubscription.subscription_id,
           user_id: userId,
           amount: servicePackage.price,
@@ -232,7 +235,7 @@ export const cancelSubscription = asyncHandler(
       );
     }
 
-    const originalAmount = Number(originalPayment.amount);
+    const originalAmount = decimalToNumber(originalPayment.amount);
 
     // ✅ Tính refund theo tỷ lệ (bỏ check hasUsage)
     let refundRatio = 0;

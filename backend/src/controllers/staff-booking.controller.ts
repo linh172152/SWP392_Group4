@@ -10,6 +10,7 @@ import {
   type BookingHoldFields,
   buildBookingUncheckedUpdate,
 } from "../services/booking-hold.service";
+import { decimalToNumber } from "../utils/decimal.util";
 
 const prisma = new PrismaClient();
 
@@ -983,7 +984,7 @@ export const completeBooking = asyncHandler(
     }
 
     // Generate transaction code
-    const transactionCode = `TXN${Date.now()}${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+    const transactionCode = `TXN${Date.now()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
     // Import notificationService
     const { notificationService } = await import("../server");
@@ -996,7 +997,7 @@ export const completeBooking = asyncHandler(
       ? new Prisma.Decimal(0)
       : (holdInfo.locked_wallet_amount ?? new Prisma.Decimal(0));
 
-    const transactionAmountNum = Number(transactionAmountDecimal);
+    const transactionAmountNum = decimalToNumber(transactionAmountDecimal);
 
     if (!holdInfo.use_subscription && transactionAmountDecimal.equals(0)) {
       throw new CustomError(

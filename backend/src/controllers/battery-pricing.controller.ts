@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { PrismaClient, Prisma } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
+import { decimalToNumber } from "../utils/decimal.util";
 
 const prisma = new PrismaClient();
 
@@ -44,7 +45,7 @@ export const getBatteryPricing = asyncHandler(
       // Convert Decimal price to number for JSON response (frontend expects number)
       const pricingsWithNumberPrice = pricings.map((pricing) => ({
         ...pricing,
-        price: Number(pricing.price),
+        price: decimalToNumber(pricing.price),
       }));
 
       res.status(200).json({
@@ -88,7 +89,7 @@ export const getBatteryPricingById = asyncHandler(
     // Convert Decimal price to number for JSON response (frontend expects number)
     const pricingWithNumberPrice = {
       ...pricing,
-      price: Number(pricing.price),
+      price: decimalToNumber(pricing.price),
     };
 
     res.status(200).json({
@@ -142,7 +143,7 @@ export const createBatteryPricing = asyncHandler(
     // Convert Decimal price to number for JSON response (frontend expects number)
     const pricingWithNumberPrice = {
       ...pricing,
-      price: Number(pricing.price),
+      price: decimalToNumber(pricing.price),
     };
 
     res.status(201).json({

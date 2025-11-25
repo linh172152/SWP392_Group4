@@ -102,7 +102,7 @@ export const createSupportTicket = asyncHandler(
     }
 
     // Generate ticket number
-    const ticketNumber = `TKT${Date.now()}${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+    const ticketNumber = `TKT${Date.now()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
     const ticket = await prisma.support_tickets.create({
       data: {

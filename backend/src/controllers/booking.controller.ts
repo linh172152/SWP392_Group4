@@ -6,9 +6,11 @@ import {
   PaymentType,
 } from "@prisma/client";
 import type { service_packages, user_subscriptions } from "@prisma/client";
+import { randomUUID } from "crypto";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
 import { prisma, notificationService } from "../server";
+import { decimalToNumber } from "../utils/decimal.util";
 import {
   releaseBookingHold,
   type BookingHoldFields,
@@ -134,7 +136,7 @@ const getBasePriceByBatteryModel = async (
     },
   });
 
-  const basePrice = pricing ? Number(pricing.price) : null;
+  const basePrice = pricing ? decimalToNumber(pricing.price) : null;
 
   if (caches?.pricing) {
     caches.pricing.set(normalized, basePrice);
@@ -772,7 +774,7 @@ export const createBooking = asyncHandler(
     }
 
     const timestamp = Date.now().toString().slice(-10);
-    const random = Math.random().toString(36).substr(2, 2).toUpperCase();
+    const random = Math.random().toString(36).substring(2, 4).toUpperCase();
     const bookingCode = `BK${timestamp}${random}`;
     const holdExpiresAt = new Date(
       scheduledTime.getTime() + HOLD_GRACE_MINUTES * 60 * 1000
@@ -894,8 +896,8 @@ export const createBooking = asyncHandler(
 
         const wallet = await ensureWalletRecord(tx, userId);
         if (wallet.balance.lessThan(basePriceDecimal)) {
-          const needed = Number(basePriceDecimal);
-          const current = Number(wallet.balance);
+          const needed = decimalToNumber(basePriceDecimal);
+          const current = decimalToNumber(wallet.balance);
           throw new CustomError(
             `Số dư ví không đủ. Cần ${needed.toLocaleString("vi-VN")}đ, hiện có ${current.toLocaleString("vi-VN")}đ. Vui lòng nạp thêm ${(needed - current).toLocaleString("vi-VN")}đ trước khi đặt lịch.`,
             400
@@ -909,11 +911,12 @@ export const createBooking = asyncHandler(
           },
         });
 
-        walletBalanceAfter = Number(updatedWallet.balance);
+        walletBalanceAfter = decimalToNumber(updatedWallet.balance);
         lockedWalletAmount = basePriceDecimal;
 
         const holdPayment = await tx.payments.create({
           data: {
+            payment_id: randomUUID(),
             user_id: userId,
             amount: basePriceDecimal,
             payment_method: "wallet",
@@ -1607,7 +1610,7 @@ export const createInstantBooking = asyncHandler(
 
     // Generate booking code (max 20 chars: INST + timestamp last 10 digits + 2 random chars)
     const timestamp = Date.now().toString().slice(-10); // Last 10 digits
-    const random = Math.random().toString(36).substr(2, 2).toUpperCase();
+    const random = Math.random().toString(36).substring(2, 4).toUpperCase();
     const bookingCode = `INST${timestamp}${random}`; // INST + 10 + 2 = 16 chars
 
     // ✅ Instant booking: hold_expires_at = now + 15 minutes (reservation window)
@@ -1732,8 +1735,8 @@ export const createInstantBooking = asyncHandler(
 
         const wallet = await ensureWalletRecord(tx, userId);
         if (wallet.balance.lessThan(basePriceDecimal)) {
-          const needed = Number(basePriceDecimal);
-          const current = Number(wallet.balance);
+          const needed = decimalToNumber(basePriceDecimal);
+          const current = decimalToNumber(wallet.balance);
           throw new CustomError(
             `Số dư ví không đủ. Cần ${needed.toLocaleString("vi-VN")}đ, hiện có ${current.toLocaleString("vi-VN")}đ. Vui lòng nạp thêm ${(needed - current).toLocaleString("vi-VN")}đ trước khi đặt lịch.`,
             400
@@ -1747,11 +1750,12 @@ export const createInstantBooking = asyncHandler(
           },
         });
 
-        walletBalanceAfter = Number(updatedWallet.balance);
+        walletBalanceAfter = decimalToNumber(updatedWallet.balance);
         lockedWalletAmount = basePriceDecimal;
 
         const holdPayment = await tx.payments.create({
           data: {
+            payment_id: randomUUID(),
             user_id: userId,
             amount: basePriceDecimal,
             payment_method: "wallet",
@@ -1984,7 +1988,7 @@ export const cancelBooking = asyncHandler(
           });
         }
 
-        const balance = Number(wallet.balance);
+        const balance = decimalToNumber(wallet.balance);
         if (balance >= cancellationFee) {
           await tx.wallets.update({
             where: { user_id: userId },
@@ -1992,7 +1996,7 @@ export const cancelBooking = asyncHandler(
           });
         } else {
           throw new CustomError(
-            `Insufficient wallet balance. Cancellation fee: ${cancellationFee.toLocaleString("vi-VN")}đ, Balance: ${Number(wallet.balance).toLocaleString("vi-VN")}đ`,
+            `Insufficient wallet balance. Cancellation fee: ${cancellationFee.toLocaleString("vi-VN")}đ, Balance: ${balance.toLocaleString("vi-VN")}đ`,
             400
           );
         }

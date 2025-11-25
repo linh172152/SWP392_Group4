@@ -1,8 +1,10 @@
 import { Request, Response } from "express";
 import { PrismaClient, Prisma } from "@prisma/client";
+import { randomUUID } from "crypto";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
 import { notificationService } from "../server";
+import { safeToNumber } from "../utils/decimal.util";
 
 const prisma = new PrismaClient();
 
@@ -420,13 +422,15 @@ export const payTransaction = asyncHandler(
       throw new CustomError("Transaction not found or already paid", 404);
     }
 
-    if (transaction.amount.toNumber() === 0) {
+    const transactionAmount = safeToNumber(transaction.amount);
+    if (transactionAmount === 0) {
       throw new CustomError("Transaction is free, no payment required", 400);
     }
 
     // Create payment record
     const payment = await prisma.payments.create({
       data: {
+        payment_id: randomUUID(),
         transaction_id: id,
         user_id: userId,
         amount: transaction.amount,
@@ -467,11 +471,11 @@ export const payTransaction = asyncHandler(
           type: "payment_success",
           userId: userId,
           title: "Thanh toán thành công!",
-          message: `Giao dịch ${transaction.transaction_code} đã được thanh toán thành công. Số tiền: ${transaction.amount} VND`,
+          message: `Giao dịch ${transaction.transaction_code} đã được thanh toán thành công. Số tiền: ${transactionAmount.toLocaleString("vi-VN")} VND`,
           data: {
             email: transaction.users_transactions_user_idTousers.email,
             userName: transaction.users_transactions_user_idTousers.full_name,
-            amount: transaction.amount,
+            amount: transactionAmount,
             transactionId: transaction.transaction_code,
             paymentTime: new Date().toISOString(),
           },
@@ -537,7 +541,7 @@ export const createRefundRequest = asyncHandler(
     }
 
     // Create support ticket for refund request
-    const ticketNumber = `REF${Date.now()}${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+    const ticketNumber = `REF${Date.now()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
     const supportTicket = await prisma.support_tickets.create({
       data: {

@@ -11,6 +11,7 @@ import {
 } from "../utils/vnpay.util";
 import { vnpayConfig } from "../config/vnpay.config";
 import crypto from "crypto-js";
+import { randomUUID } from "crypto";
 import { CustomError } from "../middlewares/error.middleware";
 import { prisma } from "../server";
 
@@ -67,8 +68,13 @@ export const createVNPayPayment = async (
       throw new CustomError("User account is inactive", 401);
     }
 
+    // Validate amount
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new CustomError("Invalid payment amount", 400);
+    }
+
     // Generate order ID
-    const orderId = `EVBSS${Date.now()}${Math.random().toString(36).substr(2, 9)}`;
+    const orderId = `EVBSS${Date.now()}${Math.random().toString(36).substring(2, 11)}`;
 
     // Create payment record
     const baseMetadata: Record<string, any> = {
@@ -87,6 +93,7 @@ export const createVNPayPayment = async (
 
     await prisma.payments.create({
       data: {
+        payment_id: randomUUID(),
         user_id: userId,
         amount: new Prisma.Decimal(amount),
         payment_method: "vnpay",
