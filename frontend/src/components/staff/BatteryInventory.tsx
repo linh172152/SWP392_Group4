@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -148,9 +148,8 @@ const BatteryInventory: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Apply filters, search, sorting and pagination khi có thay đổi
-  useEffect(() => {
-    // Sử dụng debouncedSearchTerm thay vì searchTerm trực tiếp
+  // Memoize filtered, sorted and paginated batteries
+  const filteredSortedBatteries = useMemo(() => {
     let processed = [...allBatteries];
     
     // Apply search với debounced term
@@ -204,36 +203,42 @@ const BatteryInventory: React.FC = () => {
       }
     });
     
-    // Apply pagination
-    const totalPages = Math.ceil(processed.length / pageSize);
+    return processed;
+  }, [allBatteries, debouncedSearchTerm, sortField, sortOrder]);
+
+  // Memoize paginated batteries
+  const paginatedBatteries = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;
     const endIndex = startIndex + pageSize;
-    const paginated = processed.slice(startIndex, endIndex);
-    
-    setBatteries(paginated);
-    setTotalPages(totalPages);
-    setTotalItems(processed.length);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearchTerm, sortField, sortOrder, currentPage, pageSize, allBatteries]);
+    return filteredSortedBatteries.slice(startIndex, endIndex);
+  }, [filteredSortedBatteries, currentPage, pageSize]);
 
-  // Handle sort change
-  const handleSort = (field: SortField) => {
+  // Update total pages and items when filtered data changes
+  useEffect(() => {
+    const totalPages = Math.ceil(filteredSortedBatteries.length / pageSize);
+    setTotalPages(totalPages);
+    setTotalItems(filteredSortedBatteries.length);
+    setBatteries(paginatedBatteries);
+  }, [filteredSortedBatteries, paginatedBatteries, pageSize]);
+
+  // Memoize event handlers
+  const handleSort = useCallback((field: SortField) => {
     if (sortField === field) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
     } else {
       setSortField(field);
       setSortOrder('desc');
     }
-  };
+  }, [sortField, sortOrder]);
 
-  const getSortIcon = (field: SortField) => {
+  const getSortIcon = useCallback((field: SortField) => {
     if (sortField !== field) {
       return <ArrowUpDown className="h-4 w-4 text-gray-400" />;
     }
     return sortOrder === 'asc' 
       ? <ArrowUp className="h-4 w-4 text-blue-600" />
       : <ArrowDown className="h-4 w-4 text-blue-600" />;
-  };
+  }, [sortField, sortOrder]);
 
   // Dialog handlers
   const handleViewDetail = async (battery: BatteryType) => {

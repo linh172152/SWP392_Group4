@@ -461,21 +461,23 @@ export async function getTransactionHistory(params?: {
   limit?: number;
   status?: string;
 }): Promise<TransactionHistoryResponse> {
-  // Lấy các bookings đã completed có transaction
-  // Luôn filter status=completed để chỉ lấy các giao dịch đã hoàn thành
+  // Fetch tất cả completed bookings có transaction (không giới hạn pagination ở backend)
+  // Sử dụng limit lớn để lấy tất cả, sau đó filter và paginate ở client-side
   const res = await getStationBookings({
     status: 'completed',
-    page: params?.page || 1,
-    limit: params?.limit || 10,
+    page: 1,
+    limit: 1000, // Fetch tất cả để có thể filter theo payment_status
   });
   
   // Transform bookings thành transaction history
   if (res.success && res.data?.bookings) {
+    // Chỉ lấy các bookings có transaction
     const completedBookings = res.data.bookings.filter(
       (booking: StaffBooking) => booking.transaction
     );
     
-    const transactions: TransactionHistoryItem[] = completedBookings.map(
+    // Transform tất cả thành transactions
+    const allTransactions: TransactionHistoryItem[] = completedBookings.map(
       (booking: StaffBooking) => ({
         transaction_id: booking.transaction!.transaction_id,
         transaction_code: booking.transaction!.transaction_code,
@@ -487,30 +489,49 @@ export async function getTransactionHistory(params?: {
         vehicle_license_plate: booking.vehicle?.license_plate || 'N/A',
         amount: Number(booking.transaction!.amount),
         payment_status: booking.transaction!.payment_status,
+        payment_method: (booking.transaction as any)?.payment_method,
         swap_at: booking.transaction!.swap_at,
         created_at: booking.transaction!.swap_at || booking.created_at,
         station_name: booking.station?.name,
       })
     );
     
-    // Filter by payment_status if provided
-    let filteredTransactions = transactions;
+    // Filter by payment_status nếu có (client-side)
+    let filteredTransactions = allTransactions;
     if (params?.status && params.status !== 'all') {
-      filteredTransactions = transactions.filter(
+      filteredTransactions = allTransactions.filter(
         (t) => t.payment_status === params.status
       );
     }
+    
+    // Sort by created_at desc (mới nhất trước)
+    filteredTransactions.sort((a, b) => {
+      const dateA = new Date(a.created_at).getTime();
+      const dateB = new Date(b.created_at).getTime();
+      return dateB - dateA;
+    });
+    
+    // Tính pagination sau khi filter
+    const page = params?.page || 1;
+    const limit = params?.limit || 10;
+    const total = filteredTransactions.length;
+    const pages = Math.ceil(total / limit);
+    
+    // Apply pagination
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const paginatedTransactions = filteredTransactions.slice(startIndex, endIndex);
     
     return {
       success: true,
       message: 'Lịch sử giao dịch',
       data: {
-        transactions: filteredTransactions,
+        transactions: paginatedTransactions,
         pagination: {
-          page: params?.page || 1,
-          limit: params?.limit || 10,
-          total: filteredTransactions.length,
-          pages: Math.ceil(filteredTransactions.length / (params?.limit || 10)),
+          page,
+          limit,
+          total,
+          pages,
         },
       },
     };

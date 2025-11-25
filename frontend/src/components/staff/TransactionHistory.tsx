@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -64,20 +64,26 @@ const TransactionHistory: React.FC = () => {
   };
 
   useEffect(() => {
+    // Reset về page 1 khi filter thay đổi
+    setPage(1);
     loadTransactions(1, statusFilter);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
-  const handleFilterChange = (value: string) => {
+  // Memoize event handlers
+  const handleFilterChange = useCallback((value: string) => {
     setStatusFilter(value);
     setPage(1);
-  };
+  }, []);
 
-  const handlePageChange = (newPage: number) => {
+  const handlePageChange = useCallback((newPage: number) => {
     setPage(newPage);
     loadTransactions(newPage, statusFilter);
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter]);
 
-  const getPaymentStatusBadge = (status: string) => {
+  // Memoize helper functions
+  const getPaymentStatusBadge = useCallback((status: string) => {
     switch (status) {
       case 'completed':
         return <Badge className="bg-green-500 text-white">Hoàn thành</Badge>;
@@ -90,9 +96,9 @@ const TransactionHistory: React.FC = () => {
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
-  };
+  }, []);
 
-  const getPaymentMethodLabel = (method?: string) => {
+  const getPaymentMethodLabel = useCallback((method?: string) => {
     if (!method) return 'N/A';
     switch (method) {
       case 'wallet':
@@ -108,12 +114,12 @@ const TransactionHistory: React.FC = () => {
       default:
         return method;
     }
-  };
+  }, []);
 
-  // Format amount - không có dấu + hoặc -
-  const formatAmount = (amount: number) => {
+  // Memoize format function
+  const formatAmount = useCallback((amount: number) => {
     return formatCurrency(Math.abs(amount));
-  };
+  }, []);
 
   return (
     <div className="space-y-6 p-6">
@@ -153,6 +159,7 @@ const TransactionHistory: React.FC = () => {
                 <SelectContent className="bg-white dark:bg-slate-800">
                   <SelectItem value="all">Tất cả</SelectItem>
                   <SelectItem value="completed">Hoàn thành</SelectItem>
+                  <SelectItem value="covered_by_subscription">Gói dịch vụ</SelectItem>
                   <SelectItem value="pending">Đang xử lý</SelectItem>
                   <SelectItem value="failed">Thất bại</SelectItem>
                 </SelectContent>
