@@ -217,9 +217,21 @@ export const topUpWallet = asyncHandler(async (req: Request, res: Response) => {
     throw new CustomError("Payment method not supported", 400);
   }
 
-  const topupAmount = Number(topupPackage.topup_amount);
-  const bonusAmount = Number(topupPackage.bonus_amount);
-  const actualAmount = Number(topupPackage.actual_amount);
+  const topupAmount =
+    typeof topupPackage.topup_amount === "object" &&
+    "toNumber" in topupPackage.topup_amount
+      ? (topupPackage.topup_amount as any).toNumber()
+      : Number(topupPackage.topup_amount);
+  const bonusAmount =
+    typeof topupPackage.bonus_amount === "object" &&
+    "toNumber" in topupPackage.bonus_amount
+      ? (topupPackage.bonus_amount as any).toNumber()
+      : Number(topupPackage.bonus_amount);
+  const actualAmount =
+    typeof topupPackage.actual_amount === "object" &&
+    "toNumber" in topupPackage.actual_amount
+      ? (topupPackage.actual_amount as any).toNumber()
+      : Number(topupPackage.actual_amount);
 
   if (Number.isNaN(topupAmount) || topupAmount <= 0) {
     throw new CustomError("Invalid top-up amount", 400);

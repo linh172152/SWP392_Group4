@@ -610,8 +610,27 @@ export const createBooking = asyncHandler(
       where: { station_id },
     });
 
-    if (!stationRecord || stationRecord.status !== "active") {
-      throw new CustomError("Station not found or not active", 404);
+    if (!stationRecord) {
+      throw new CustomError("Trạm không tồn tại", 404);
+    }
+
+    if (stationRecord.status !== "active") {
+      if (stationRecord.status === "maintenance") {
+        throw new CustomError(
+          `Trạm "${stationRecord.name}" đang bảo trì, không thể đặt chỗ. Vui lòng chọn trạm khác.`,
+          400
+        );
+      } else if (stationRecord.status === "closed") {
+        throw new CustomError(
+          `Trạm "${stationRecord.name}" đã đóng cửa, không thể đặt chỗ. Vui lòng chọn trạm khác.`,
+          400
+        );
+      } else {
+        throw new CustomError(
+          `Trạm "${stationRecord.name}" không hoạt động, không thể đặt chỗ. Vui lòng chọn trạm khác.`,
+          400
+        );
+      }
     }
 
     if (
