@@ -98,14 +98,16 @@ export const getUserTransactions = asyncHandler(
         batteries_transactions_new_battery_idTobatteries,
         amount,
         payments,
+        stations,
         ...rest
       } = transaction;
       return {
         ...rest,
         amount: Number(amount),
+        station: stations || null, // ✅ Map stations (số nhiều) thành station (số ít) để match với frontend
         old_battery: batteries_transactions_old_battery_idTobatteries || null,
         new_battery: batteries_transactions_new_battery_idTobatteries || null,
-        payments: payments
+        payment: payments
           ? {
               ...payments,
               amount: Number(payments.amount),
@@ -234,14 +236,16 @@ export const getTransactionDetails = asyncHandler(
       batteries_transactions_new_battery_idTobatteries,
       amount,
       payments,
+      stations,
       ...rest
     } = transaction;
     const mappedTransaction = {
       ...rest,
       amount: Number(amount),
+      station: stations || null, // ✅ Map stations (số nhiều) thành station (số ít) để match với frontend
       old_battery: batteries_transactions_old_battery_idTobatteries || null,
       new_battery: batteries_transactions_new_battery_idTobatteries || null,
-      payments: payments
+      payment: payments
         ? {
             ...payments,
             amount: Number(payments.amount),

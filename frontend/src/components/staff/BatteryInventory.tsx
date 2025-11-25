@@ -531,7 +531,7 @@ const BatteryInventory: React.FC = () => {
                 <SelectItem value="full">Đầy</SelectItem>
                 <SelectItem value="reserved">Đã giữ chỗ</SelectItem>
                 <SelectItem value="charging">Đang sạc</SelectItem>
-                <SelectItem value="in_use">Đang dùng</SelectItem>
+                {/* ✅ Loại bỏ "in_use" vì pin đang được driver sử dụng không còn ở trong kho */}
                 <SelectItem value="maintenance">Bảo trì</SelectItem>
                 <SelectItem value="damaged">Hỏng</SelectItem>
               </SelectContent>

@@ -24,6 +24,7 @@ export const getStationBatteries = asyncHandler(
     const { station_id, status, model } = req.query;
 
     const whereClause: any = {};
+    let isStaff = false;
 
     // ✅ Nếu là staff, force chỉ xem pin của station mình (bỏ qua station_id trong query)
     if (userId) {
@@ -35,6 +36,7 @@ export const getStationBatteries = asyncHandler(
       if (user?.station_id && user.role === "STAFF") {
         // ✅ Staff: Force chỉ xem pin của station mình, bỏ qua station_id trong query
         whereClause.station_id = user.station_id;
+        isStaff = true;
       } else if (station_id) {
         // Admin hoặc user khác: Có thể filter theo station_id trong query
         whereClause.station_id = station_id;
@@ -45,9 +47,23 @@ export const getStationBatteries = asyncHandler(
       whereClause.station_id = station_id;
     }
 
+    // ✅ Filter theo status
     if (status) {
-      whereClause.status = status;
+      // ✅ Staff: Nếu filter status = "in_use", không trả về kết quả nào
+      // vì pin đang được driver sử dụng không còn ở trong kho
+      if (isStaff && status === "in_use") {
+        whereClause.status = "in_use_NONE"; // Status không tồn tại → trả về empty array
+      } else {
+        whereClause.status = status;
+      }
+    } else if (isStaff) {
+      // ✅ Staff: Nếu không có filter status, loại bỏ pin đã được driver lấy đi (in_use)
+      // Vì pin đang được sử dụng trên xe không còn ở trong kho nữa
+      whereClause.status = {
+        not: "in_use",
+      };
     }
+
     if (model) {
       whereClause.model = model;
     }
@@ -66,9 +82,11 @@ export const getStationBatteries = asyncHandler(
       orderBy: { created_at: "desc" },
     });
 
+    // ✅ Map stations (số nhiều từ Prisma) thành station (số ít) để match với frontend interface
     const batteriesWithLabels = batteries.map(
       (battery: (typeof batteries)[number]) => ({
         ...battery,
+        station: battery.stations || null, // ✅ Map stations -> station để frontend có thể dùng battery.station.name
         status_label: batteryStatusLabels[battery.status] ?? battery.status,
       })
     );
@@ -261,13 +279,19 @@ export const getBatteryDetails = asyncHandler(
       ...battery,
       capacity_kwh: battery.capacity_kwh ? Number(battery.capacity_kwh) : null,
       voltage: battery.voltage ? Number(battery.voltage) : null,
-      health_percentage: battery.health_percentage ? Number(battery.health_percentage) : null,
+      health_percentage: battery.health_percentage
+        ? Number(battery.health_percentage)
+        : null,
       status_label: batteryStatusLabels[battery.status] ?? battery.status,
       stations: battery.stations
         ? {
             ...battery.stations,
-            latitude: battery.stations.latitude ? Number(battery.stations.latitude) : null,
-            longitude: battery.stations.longitude ? Number(battery.stations.longitude) : null,
+            latitude: battery.stations.latitude
+              ? Number(battery.stations.latitude)
+              : null,
+            longitude: battery.stations.longitude
+              ? Number(battery.stations.longitude)
+              : null,
           }
         : null,
     };
