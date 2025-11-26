@@ -58,6 +58,10 @@ export const getStationBatteries = asyncHandler(
     // ✅ Chỉ set status nếu chưa được set ở trên (cho staff)
     if (status && !whereClause.status) {
       whereClause.status = status;
+    } else {
+      // ✅ Mặc định exclude pin "in_use" vì pin đó đã được driver đem đi, không còn ở trạm
+      // Nếu user muốn xem pin "in_use", họ có thể filter status = "in_use"
+      whereClause.status = { not: "in_use" };
     }
     if (model) {
       whereClause.model = model;

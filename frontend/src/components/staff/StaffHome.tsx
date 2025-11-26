@@ -249,7 +249,11 @@ const StaffHome: React.FC = () => {
       </div>
 
       {/* Key Metrics - Redesigned */}
+<<<<<<< HEAD
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+=======
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+>>>>>>> 4b3d6fb84f5b1c133031087768f2b7b501caec88
         <Card className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -302,6 +306,28 @@ const StaffHome: React.FC = () => {
               </div>
               <div className="p-4 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
                 <Activity className="h-6 w-6 text-white" />
+<<<<<<< HEAD
+=======
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Sử dụng</p>
+                <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">
+                  {batteryUtilization}%
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  tỷ lệ sử dụng
+                </p>
+              </div>
+              <div className="p-4 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <TrendingUp className="h-6 w-6 text-white" />
+>>>>>>> 4b3d6fb84f5b1c133031087768f2b7b501caec88
               </div>
             </div>
           </CardContent>
@@ -323,6 +349,7 @@ const StaffHome: React.FC = () => {
               </div>
             </div>
           </CardHeader>
+<<<<<<< HEAD
           <CardContent className="space-y-6">
             {totalBatteries === 0 ? (
               <div className="text-center py-12">
@@ -330,12 +357,20 @@ const StaffHome: React.FC = () => {
                   <Battery className="h-10 w-10 text-slate-400" />
                 </div>
                 <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+=======
+          <CardContent className="space-y-5">
+            {totalBatteries === 0 ? (
+              <div className="text-center py-8">
+                <Battery className="h-12 w-12 mx-auto mb-3 text-slate-400" />
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+>>>>>>> 4b3d6fb84f5b1c133031087768f2b7b501caec88
                   Chưa có dữ liệu pin
                 </p>
               </div>
             ) : (
               <>
                 <div className="space-y-4">
+<<<<<<< HEAD
                   {/* Khả dụng */}
                   <div className="group relative p-4 rounded-xl bg-gradient-to-r from-green-50/50 to-emerald-50/30 dark:from-green-950/20 dark:to-emerald-950/10 border border-green-200/50 dark:border-green-800/30 hover:shadow-md transition-all duration-300 hover:scale-[1.02]">
                     <div className="flex items-center justify-between mb-3">
@@ -458,6 +493,69 @@ const StaffHome: React.FC = () => {
                       </span>
                       <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">pin</span>
                     </div>
+=======
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Khả dụng</span>
+                      </div>
+                      <span className="text-sm font-bold text-green-600 dark:text-green-400">{availableBatteries}</span>
+                    </div>
+                    <Progress 
+                      value={(availableBatteries / totalBatteries) * 100} 
+                      className="h-3 bg-slate-200 dark:bg-slate-700"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Đang sạc</span>
+                      </div>
+                      <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{chargingBatteries}</span>
+                    </div>
+                    <Progress 
+                      value={(chargingBatteries / totalBatteries) * 100} 
+                      className="h-3 bg-slate-200 dark:bg-slate-700"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Bảo trì</span>
+                      </div>
+                      <span className="text-sm font-bold text-yellow-600 dark:text-yellow-400">{maintenanceBatteries}</span>
+                    </div>
+                    <Progress 
+                      value={(maintenanceBatteries / totalBatteries) * 100} 
+                      className="h-3 bg-slate-200 dark:bg-slate-700"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Hỏng</span>
+                      </div>
+                      <span className="text-sm font-bold text-red-600 dark:text-red-400">{damagedBatteries}</span>
+                    </div>
+                    <Progress 
+                      value={(damagedBatteries / totalBatteries) * 100} 
+                      className="h-3 bg-slate-200 dark:bg-slate-700"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-slate-200/50 dark:border-slate-700/50 mt-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Tổng số pin</span>
+                    <span className="text-lg font-bold text-slate-900 dark:text-white">{totalBatteries}</span>
+>>>>>>> 4b3d6fb84f5b1c133031087768f2b7b501caec88
                   </div>
                 </div>
               </>

@@ -381,6 +381,63 @@ export async function getAvailableBatteries(
 }
 
 // ============================================
+// STAFF TRANSACTION HISTORY
+// ============================================
+
+export interface TransactionHistoryItem {
+  transaction_id: string;
+  transaction_code: string;
+  booking_code: string;
+  payment_status: string;
+  amount: number;
+  payment_method?: string;
+  user_name: string;
+  user_phone?: string;
+  vehicle_license_plate: string;
+  station_name?: string;
+  swap_at?: string;
+  created_at: string;
+}
+
+export interface GetTransactionHistoryParams {
+  page?: number;
+  limit?: number;
+  status?: string;
+}
+
+export interface GetTransactionHistoryResponse {
+  success: boolean;
+  message: string;
+  data: {
+    transactions: TransactionHistoryItem[];
+    pagination: {
+      page: number;
+      pages: number;
+      total: number;
+      limit: number;
+    };
+  };
+}
+
+/**
+ * Lấy lịch sử giao dịch của trạm (cho staff)
+ */
+export async function getTransactionHistory(
+  params?: GetTransactionHistoryParams
+): Promise<GetTransactionHistoryResponse> {
+  const qs = new URLSearchParams();
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.status) qs.set("status", params.status);
+
+  const url = `${API_BASE_URL}/staff/transactions${
+    qs.toString() ? `?${qs.toString()}` : ""
+  }`;
+  const res = await authFetch(url);
+  return res;
+}
+
+// ============================================
 // STAFF SCHEDULE OPERATIONS
 // ============================================
 
@@ -426,144 +483,6 @@ export async function updateScheduleStatus(
     body: JSON.stringify(data),
   });
   return res; // { success, message, data: schedule }
-}
-
-/**
- * Lấy lịch sử giao dịch từ các bookings đã hoàn thành
- */
-export interface TransactionHistoryItem {
-  transaction_id: string;
-  transaction_code: string;
-  booking_id: string;
-  booking_code: string;
-  user_id: string;
-  user_name: string;
-  user_phone?: string;
-  vehicle_license_plate: string;
-  amount: number;
-  payment_status: string;
-  payment_method?: string;
-  swap_at?: string;
-  created_at: string;
-  station_name?: string;
-}
-
-export interface TransactionHistoryResponse {
-  success: boolean;
-  message: string;
-  data: {
-    transactions: TransactionHistoryItem[];
-    pagination: {
-      page: number;
-      limit: number;
-      total: number;
-      pages: number;
-    };
-  };
-}
-
-export async function getTransactionHistory(params?: {
-  page?: number;
-  limit?: number;
-  status?: string;
-}): Promise<TransactionHistoryResponse> {
-  // Fetch tất cả completed bookings có transaction (không giới hạn pagination ở backend)
-  // Sử dụng limit lớn để lấy tất cả, sau đó filter và paginate ở client-side
-  const res = await getStationBookings({
-    status: "completed",
-    page: 1,
-    limit: 1000, // Fetch tất cả để có thể filter theo payment_status
-  });
-
-  // Transform bookings thành transaction history
-  if (res.success && res.data?.bookings) {
-    // Chỉ lấy các bookings có transaction
-    const completedBookings = res.data.bookings.filter(
-      (booking: StaffBooking) => booking.transaction
-    );
-
-    // Transform tất cả thành transactions
-    const allTransactions: TransactionHistoryItem[] = completedBookings.map(
-      (booking: StaffBooking) => {
-        // Backend trả về 'station' (số ít) sau khi đã map từ 'stations'
-        // Nhưng cần kiểm tra cả hai trường hợp để đảm bảo tương thích
-        const station = booking.station || (booking as any).stations;
-        return {
-          transaction_id: booking.transaction!.transaction_id,
-          transaction_code: booking.transaction!.transaction_code,
-          booking_id: booking.booking_id,
-          booking_code: booking.booking_code,
-          user_id: booking.user_id,
-          user_name: booking.user?.full_name || "N/A",
-          user_phone: booking.user?.phone,
-          vehicle_license_plate: booking.vehicle?.license_plate || "N/A",
-          amount: Number(booking.transaction!.amount),
-          payment_status: booking.transaction!.payment_status,
-          payment_method: (booking.transaction as any)?.payment_method,
-          swap_at: booking.transaction!.swap_at,
-          created_at: booking.transaction!.swap_at || booking.created_at,
-          station_name: station?.name || null,
-        };
-      }
-    );
-
-    // Filter by payment_status nếu có (client-side)
-    let filteredTransactions = allTransactions;
-    if (params?.status && params.status !== "all") {
-      filteredTransactions = allTransactions.filter(
-        (t) => t.payment_status === params.status
-      );
-    }
-
-    // Sort by created_at desc (mới nhất trước)
-    filteredTransactions.sort((a, b) => {
-      const dateA = new Date(a.created_at).getTime();
-      const dateB = new Date(b.created_at).getTime();
-      return dateB - dateA;
-    });
-
-    // Tính pagination sau khi filter
-    const page = params?.page || 1;
-    const limit = params?.limit || 10;
-    const total = filteredTransactions.length;
-    const pages = Math.ceil(total / limit);
-
-    // Apply pagination
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
-    const paginatedTransactions = filteredTransactions.slice(
-      startIndex,
-      endIndex
-    );
-
-    return {
-      success: true,
-      message: "Lịch sử giao dịch",
-      data: {
-        transactions: paginatedTransactions,
-        pagination: {
-          page,
-          limit,
-          total,
-          pages,
-        },
-      },
-    };
-  }
-
-  return {
-    success: false,
-    message: "Không thể tải lịch sử giao dịch",
-    data: {
-      transactions: [],
-      pagination: {
-        page: params?.page || 1,
-        limit: params?.limit || 10,
-        total: 0,
-        pages: 0,
-      },
-    },
-  };
 }
 
 export default {

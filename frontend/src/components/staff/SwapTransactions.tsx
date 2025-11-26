@@ -277,6 +277,7 @@ const SwapTransactions: React.FC = () => {
     }
   }, []);
 
+<<<<<<< HEAD
   const getSortIcon = useCallback(
     (field: SortField) => {
       if (sortField !== field) {
@@ -290,6 +291,18 @@ const SwapTransactions: React.FC = () => {
     },
     [sortField, sortOrder]
   );
+=======
+  const getSortIcon = useCallback((field: SortField) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="h-4 w-4 text-gray-400" />;
+    }
+    return sortOrder === "asc" ? (
+      <ArrowUp className="h-4 w-4 text-blue-600" />
+    ) : (
+      <ArrowDown className="h-4 w-4 text-blue-600" />
+    );
+  }, [sortField, sortOrder]);
+>>>>>>> 4b3d6fb84f5b1c133031087768f2b7b501caec88
 
   // Debounce search - chỉ filter trong page hiện tại (client-side)
   // Note: Search chỉ áp dụng cho items trong page hiện tại
@@ -319,6 +332,7 @@ const SwapTransactions: React.FC = () => {
   }, [autoRefreshEnabled, currentPage, pageSize, statusFilter]);
 
   // Memoize event handlers
+<<<<<<< HEAD
   const handleSort = useCallback(
     (field: SortField) => {
       if (sortField === field) {
@@ -330,6 +344,17 @@ const SwapTransactions: React.FC = () => {
     },
     [sortField, sortOrder]
   );
+=======
+  const handleSort = useCallback((field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortOrder("desc");
+    }
+  }, [sortField, sortOrder]);
+
+>>>>>>> 4b3d6fb84f5b1c133031087768f2b7b501caec88
 
   // Memoize dialog handlers
   const handleViewDetail = useCallback((booking: StaffBooking) => {

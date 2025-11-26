@@ -215,16 +215,16 @@ const TransactionHistory: React.FC = () => {
                           <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg shadow-md">
                             <CreditCard className="h-5 w-5 text-white" />
                           </div>
-                          <div>
+                      <div>
                             <h3 className="font-bold text-lg bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
-                              {transaction.transaction_code}
-                            </h3>
+                            {transaction.transaction_code}
+                          </h3>
                             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                               Booking: <span className="font-mono">{transaction.booking_code}</span>
                             </p>
                           </div>
                           <div className="ml-auto">
-                            {getPaymentStatusBadge(transaction.payment_status)}
+                          {getPaymentStatusBadge(transaction.payment_status)}
                           </div>
                         </div>
                       </div>

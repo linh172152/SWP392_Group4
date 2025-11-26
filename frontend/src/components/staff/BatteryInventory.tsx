@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Card,
@@ -18,6 +19,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+=======
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
+import { Progress } from '../ui/progress';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+>>>>>>> 4b3d6fb84f5b1c133031087768f2b7b501caec88
 import {
   Dialog,
   DialogContent,
@@ -230,7 +241,11 @@ const BatteryInventory: React.FC = () => {
         return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
       }
     });
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> 4b3d6fb84f5b1c133031087768f2b7b501caec88
     return processed;
   }, [allBatteries, debouncedSearchTerm, sortField, sortOrder]);
 
@@ -240,6 +255,7 @@ const BatteryInventory: React.FC = () => {
     const endIndex = startIndex + pageSize;
     return filteredSortedBatteries.slice(startIndex, endIndex);
   }, [filteredSortedBatteries, currentPage, pageSize]);
+<<<<<<< HEAD
 
   // Update total pages and items when filtered data changes
   useEffect(() => {
@@ -275,6 +291,35 @@ const BatteryInventory: React.FC = () => {
     },
     [sortField, sortOrder]
   );
+=======
+
+  // Update total pages and items when filtered data changes
+  useEffect(() => {
+    const totalPages = Math.ceil(filteredSortedBatteries.length / pageSize);
+    setTotalPages(totalPages);
+    setTotalItems(filteredSortedBatteries.length);
+    setBatteries(paginatedBatteries);
+  }, [filteredSortedBatteries, paginatedBatteries, pageSize]);
+
+  // Memoize event handlers
+  const handleSort = useCallback((field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('desc');
+    }
+  }, [sortField, sortOrder]);
+
+  const getSortIcon = useCallback((field: SortField) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="h-4 w-4 text-gray-400" />;
+    }
+    return sortOrder === 'asc' 
+      ? <ArrowUp className="h-4 w-4 text-blue-600" />
+      : <ArrowDown className="h-4 w-4 text-blue-600" />;
+  }, [sortField, sortOrder]);
+>>>>>>> 4b3d6fb84f5b1c133031087768f2b7b501caec88
 
   // Dialog handlers
   const handleViewDetail = async (battery: BatteryType) => {
