@@ -264,12 +264,15 @@ export const getStationBookings = asyncHandler(
     const mappedBookings = bookings.map((booking: any) => {
       const {
         users_bookings_user_idTousers,
+        users_bookings_checked_in_by_staff_idTousers,
         vehicles,
         transactions,
         stations,
         ...rest
       } = booking;
       const user = users_bookings_user_idTousers || null;
+      const checked_in_by_staff =
+        users_bookings_checked_in_by_staff_idTousers || null;
       const vehicle = vehicles
         ? {
             ...vehicles,
@@ -321,6 +324,7 @@ export const getStationBookings = asyncHandler(
       return {
         ...rest,
         user,
+        checked_in_by_staff,
         vehicle,
         transaction,
         station,
@@ -454,12 +458,15 @@ export const getBookingDetails = asyncHandler(
 
     const {
       users_bookings_user_idTousers,
+      users_bookings_checked_in_by_staff_idTousers,
       vehicles,
       transactions,
       stations,
       ...rest
     } = booking;
     const user = users_bookings_user_idTousers || null;
+    const checked_in_by_staff =
+      users_bookings_checked_in_by_staff_idTousers || null;
     const vehicle = vehicles
       ? {
           ...vehicles,
@@ -509,6 +516,7 @@ export const getBookingDetails = asyncHandler(
     const mappedBooking = {
       ...rest,
       user,
+      checked_in_by_staff,
       vehicle,
       transaction: mappedTransaction,
       station,

@@ -127,8 +127,10 @@ export const getAllStations = asyncHandler(
 
         const dailyRevenue = dailyRevenueResult._sum.amount || 0;
 
+        // Map response to frontend-expected format
+        const { users, batteries, _count, ...stationData } = station;
         return {
-          ...station,
+          ...stationData,
           battery_stats: batteryStatusCount,
           total_batteries: station.batteries.length,
           total_bookings: station._count.bookings,
@@ -285,15 +287,20 @@ export const getStationDetails = asyncHandler(
 
     const dailyRevenue = dailyRevenueResult._sum.amount || 0;
 
+    // Map response to frontend-expected format
+    const { users, batteries, _count, station_ratings, ...stationData } =
+      station;
     res.status(200).json({
       success: true,
       message: "Station details retrieved successfully",
       data: {
-        ...station,
+        ...stationData,
+        batteries: station.batteries, // Keep batteries for details view
         battery_stats: batteryStatusCount,
         total_batteries: station.batteries.length,
         average_rating: avgRating,
         total_ratings: station.station_ratings.length,
+        station_ratings: station.station_ratings, // Keep ratings for details view
         total_bookings: station._count.bookings,
         total_transactions: station._count.transactions,
         staff_count: station.users.length,

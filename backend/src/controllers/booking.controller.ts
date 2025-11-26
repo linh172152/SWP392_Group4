@@ -1192,7 +1192,13 @@ export const getBookingDetails = asyncHandler(
       batteryModel: booking.battery_model,
     });
 
-    const { vehicles, transactions, stations, ...rest } = booking;
+    const {
+      vehicles,
+      transactions,
+      stations,
+      users_bookings_checked_in_by_staff_idTousers,
+      ...rest
+    } = booking;
     const vehicle = vehicles
       ? {
           ...vehicles,
@@ -1216,11 +1222,14 @@ export const getBookingDetails = asyncHandler(
           longitude: stations.longitude ? Number(stations.longitude) : null,
         }
       : null;
+    const checked_in_by_staff =
+      users_bookings_checked_in_by_staff_idTousers || null;
     const mappedBooking = {
       ...rest,
       vehicle,
       transaction,
       station,
+      checked_in_by_staff,
     };
 
     res.status(200).json({

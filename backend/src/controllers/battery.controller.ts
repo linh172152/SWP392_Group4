@@ -268,6 +268,26 @@ export const getBatteryDetails = asyncHandler(
       throw new CustomError("Battery not found", 404);
     }
 
+    // Map battery_transfer_logs relation names to frontend-expected field names
+    const mappedTransferLogs = battery.battery_transfer_logs
+      ? battery.battery_transfer_logs.map((log: any) => {
+          const mapped = {
+            ...log,
+            from_station:
+              log.stations_battery_transfer_logs_from_station_idTostations,
+            to_station:
+              log.stations_battery_transfer_logs_to_station_idTostations,
+            transferred_by_user: log.users,
+          };
+          delete (mapped as any)
+            .stations_battery_transfer_logs_from_station_idTostations;
+          delete (mapped as any)
+            .stations_battery_transfer_logs_to_station_idTostations;
+          delete (mapped as any).users;
+          return mapped;
+        })
+      : [];
+
     const batteryWithLabel = {
       ...battery,
       capacity_kwh: battery.capacity_kwh ? Number(battery.capacity_kwh) : null,
@@ -287,6 +307,7 @@ export const getBatteryDetails = asyncHandler(
               : null,
           }
         : null,
+      battery_transfer_logs: mappedTransferLogs,
     };
 
     res.status(200).json({
@@ -448,11 +469,28 @@ export const getBatteryHistory = asyncHandler(
       where: { battery_id: id },
     });
 
+    // Map Prisma relation names to frontend-expected field names
+    const mappedHistory = history.map((log: any) => {
+      const mapped = {
+        ...log,
+        from_station:
+          log.stations_battery_transfer_logs_from_station_idTostations,
+        to_station: log.stations_battery_transfer_logs_to_station_idTostations,
+        transferred_by_user: log.users,
+      };
+      delete (mapped as any)
+        .stations_battery_transfer_logs_from_station_idTostations;
+      delete (mapped as any)
+        .stations_battery_transfer_logs_to_station_idTostations;
+      delete (mapped as any).users;
+      return mapped;
+    });
+
     res.status(200).json({
       success: true,
       message: "Battery history retrieved successfully",
       data: {
-        history,
+        history: mappedHistory,
         pagination: {
           page: parseInt(page as string),
           limit: parseInt(limit as string),

@@ -146,9 +146,7 @@ export const createBatteryTransfer = asyncHandler(
       ];
       const shouldMarkMaintenance =
         transferStatus === "completed" &&
-        maintenanceReasons.some((reason) =>
-          normalizedReason.includes(reason)
-        );
+        maintenanceReasons.some((reason) => normalizedReason.includes(reason));
 
       // ✅ Xác định status mới dựa trên transfer_reason
       let newStatus: string;
@@ -182,7 +180,24 @@ export const createBatteryTransfer = asyncHandler(
         include: transferInclude,
       });
 
-      return transferLog;
+      // Map Prisma relation names to frontend-expected field names
+      const mappedResult = {
+        ...transferLog,
+        from_station:
+          transferLog.stations_battery_transfer_logs_from_station_idTostations,
+        to_station:
+          transferLog.stations_battery_transfer_logs_to_station_idTostations,
+        transferred_by_user: transferLog.users,
+        battery: transferLog.batteries,
+      };
+      delete (mappedResult as any)
+        .stations_battery_transfer_logs_from_station_idTostations;
+      delete (mappedResult as any)
+        .stations_battery_transfer_logs_to_station_idTostations;
+      delete (mappedResult as any).users;
+      delete (mappedResult as any).batteries;
+
+      return mappedResult;
     });
 
     res.status(201).json({
@@ -233,11 +248,31 @@ export const getBatteryTransfers = asyncHandler(
       prisma.battery_transfer_logs.count({ where: whereClause }),
     ]);
 
+    // Map Prisma relation names to frontend-expected field names
+    const mappedTransfers = transfers.map((transfer) => {
+      const mapped = {
+        ...transfer,
+        from_station:
+          transfer.stations_battery_transfer_logs_from_station_idTostations,
+        to_station:
+          transfer.stations_battery_transfer_logs_to_station_idTostations,
+        transferred_by_user: transfer.users,
+        battery: transfer.batteries,
+      };
+      delete (mapped as any)
+        .stations_battery_transfer_logs_from_station_idTostations;
+      delete (mapped as any)
+        .stations_battery_transfer_logs_to_station_idTostations;
+      delete (mapped as any).users;
+      delete (mapped as any).batteries;
+      return mapped;
+    });
+
     res.status(200).json({
       success: true,
       message: "Battery transfers retrieved successfully",
       data: {
-        transfers,
+        transfers: mappedTransfers,
         pagination: {
           page: Math.max(1, parseInt(page as string, 10)),
           limit: take,
@@ -266,10 +301,27 @@ export const getBatteryTransferDetails = asyncHandler(
       throw new CustomError("Battery transfer log not found", 404);
     }
 
+    // Map Prisma relation names to frontend-expected field names
+    const mappedTransfer = {
+      ...transfer,
+      from_station:
+        transfer.stations_battery_transfer_logs_from_station_idTostations,
+      to_station:
+        transfer.stations_battery_transfer_logs_to_station_idTostations,
+      transferred_by_user: transfer.users,
+      battery: transfer.batteries,
+    };
+    delete (mappedTransfer as any)
+      .stations_battery_transfer_logs_from_station_idTostations;
+    delete (mappedTransfer as any)
+      .stations_battery_transfer_logs_to_station_idTostations;
+    delete (mappedTransfer as any).users;
+    delete (mappedTransfer as any).batteries;
+
     res.status(200).json({
       success: true,
       message: "Battery transfer details retrieved successfully",
-      data: transfer,
+      data: mappedTransfer,
     });
   }
 );
