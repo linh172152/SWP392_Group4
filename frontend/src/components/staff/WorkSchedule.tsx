@@ -659,7 +659,7 @@ const WorkSchedule: React.FC = () => {
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center space-x-3">
                         <div className="text-lg font-semibold text-slate-900 dark:text-white">
-                          {new Date(schedule.shift_start).toLocaleDateString('vi-VN', { 
+                          {new Date(schedule.shift_date || schedule.shift_start).toLocaleDateString('vi-VN', { 
                             weekday: 'long', 
                             day: '2-digit', 
                             month: '2-digit',
@@ -731,7 +731,7 @@ const WorkSchedule: React.FC = () => {
                 <Label>Thông tin ca làm việc</Label>
                 <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-md">
                   <p className="text-sm font-medium text-slate-900 dark:text-white">
-                    {new Date(selectedSchedule.shift_start).toLocaleDateString('vi-VN', {
+                    {new Date(selectedSchedule.shift_date || selectedSchedule.shift_start).toLocaleDateString('vi-VN', {
                       weekday: 'long',
                       day: '2-digit',
                       month: '2-digit',

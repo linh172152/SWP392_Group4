@@ -221,7 +221,13 @@ export const getUserDetails = asyncHandler(
       throw new CustomError("User not found", 404);
     }
 
-    const { user_subscriptions, ...rest } = user;
+    const {
+      user_subscriptions,
+      bookings_bookings_user_idTousers,
+      transactions_transactions_user_idTousers,
+      support_tickets_support_tickets_user_idTousers,
+      ...rest
+    } = user;
     const subscriptions = user_subscriptions
       ? user_subscriptions.map((sub: any) => {
           const { service_packages, ...subRest } = sub;
@@ -234,6 +240,9 @@ export const getUserDetails = asyncHandler(
     const mappedUser = {
       ...rest,
       user_subscriptions: subscriptions,
+      bookings: bookings_bookings_user_idTousers || [],
+      transactions: transactions_transactions_user_idTousers || [],
+      support_tickets: support_tickets_support_tickets_user_idTousers || [],
     };
 
     res.status(200).json({

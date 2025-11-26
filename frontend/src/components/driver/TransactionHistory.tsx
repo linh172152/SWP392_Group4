@@ -92,7 +92,10 @@ const TransactionHistory: React.FC = () => {
 
   const handleRatingSuccess = () => {
     // Reload transactions sau khi đánh giá thành công
-    loadTransactions(page);
+    // Thêm delay nhỏ để đảm bảo backend đã lưu rating
+    setTimeout(() => {
+      loadTransactions(page);
+    }, 500);
   };
 
   return (

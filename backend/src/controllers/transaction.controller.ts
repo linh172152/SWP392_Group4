@@ -94,6 +94,7 @@ export const getUserTransactions = asyncHandler(
         batteries_transactions_old_battery_idTobatteries,
         batteries_transactions_new_battery_idTobatteries,
         users_transactions_staff_idTousers,
+        station_ratings,
         amount,
         payments,
         ...rest
@@ -104,6 +105,7 @@ export const getUserTransactions = asyncHandler(
         old_battery: batteries_transactions_old_battery_idTobatteries || null,
         new_battery: batteries_transactions_new_battery_idTobatteries || null,
         staff: users_transactions_staff_idTousers || null,
+        station_rating: station_ratings || null, // Map station_ratings to station_rating (1:1 relationship)
         payments: payments
           ? {
               ...payments,
@@ -229,6 +231,7 @@ export const getTransactionDetails = asyncHandler(
       batteries_transactions_old_battery_idTobatteries,
       batteries_transactions_new_battery_idTobatteries,
       users_transactions_staff_idTousers,
+      station_ratings,
       amount,
       payments,
       ...rest
@@ -239,6 +242,7 @@ export const getTransactionDetails = asyncHandler(
       old_battery: batteries_transactions_old_battery_idTobatteries || null,
       new_battery: batteries_transactions_new_battery_idTobatteries || null,
       staff: users_transactions_staff_idTousers || null,
+      station_rating: station_ratings || null, // Map station_ratings to station_rating (1:1 relationship)
       payments: payments
         ? {
             ...payments,
