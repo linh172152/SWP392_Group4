@@ -43,6 +43,7 @@ import {
   Clock,
   Edit,
   Trash2,
+  Star,
 } from "lucide-react";
 import type { Station } from "../../services/station.service";
 import {
@@ -52,6 +53,10 @@ import {
   updateStation,
 } from "../../services/station.service";
 import { updateStaff } from "../../services/staff.service";
+import {
+  getStationRatingSummary,
+  type StationRatingSummary,
+} from "../../services/rating.service";
 
 const StationManagement: React.FC = () => {
   const [stations, setStations] = useState<Station[]>([]);
@@ -63,6 +68,9 @@ const StationManagement: React.FC = () => {
   const [editingStation, setEditingStation] = useState<Station | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [stationToDelete, setStationToDelete] = useState<string | null>(null);
+  const [stationRatings, setStationRatings] = useState<
+    Record<string, StationRatingSummary>
+  >({});
 
   // Fetch stations from API
   const fetchStations = async () => {
@@ -113,6 +121,27 @@ const StationManagement: React.FC = () => {
 
           console.log("Transformed stations:", transformedStations);
           setStations(transformedStations);
+
+          // Fetch rating summaries for all stations
+          const ratingsMap: Record<string, StationRatingSummary> = {};
+          await Promise.all(
+            transformedStations.map(async (station: Station) => {
+              try {
+                const ratingRes = await getStationRatingSummary(
+                  station.station_id
+                );
+                if (ratingRes.success) {
+                  ratingsMap[station.station_id] = ratingRes.data;
+                }
+              } catch (error) {
+                console.error(
+                  `Error fetching rating for station ${station.station_id}:`,
+                  error
+                );
+              }
+            })
+          );
+          setStationRatings(ratingsMap);
         } else {
           console.error("Invalid API response format:", res);
           setStations([]);
@@ -640,6 +669,47 @@ const StationManagement: React.FC = () => {
                           {station.operating_hours}
                         </span>
                       </div>
+                      {/* Rating Summary - Hiển thị dưới Giờ hoạt động */}
+                      {stationRatings[station.station_id] &&
+                        stationRatings[station.station_id].total_ratings >
+                          0 && (
+                          <div className="flex justify-between items-center pt-2">
+                            <span className="text-slate-600 dark:text-slate-400">
+                              Đánh giá:
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-semibold text-yellow-600 dark:text-yellow-400 text-sm">
+                                {stationRatings[
+                                  station.station_id
+                                ].average_rating.toFixed(1)}
+                              </span>
+                              <div className="flex items-center gap-0.5">
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <Star
+                                    key={star}
+                                    className={`h-2.5 w-2.5 ${
+                                      star <=
+                                      Math.round(
+                                        stationRatings[station.station_id]
+                                          .average_rating
+                                      )
+                                        ? "text-yellow-500 fill-current"
+                                        : "text-gray-300"
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+                              <span className="text-xs text-slate-500 dark:text-slate-400">
+                                (
+                                {
+                                  stationRatings[station.station_id]
+                                    .total_ratings
+                                }
+                                )
+                              </span>
+                            </div>
+                          </div>
+                        )}
                     </div>
                   </div>
 

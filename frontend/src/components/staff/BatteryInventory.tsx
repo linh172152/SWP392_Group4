@@ -28,7 +28,6 @@ import {
 } from "../ui/dialog";
 import {
   Battery,
-  Plus,
   Search,
   Filter,
   Zap,

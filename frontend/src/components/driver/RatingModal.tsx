@@ -43,6 +43,11 @@ const RatingModal: React.FC<RatingModalProps> = ({
       return;
     }
 
+    // ✅ Prevent multiple submissions
+    if (loading) {
+      return;
+    }
+
     setLoading(true);
     setError('');
 
@@ -59,10 +64,22 @@ const RatingModal: React.FC<RatingModalProps> = ({
       setComment('');
       setHoveredRating(0);
       
+      // ✅ Close modal and reload data immediately
       onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err.message || 'Có lỗi xảy ra khi gửi đánh giá');
+      // ✅ Handle "already rated" error specifically
+      const errorMessage = err.message || 'Có lỗi xảy ra khi gửi đánh giá';
+      if (errorMessage.includes('đã được đánh giá') || errorMessage.includes('already rated')) {
+        setError('Giao dịch này đã được đánh giá. Mỗi giao dịch chỉ có thể đánh giá một lần.');
+        // Reload data to update UI
+        setTimeout(() => {
+          onSuccess();
+          onClose();
+        }, 2000);
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }

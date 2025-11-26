@@ -25,61 +25,70 @@ export const createRating = asyncHandler(
       throw new CustomError("Rating must be between 1 and 5", 400);
     }
 
-    // Check if transaction exists and belongs to user
-    const transaction = await prisma.transactions.findFirst({
-      where: {
-        transaction_id,
-        user_id: userId,
-        payment_status: "completed",
-      },
-    });
+    // ✅ Use transaction to prevent race condition
+    const ratingData = await prisma.$transaction(async (tx) => {
+      // Check if transaction exists and belongs to user
+      const transaction = await tx.transactions.findFirst({
+        where: {
+          transaction_id,
+          user_id: userId,
+          payment_status: "completed",
+        },
+      });
 
-    if (!transaction) {
-      throw new CustomError("Transaction not found or not completed", 404);
-    }
+      if (!transaction) {
+        throw new CustomError("Transaction not found or not completed", 404);
+      }
 
-    // Check if already rated
-    const existingRating = await prisma.station_ratings.findFirst({
-      where: { transaction_id },
-    });
+      // ✅ Check if already rated (within transaction to prevent race condition)
+      const existingRating = await tx.station_ratings.findFirst({
+        where: { transaction_id },
+      });
 
-    if (existingRating) {
-      throw new CustomError("Transaction already rated", 400);
-    }
+      if (existingRating) {
+        throw new CustomError(
+          "Giao dịch này đã được đánh giá. Mỗi giao dịch chỉ có thể đánh giá một lần.",
+          400
+        );
+      }
 
-    const ratingData = await prisma.station_ratings.create({
-      data: {
-        rating_id: randomUUID(),
-        user_id: userId,
-        station_id: station_id as string,
-        transaction_id: transaction_id as string | null,
-        rating: rating as number,
-        comment: comment as string | null,
-        updated_at: new Date(),
-      } as Prisma.station_ratingsUncheckedCreateInput,
-      include: {
-        users: {
-          select: {
-            user_id: true,
-            full_name: true,
-            email: true,
+      // ✅ Create rating (unique constraint will also prevent duplicates)
+      const newRating = await tx.station_ratings.create({
+        data: {
+          rating_id: randomUUID(),
+          user_id: userId,
+          station_id: station_id as string,
+          transaction_id: transaction_id as string | null,
+          rating: rating as number,
+          comment: comment as string | null,
+          updated_at: new Date(),
+        } as Prisma.station_ratingsUncheckedCreateInput,
+        include: {
+          users: {
+            select: {
+              user_id: true,
+              full_name: true,
+              email: true,
+            },
+          },
+          stations: {
+            select: {
+              station_id: true,
+              name: true,
+              address: true,
+            },
+          },
+          transactions: {
+            select: {
+              transaction_id: true,
+              transaction_code: true,
+              swap_at: true,
+            },
           },
         },
-        stations: {
-          select: {
-            station_id: true,
-            name: true,
-            address: true,
-          },
-        },
-        transactions: {
-          select: {
-            transaction_id: true,
-            transaction_code: true,
-            swap_at: true,
-          },
-        },
-      },
+      });
+
+      return newRating;
     });
 
     res.status(201).json({

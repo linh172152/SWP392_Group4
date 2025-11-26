@@ -300,18 +300,22 @@ const TransactionHistory: React.FC = () => {
                     {(transaction.station_id || transaction.station) && (
                       <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
                         {transaction.station_rating ? (
-                          <div className="flex items-center gap-2 text-sm">
-                            <Star className="h-4 w-4 text-yellow-400 fill-current" />
-                            <span className="text-slate-600 dark:text-slate-400">
-                              Đã đánh giá:{" "}
-                              <span className="font-medium text-slate-900 dark:text-white">
-                                {transaction.station_rating.rating}/5
-                              </span>
-                            </span>
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2 text-sm">
+                                <Star className="h-4 w-4 text-yellow-400 fill-current" />
+                                <span className="text-slate-600 dark:text-slate-400">
+                                  Đã đánh giá:{" "}
+                                  <span className="font-medium text-slate-900 dark:text-white">
+                                    {transaction.station_rating.rating}/5
+                                  </span>
+                                </span>
+                              </div>
+                            </div>
                             {transaction.station_rating.comment && (
-                              <span className="text-slate-500 dark:text-slate-400 italic">
-                                - "{transaction.station_rating.comment}"
-                              </span>
+                              <div className="text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                                <p className="italic">"{transaction.station_rating.comment}"</p>
+                              </div>
                             )}
                           </div>
                         ) : (
@@ -319,7 +323,8 @@ const TransactionHistory: React.FC = () => {
                             variant="outline"
                             size="sm"
                             onClick={() => handleOpenRating(transaction)}
-                            className="w-full glass border-blue-200/50 dark:border-purple-400/30 hover:bg-blue-50/50 dark:hover:bg-purple-500/10"
+                            disabled={ratingModalOpen && selectedTransaction?.transaction_id === transaction.transaction_id}
+                            className="w-full glass border-blue-200/50 dark:border-purple-400/30 hover:bg-blue-50/50 dark:hover:bg-purple-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <Star className="mr-2 h-4 w-4" />
                             Đánh giá dịch vụ

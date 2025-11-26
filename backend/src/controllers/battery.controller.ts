@@ -326,7 +326,14 @@ export const getBatteryDetails = asyncHandler(
 export const updateBatteryStatus = asyncHandler(
   async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { status, current_charge, health_percentage, cycle_count } = req.body;
+    const {
+      status,
+      current_charge,
+      health_percentage,
+      cycle_count,
+      battery_code,
+      model,
+    } = req.body;
 
     if (!status) {
       throw new CustomError("Status is required", 400);
@@ -341,6 +348,43 @@ export const updateBatteryStatus = asyncHandler(
     }
 
     const updateData: any = { status };
+
+    // ✅ Allow updating battery_code (with unique check)
+    if (battery_code !== undefined) {
+      const trimmedCode =
+        typeof battery_code === "string" ? battery_code.trim() : battery_code;
+      if (!trimmedCode || trimmedCode.length === 0) {
+        throw new CustomError("Battery code cannot be empty", 400);
+      }
+
+      // Check if new code already exists (excluding current battery)
+      if (trimmedCode !== battery.battery_code) {
+        const existingBattery = await prisma.batteries.findFirst({
+          where: {
+            battery_code: trimmedCode,
+            battery_id: { not: id },
+          },
+        });
+
+        if (existingBattery) {
+          throw new CustomError(
+            `Battery code "${trimmedCode}" already exists`,
+            400
+          );
+        }
+      }
+
+      updateData.battery_code = trimmedCode;
+    }
+
+    // ✅ Allow updating model
+    if (model !== undefined) {
+      const trimmedModel = typeof model === "string" ? model.trim() : model;
+      if (!trimmedModel || trimmedModel.length === 0) {
+        throw new CustomError("Model cannot be empty", 400);
+      }
+      updateData.model = trimmedModel;
+    }
 
     if (current_charge !== undefined) {
       updateData.current_charge = current_charge;
