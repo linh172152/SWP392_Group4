@@ -2073,6 +2073,25 @@ export const cancelBooking = asyncHandler(
             },
           },
         });
+
+        // ✅ Tạo payment record để hiển thị trong lịch sử giao dịch
+        await tx.payments.create({
+          data: {
+            payment_id: randomUUID(),
+            user_id: userId,
+            amount: new Prisma.Decimal(cancellationFee),
+            payment_method: "wallet",
+            payment_status: "completed",
+            payment_type: PaymentType.PENALTY,
+            paid_at: new Date(),
+            metadata: {
+              type: "late_cancellation_fee",
+              booking_code: booking.booking_code,
+              booking_id: booking.booking_id,
+              reason: "User cancelled confirmed booking",
+            } as Prisma.InputJsonValue,
+          } as Prisma.paymentsUncheckedCreateInput,
+        });
       }
 
       // Release hold (sẽ hoàn tiền hold về ví như bình thường)

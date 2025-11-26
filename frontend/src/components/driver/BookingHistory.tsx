@@ -986,7 +986,8 @@ const BookingHistory: React.FC = () => {
                                 </p>
                               )}
                             {cancelCheck.canCancel &&
-                              !cancelCheck.cancellationFee &&
+                              (!cancelCheck.cancellationFee ||
+                                cancelCheck.cancellationFee === 0) &&
                               cancelCheck.minutesUntilScheduled !== undefined &&
                               cancelCheck.minutesUntilScheduled < 30 && (
                                 <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
