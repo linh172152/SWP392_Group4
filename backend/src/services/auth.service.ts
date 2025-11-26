@@ -11,6 +11,7 @@ import {
 } from "../utils/jwt.util";
 import { CustomError } from "../middlewares/error.middleware";
 import { prisma } from "../server";
+import { randomUUID } from "crypto";
 
 type VehicleWithBattery = Prisma.vehiclesGetPayload<{
   include: {
@@ -112,6 +113,7 @@ export const registerUser = async (
     // Create user
     const user = await prisma.users.create({
       data: {
+        user_id: randomUUID(),
         email: data.email,
         password_hash: hashedPassword,
         full_name: data.full_name,

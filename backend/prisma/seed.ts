@@ -5,13 +5,14 @@ import {
   BatteryStatus,
 } from "@prisma/client";
 import { hashPassword } from "../src/utils/bcrypt.util";
+import { randomUUID } from "crypto";
 
 const prisma = new PrismaClient();
 
 async function main() {
   // Safety check: Only seed if explicitly requested or if database is empty
-  const existingUsersCount = await prisma.user.count();
-  const existingStationsCount = await prisma.station.count();
+  const existingUsersCount = await prisma.users.count();
+  const existingStationsCount = await prisma.stations.count();
   const forceSeed = process.env.FORCE_SEED === "true";
   const isProduction = process.env.NODE_ENV === "production";
 
@@ -76,7 +77,7 @@ async function main() {
   // CREATE ADMIN USERS (using upsert to avoid duplicates)
   // ===========================================
   const admins = await Promise.all([
-    prisma.user.upsert({
+    prisma.users.upsert({
       where: { email: "admin@evbattery.com" },
       update: {
         full_name: "Nguyen Van Admin",
@@ -86,15 +87,17 @@ async function main() {
         status: "ACTIVE",
       },
       create: {
+        user_id: randomUUID(),
         full_name: "Nguyen Van Admin",
         email: "admin@evbattery.com",
         password_hash: adminPasswordHash,
         phone: "0123456789",
         role: "ADMIN",
         status: "ACTIVE",
+        updated_at: new Date(),
       },
     }),
-    prisma.user.upsert({
+    prisma.users.upsert({
       where: { email: "manager@evbattery.com" },
       update: {
         full_name: "Tran Thi Manager",
@@ -104,12 +107,14 @@ async function main() {
         status: "ACTIVE",
       },
       create: {
+        user_id: randomUUID(),
         full_name: "Tran Thi Manager",
         email: "manager@evbattery.com",
         password_hash: adminPasswordHash,
         phone: "0123456790",
         role: "ADMIN",
         status: "ACTIVE",
+        updated_at: new Date(),
       },
     }),
   ]);
@@ -119,8 +124,9 @@ async function main() {
   // CREATE STATIONS
   // ===========================================
   const stations = await Promise.all([
-    prisma.station.create({
+    prisma.stations.create({
       data: {
+        station_id: randomUUID(),
         name: "EV Battery Station - District 1",
         address: "123 Nguyen Hue, District 1, Ho Chi Minh City",
         latitude: 10.7769,
@@ -129,10 +135,12 @@ async function main() {
         supported_models: ["Tesla Model 3", "VinFast VF8"],
         operating_hours: "24/7",
         status: "active",
+        updated_at: new Date(),
       },
     }),
-    prisma.station.create({
+    prisma.stations.create({
       data: {
+        station_id: randomUUID(),
         name: "EV Battery Station - District 7",
         address: "456 Nguyen Thi Thap, District 7, Ho Chi Minh City",
         latitude: 10.7374,
@@ -141,10 +149,12 @@ async function main() {
         supported_models: ["VinFast VF8", "Tesla Model 3"],
         operating_hours: "6:00 - 22:00",
         status: "active",
+        updated_at: new Date(),
       },
     }),
-    prisma.station.create({
+    prisma.stations.create({
       data: {
+        station_id: randomUUID(),
         name: "EV Battery Station - Thu Duc",
         address: "789 Vo Van Ngan, Thu Duc City, Ho Chi Minh City",
         latitude: 10.8603,
@@ -153,10 +163,12 @@ async function main() {
         supported_models: ["Tesla Model 3", "VinFast VF8"],
         operating_hours: "24/7",
         status: "active",
+        updated_at: new Date(),
       },
     }),
-    prisma.station.create({
+    prisma.stations.create({
       data: {
+        station_id: randomUUID(),
         name: "EV Battery Station - Binh Thanh",
         address: "321 Dien Bien Phu, Binh Thanh District, Ho Chi Minh City",
         latitude: 10.8106,
@@ -165,6 +177,7 @@ async function main() {
         supported_models: ["VinFast VF8", "Tesla Model 3"],
         operating_hours: "7:00 - 21:00",
         status: "maintenance",
+        updated_at: new Date(),
       },
     }),
   ]);
@@ -174,7 +187,7 @@ async function main() {
   // CREATE STAFF USERS (using upsert to avoid duplicates)
   // ===========================================
   const staffs = await Promise.all([
-    prisma.user.upsert({
+    prisma.users.upsert({
       where: { email: "staff1@evbattery.com" },
       update: {
         full_name: "Le Van Staff 1",
@@ -185,6 +198,7 @@ async function main() {
         status: "ACTIVE",
       },
       create: {
+        user_id: randomUUID(),
         full_name: "Le Van Staff 1",
         email: "staff1@evbattery.com",
         password_hash: staffPasswordHash,
@@ -192,9 +206,10 @@ async function main() {
         role: "STAFF",
         station_id: stations[0].station_id,
         status: "ACTIVE",
+        updated_at: new Date(),
       },
     }),
-    prisma.user.upsert({
+    prisma.users.upsert({
       where: { email: "staff2@evbattery.com" },
       update: {
         full_name: "Pham Thi Staff 2",
@@ -205,6 +220,7 @@ async function main() {
         status: "ACTIVE",
       },
       create: {
+        user_id: randomUUID(),
         full_name: "Pham Thi Staff 2",
         email: "staff2@evbattery.com",
         password_hash: staffPasswordHash,
@@ -212,9 +228,10 @@ async function main() {
         role: "STAFF",
         station_id: stations[0].station_id,
         status: "ACTIVE",
+        updated_at: new Date(),
       },
     }),
-    prisma.user.upsert({
+    prisma.users.upsert({
       where: { email: "staff3@evbattery.com" },
       update: {
         full_name: "Hoang Van Staff 3",
@@ -225,6 +242,7 @@ async function main() {
         status: "ACTIVE",
       },
       create: {
+        user_id: randomUUID(),
         full_name: "Hoang Van Staff 3",
         email: "staff3@evbattery.com",
         password_hash: staffPasswordHash,
@@ -232,9 +250,10 @@ async function main() {
         role: "STAFF",
         station_id: stations[1].station_id,
         status: "ACTIVE",
+        updated_at: new Date(),
       },
     }),
-    prisma.user.upsert({
+    prisma.users.upsert({
       where: { email: "staff4@evbattery.com" },
       update: {
         full_name: "Vu Thi Staff 4",
@@ -245,6 +264,7 @@ async function main() {
         status: "ACTIVE",
       },
       create: {
+        user_id: randomUUID(),
         full_name: "Vu Thi Staff 4",
         email: "staff4@evbattery.com",
         password_hash: staffPasswordHash,
@@ -252,6 +272,7 @@ async function main() {
         role: "STAFF",
         station_id: stations[2].station_id,
         status: "ACTIVE",
+        updated_at: new Date(),
       },
     }),
   ]);
@@ -280,7 +301,7 @@ async function main() {
       shiftEnd.setUTCHours(shiftStart.getUTCHours() + 8, 0, 0, 0);
 
       schedulePromises.push(
-        prisma.staffSchedule.create({
+        prisma.staff_schedules.create({
           data: {
             staff_id: staff.user_id,
             station_id: baseStationId,
@@ -304,7 +325,7 @@ async function main() {
   // CREATE DRIVER USERS (using upsert to avoid duplicates)
   // ===========================================
   const drivers = await Promise.all([
-    prisma.user.upsert({
+    prisma.users.upsert({
       where: { email: "driver1@evbattery.com" },
       update: {
         full_name: "Tran Van Driver 1",
@@ -314,15 +335,17 @@ async function main() {
         status: "ACTIVE",
       },
       create: {
+        user_id: randomUUID(),
         full_name: "Tran Van Driver 1",
         email: "driver1@evbattery.com",
         password_hash: driverPasswordHash,
         phone: "0912345678",
         role: "DRIVER",
         status: "ACTIVE",
+        updated_at: new Date(),
       },
     }),
-    prisma.user.upsert({
+    prisma.users.upsert({
       where: { email: "driver2@evbattery.com" },
       update: {
         full_name: "Nguyen Thi Driver 2",
@@ -332,15 +355,17 @@ async function main() {
         status: "ACTIVE",
       },
       create: {
+        user_id: randomUUID(),
         full_name: "Nguyen Thi Driver 2",
         email: "driver2@evbattery.com",
         password_hash: driverPasswordHash,
         phone: "0912345679",
         role: "DRIVER",
         status: "ACTIVE",
+        updated_at: new Date(),
       },
     }),
-    prisma.user.upsert({
+    prisma.users.upsert({
       where: { email: "driver3@evbattery.com" },
       update: {
         full_name: "Le Van Driver 3",
@@ -350,15 +375,17 @@ async function main() {
         status: "ACTIVE",
       },
       create: {
+        user_id: randomUUID(),
         full_name: "Le Van Driver 3",
         email: "driver3@evbattery.com",
         password_hash: driverPasswordHash,
         phone: "0912345680",
         role: "DRIVER",
         status: "ACTIVE",
+        updated_at: new Date(),
       },
     }),
-    prisma.user.upsert({
+    prisma.users.upsert({
       where: { email: "driver4@evbattery.com" },
       update: {
         full_name: "Pham Thi Driver 4",
@@ -368,15 +395,17 @@ async function main() {
         status: "ACTIVE",
       },
       create: {
+        user_id: randomUUID(),
         full_name: "Pham Thi Driver 4",
         email: "driver4@evbattery.com",
         password_hash: driverPasswordHash,
         phone: "0912345681",
         role: "DRIVER",
         status: "ACTIVE",
+        updated_at: new Date(),
       },
     }),
-    prisma.user.upsert({
+    prisma.users.upsert({
       where: { email: "driver5@evbattery.com" },
       update: {
         full_name: "Hoang Van Driver 5",
@@ -386,15 +415,17 @@ async function main() {
         status: "ACTIVE",
       },
       create: {
+        user_id: randomUUID(),
         full_name: "Hoang Van Driver 5",
         email: "driver5@evbattery.com",
         password_hash: driverPasswordHash,
         phone: "0912345682",
         role: "DRIVER",
         status: "ACTIVE",
+        updated_at: new Date(),
       },
     }),
-    prisma.user.upsert({
+    prisma.users.upsert({
       where: { email: "driver6@evbattery.com" },
       update: {
         full_name: "Vu Thi Driver 6",
@@ -404,12 +435,14 @@ async function main() {
         status: "INACTIVE",
       },
       create: {
+        user_id: randomUUID(),
         full_name: "Vu Thi Driver 6",
         email: "driver6@evbattery.com",
         password_hash: driverPasswordHash,
         phone: "0912345683",
         role: "DRIVER",
         status: "INACTIVE",
+        updated_at: new Date(),
       },
     }),
   ]);
@@ -420,7 +453,7 @@ async function main() {
   // ===========================================
   const wallets = await Promise.all(
     drivers.map((driver) =>
-      prisma.wallet.create({
+      prisma.wallets.create({
         data: {
           user_id: driver.user_id,
           balance: new Prisma.Decimal(0),
@@ -486,7 +519,7 @@ async function main() {
 
   const vehicles = await Promise.all(
     vehicleDefinitions.map((definition) =>
-      prisma.vehicle.create({
+      prisma.vehicles.create({
         data: {
           user_id: definition.user.user_id,
           license_plate: definition.license_plate,
@@ -528,7 +561,7 @@ async function main() {
     const voltage = model === "VinFast VF8 Battery" ? 400 : 350;
 
     batteryPromises.push(
-      prisma.battery.create({
+      prisma.batteries.create({
         data: {
           battery_code: `BAT-D1-${i.toString().padStart(3, "0")}`,
           station_id: stations[0].station_id,
@@ -569,7 +602,7 @@ async function main() {
     const voltage = model === "VinFast VF8 Battery" ? 400 : 350;
 
     batteryPromises.push(
-      prisma.battery.create({
+      prisma.batteries.create({
         data: {
           battery_code: `BAT-D7-${i.toString().padStart(3, "0")}`,
           station_id: stations[1].station_id,
@@ -610,7 +643,7 @@ async function main() {
     const voltage = model === "VinFast VF8 Battery" ? 400 : 350;
 
     batteryPromises.push(
-      prisma.battery.create({
+      prisma.batteries.create({
         data: {
           battery_code: `BAT-TD-${i.toString().padStart(3, "0")}`,
           station_id: stations[2].station_id,
@@ -696,7 +729,7 @@ async function main() {
 
   const servicePackages = await Promise.all(
     packageDefinitions.map((pkg) =>
-      prisma.servicePackage.create({
+      prisma.service_packages.create({
         data: {
           name: pkg.name,
           description: pkg.description,
@@ -750,7 +783,7 @@ async function main() {
 
   const topupPackages = await Promise.all(
     topupPackageDefinitions.map((pkg) =>
-      prisma.topUpPackage.create({
+      prisma.topup_packages.create({
         data: {
           name: pkg.name,
           description: pkg.description,
@@ -768,7 +801,7 @@ async function main() {
   // CREATE USER SUBSCRIPTIONS
   // ===========================================
   const userSubscriptions = await Promise.all([
-    prisma.userSubscription.create({
+    prisma.user_subscriptions.create({
       data: {
         user_id: drivers[0].user_id,
         package_id: servicePackages[0].package_id,
@@ -783,7 +816,7 @@ async function main() {
         },
       },
     }),
-    prisma.userSubscription.create({
+    prisma.user_subscriptions.create({
       data: {
         user_id: drivers[1].user_id,
         package_id: servicePackages[1].package_id,
@@ -798,7 +831,7 @@ async function main() {
         },
       },
     }),
-    prisma.userSubscription.create({
+    prisma.user_subscriptions.create({
       data: {
         user_id: drivers[2].user_id,
         package_id: servicePackages[2].package_id,
@@ -819,7 +852,7 @@ async function main() {
   // ===========================================
   // CREATE DEMO BOOKINGS WITH HOLD DATA
   // ===========================================
-  const batteriesForHolds = await prisma.battery.findMany({
+  const batteriesForHolds = await prisma.batteries.findMany({
     take: 5,
     orderBy: { created_at: "asc" },
   });
@@ -839,7 +872,7 @@ async function main() {
   // CREATE WALLET TOP-UPS
   // ===========================================
   const walletTopups = await Promise.all([
-    prisma.payment.create({
+    prisma.payments.create({
       data: {
         user_id: drivers[0].user_id,
         topup_package_id: topupPackages[0].package_id,
@@ -854,7 +887,7 @@ async function main() {
         paid_at: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000),
       },
     }),
-    prisma.payment.create({
+    prisma.payments.create({
       data: {
         user_id: drivers[1].user_id,
         topup_package_id: topupPackages[1].package_id,
@@ -869,7 +902,7 @@ async function main() {
         paid_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
       },
     }),
-    prisma.payment.create({
+    prisma.payments.create({
       data: {
         user_id: drivers[4].user_id,
         topup_package_id: topupPackages[2].package_id,
@@ -887,32 +920,32 @@ async function main() {
   ]);
   console.log("✅ Created top-up payments:", walletTopups.length);
 
-  await prisma.wallet.update({
+  await prisma.wallets.update({
     where: { user_id: drivers[0].user_id },
     data: { balance: new Prisma.Decimal(210000) },
   });
-  await prisma.wallet.update({
+  await prisma.wallets.update({
     where: { user_id: drivers[1].user_id },
     data: { balance: new Prisma.Decimal(440000) },
   });
-  await prisma.wallet.update({
+  await prisma.wallets.update({
     where: { user_id: drivers[2].user_id },
     data: { balance: new Prisma.Decimal(0) },
   });
-  await prisma.wallet.update({
+  await prisma.wallets.update({
     where: { user_id: drivers[3].user_id },
     data: { balance: new Prisma.Decimal(0) },
   });
-  await prisma.wallet.update({
+  await prisma.wallets.update({
     where: { user_id: drivers[4].user_id },
     data: { balance: new Prisma.Decimal(105000) },
   });
-  await prisma.wallet.update({
+  await prisma.wallets.update({
     where: { user_id: drivers[5].user_id },
     data: { balance: new Prisma.Decimal(0) },
   });
 
-  const refundPayment = await prisma.payment.create({
+  const refundPayment = await prisma.payments.create({
     data: {
       user_id: drivers[2].user_id,
       amount: new Prisma.Decimal(150000),
@@ -926,12 +959,12 @@ async function main() {
       paid_at: new Date(Date.now() - 12 * 60 * 60 * 1000),
     },
   });
-  await prisma.wallet.update({
+  await prisma.wallets.update({
     where: { user_id: drivers[2].user_id },
     data: { balance: new Prisma.Decimal(150000) },
   });
 
-  const holdPayment = await prisma.payment.create({
+  const holdPayment = await prisma.payments.create({
     data: {
       user_id: drivers[1].user_id,
       amount: new Prisma.Decimal(250000),
@@ -946,13 +979,13 @@ async function main() {
     },
   });
 
-  await prisma.wallet.update({
+  await prisma.wallets.update({
     where: { user_id: drivers[1].user_id },
     data: { balance: new Prisma.Decimal(190000) },
   });
 
   const bookings = await Promise.all([
-    prisma.booking.create({
+    prisma.bookings.create({
       data: {
         booking_code: "BSS20250120001",
         user_id: drivers[0].user_id,
@@ -974,7 +1007,7 @@ async function main() {
       } as any,
       include: { station: true, vehicle: true },
     }),
-    prisma.booking.create({
+    prisma.bookings.create({
       data: {
         booking_code: "BSS20250120002",
         user_id: drivers[1].user_id,
@@ -996,7 +1029,7 @@ async function main() {
       } as any,
       include: { station: true, vehicle: true },
     }),
-    prisma.booking.create({
+    prisma.bookings.create({
       data: {
         booking_code: "BSS20250120003",
         user_id: drivers[2].user_id,
@@ -1010,7 +1043,7 @@ async function main() {
       },
       include: { station: true, vehicle: true },
     }),
-    prisma.booking.create({
+    prisma.bookings.create({
       data: {
         booking_code: "BSS20250120004",
         user_id: drivers[3].user_id,
@@ -1024,7 +1057,7 @@ async function main() {
       },
       include: { station: true, vehicle: true },
     }),
-    prisma.booking.create({
+    prisma.bookings.create({
       data: {
         booking_code: "BSS20250120005",
         user_id: drivers[4].user_id,
@@ -1042,14 +1075,14 @@ async function main() {
   console.log("✅ Created bookings:", bookings.length);
 
   // Update batteries used for holds to reserved/in_use for demo consistency
-  await prisma.battery.update({
+  await prisma.batteries.update({
     where: { battery_id: batteriesForHolds[0].battery_id },
     data: {
       status: "reserved" as BatteryStatus,
       station_id: stations[0].station_id,
     },
   });
-  await prisma.battery.update({
+  await prisma.batteries.update({
     where: { battery_id: batteriesForHolds[1].battery_id },
     data: {
       status: "reserved" as BatteryStatus,
@@ -1115,13 +1148,13 @@ async function main() {
         station_id: stations[1].station_id,
         old_battery_id:
           (
-            await prisma.battery.findFirst({
+            await prisma.batteries.findFirst({
               where: { station_id: stations[1].station_id, status: "in_use" },
             })
           )?.battery_id || createdBatteries[15].battery_id,
         new_battery_id:
           (
-            await prisma.battery.findFirst({
+            await prisma.batteries.findFirst({
               where: { station_id: stations[1].station_id, status: "full" },
             })
           )?.battery_id || createdBatteries[16].battery_id,
@@ -1142,7 +1175,7 @@ async function main() {
   // CREATE PAYMENTS
   // ===========================================
   const swapAndSubscriptionPayments = await Promise.all([
-    prisma.payment.create({
+    prisma.payments.create({
       data: {
         transaction_id: transactions[0].transaction_id,
         user_id: drivers[2].user_id,
@@ -1154,7 +1187,7 @@ async function main() {
         payment_type: "SWAP",
       },
     }),
-    prisma.payment.create({
+    prisma.payments.create({
       data: {
         subscription_id: userSubscriptions[0].subscription_id,
         user_id: drivers[0].user_id,
@@ -1166,7 +1199,7 @@ async function main() {
         payment_type: "SUBSCRIPTION",
       },
     }),
-    prisma.payment.create({
+    prisma.payments.create({
       data: {
         subscription_id: userSubscriptions[1].subscription_id,
         user_id: drivers[1].user_id,
@@ -1191,7 +1224,7 @@ async function main() {
   // CREATE SUPPORT TICKETS
   // ===========================================
   const supportTickets = await Promise.all([
-    prisma.supportTicket.create({
+    prisma.support_tickets.create({
       data: {
         ticket_number: "TKT20250120001",
         user_id: drivers[0].user_id,
@@ -1203,7 +1236,7 @@ async function main() {
         status: "open",
       },
     }),
-    prisma.supportTicket.create({
+    prisma.support_tickets.create({
       data: {
         ticket_number: "TKT20250120002",
         user_id: drivers[1].user_id,
@@ -1216,7 +1249,7 @@ async function main() {
         assigned_to_staff_id: staffs[0].user_id,
       },
     }),
-    prisma.supportTicket.create({
+    prisma.support_tickets.create({
       data: {
         ticket_number: "TKT20250120003",
         user_id: drivers[2].user_id,
@@ -1230,7 +1263,7 @@ async function main() {
         resolved_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
       },
     }),
-    prisma.supportTicket.create({
+    prisma.support_tickets.create({
       data: {
         ticket_number: "TKT20250120004",
         user_id: drivers[3].user_id,
@@ -1248,7 +1281,7 @@ async function main() {
   // CREATE TICKET REPLIES
   // ===========================================
   const ticketReplies = await Promise.all([
-    prisma.ticketReply.create({
+    prisma.ticket_replies.create({
       data: {
         ticket_id: supportTickets[1].ticket_id,
         user_id: staffs[0].user_id,
@@ -1257,7 +1290,7 @@ async function main() {
         is_staff: true,
       },
     }),
-    prisma.ticketReply.create({
+    prisma.ticket_replies.create({
       data: {
         ticket_id: supportTickets[1].ticket_id,
         user_id: drivers[1].user_id,
@@ -1265,7 +1298,7 @@ async function main() {
         is_staff: false,
       },
     }),
-    prisma.ticketReply.create({
+    prisma.ticket_replies.create({
       data: {
         ticket_id: supportTickets[2].ticket_id,
         user_id: staffs[1].user_id,
@@ -1281,7 +1314,7 @@ async function main() {
   // CREATE STATION RATINGS
   // ===========================================
   const stationRatings = await Promise.all([
-    prisma.stationRating.create({
+    prisma.station_ratings.create({
       data: {
         user_id: drivers[2].user_id,
         station_id: stations[1].station_id,
@@ -1298,7 +1331,7 @@ async function main() {
   // CREATE BATTERY TRANSFER LOGS
   // ===========================================
   const batteryTransferLogs = await Promise.all([
-    prisma.batteryTransferLog.create({
+    prisma.battery_transfer_logs.create({
       data: {
         battery_id: createdBatteries[0].battery_id,
         from_station_id: stations[0].station_id,
@@ -1308,7 +1341,7 @@ async function main() {
         notes: "Moving battery to balance inventory between stations",
       },
     }),
-    prisma.batteryTransferLog.create({
+    prisma.battery_transfer_logs.create({
       data: {
         battery_id: createdBatteries[15].battery_id,
         from_station_id: stations[1].station_id,
@@ -1383,7 +1416,7 @@ async function main() {
     },
   ];
 
-  const notificationsResult = await prisma.notification.createMany({
+  const notificationsResult = await prisma.notifications.createMany({
     data: notificationSeedData,
   });
   const notificationsCount = notificationsResult.count;

@@ -8,12 +8,9 @@ import { prisma } from "../server";
  */
 export const getNotifications = asyncHandler(
   async (req: Request, res: Response) => {
-    const userId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is DRIVER
+    const userId = req.user!.userId;
     const { is_read, page = 1, limit = 20 } = req.query;
-
-    if (!userId) {
-      throw new CustomError("User not authenticated", 401);
-    }
 
     const whereClause: any = { user_id: userId };
     if (is_read !== undefined) {
@@ -62,12 +59,9 @@ export const getNotifications = asyncHandler(
  */
 export const markNotificationAsRead = asyncHandler(
   async (req: Request, res: Response) => {
-    const userId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is DRIVER
+    const userId = req.user!.userId;
     const { id } = req.params;
-
-    if (!userId) {
-      throw new CustomError("User not authenticated", 401);
-    }
 
     const notification = await prisma.notifications.findFirst({
       where: {
@@ -98,11 +92,8 @@ export const markNotificationAsRead = asyncHandler(
  */
 export const markAllNotificationsAsRead = asyncHandler(
   async (req: Request, res: Response) => {
-    const userId = req.user?.userId;
-
-    if (!userId) {
-      throw new CustomError("User not authenticated", 401);
-    }
+    // Middleware already ensures req.user exists and role is DRIVER
+    const userId = req.user!.userId;
 
     const result = await prisma.notifications.updateMany({
       where: {

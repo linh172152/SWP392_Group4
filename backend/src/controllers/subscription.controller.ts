@@ -10,11 +10,8 @@ const PAYMENT_STATUS_COMPLETED = "completed" as unknown as PaymentStatus;
 
 export const getMySubscriptions = asyncHandler(
   async (req: Request, res: Response) => {
-    const userId = req.user?.userId;
-
-    if (!userId) {
-      throw new CustomError("Driver not authenticated", 401);
-    }
+    // Middleware already ensures req.user exists and role is DRIVER
+    const userId = req.user!.userId;
 
     const subscriptions = await prisma.user_subscriptions.findMany({
       where: { user_id: userId },
@@ -65,13 +62,10 @@ export const getMySubscriptions = asyncHandler(
 
 export const subscribeToPackage = asyncHandler(
   async (req: Request, res: Response) => {
-    const userId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is DRIVER
+    const userId = req.user!.userId;
     const { packageId } = req.params;
     const { autoRenew = false } = req.body;
-
-    if (!userId) {
-      throw new CustomError("Driver not authenticated", 401);
-    }
 
     if (!packageId) {
       throw new CustomError("packageId is required", 400);
@@ -176,13 +170,10 @@ export const subscribeToPackage = asyncHandler(
 
 export const cancelSubscription = asyncHandler(
   async (req: Request, res: Response) => {
-    const userId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is DRIVER
+    const userId = req.user!.userId;
     const { subscriptionId } = req.params;
     const { reason } = req.body ?? {};
-
-    if (!userId) {
-      throw new CustomError("Driver not authenticated", 401);
-    }
 
     if (!subscriptionId) {
       throw new CustomError("subscriptionId is required", 400);

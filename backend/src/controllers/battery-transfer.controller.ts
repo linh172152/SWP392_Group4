@@ -47,7 +47,8 @@ const transferInclude = {
 
 export const createBatteryTransfer = asyncHandler(
   async (req: Request, res: Response) => {
-    const adminId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is ADMIN
+    const adminId = req.user!.userId;
     const {
       battery_id,
       to_station_id,
@@ -61,10 +62,6 @@ export const createBatteryTransfer = asyncHandler(
     )
       ? (transferStatusRaw as TransferStatusValue)
       : "completed";
-
-    if (!adminId) {
-      throw new CustomError("Admin not authenticated", 401);
-    }
 
     if (!battery_id || !to_station_id || !transfer_reason) {
       throw new CustomError(
@@ -180,6 +177,7 @@ export const createBatteryTransfer = asyncHandler(
           transferred_by: adminId,
           notes: notes as string | null,
           transfer_status: transferStatus,
+          transferred_at: new Date(), // Explicitly set transfer time
         } as Prisma.battery_transfer_logsUncheckedCreateInput,
         include: transferInclude,
       });

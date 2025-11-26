@@ -60,14 +60,15 @@ export const getAllStations = asyncHandler(
       take: parseInt(limit as string),
     });
 
-    // Get today's date range for calculating daily stats
+    // Get today's date range for calculating daily stats (using UTC to avoid timezone issues)
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    today.setUTCHours(0, 0, 0, 0);
+    today.setUTCMilliseconds(0);
     const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
     const stationsWithStats = await Promise.all(
-      stations.map(async (station: typeof stations[number]) => {
+      stations.map(async (station: (typeof stations)[number]) => {
         const batteryStatusCount = (station.batteries || []).reduce(
           (acc: Record<string, number>, battery: { status: string }) => {
             acc[battery.status] = (acc[battery.status] || 0) + 1;
@@ -77,7 +78,7 @@ export const getAllStations = asyncHandler(
         );
 
         // Calculate daily swaps (completed transactions today)
-        // Use swap_completed_at if available, otherwise use swap_at
+        // Check both swap_completed_at and swap_at to ensure we capture all swaps
         const dailySwaps = await prisma.transactions.count({
           where: {
             station_id: station.station_id,
@@ -90,15 +91,10 @@ export const getAllStations = asyncHandler(
                 },
               },
               {
-                AND: [
-                  { swap_completed_at: null },
-                  {
-                    swap_at: {
-                      gte: today,
-                      lt: tomorrow,
-                    },
-                  },
-                ],
+                swap_at: {
+                  gte: today,
+                  lt: tomorrow,
+                },
               },
             ],
           },
@@ -117,15 +113,10 @@ export const getAllStations = asyncHandler(
                 },
               },
               {
-                AND: [
-                  { swap_completed_at: null },
-                  {
-                    swap_at: {
-                      gte: today,
-                      lt: tomorrow,
-                    },
-                  },
-                ],
+                swap_at: {
+                  gte: today,
+                  lt: tomorrow,
+                },
               },
             ],
           },
@@ -143,6 +134,7 @@ export const getAllStations = asyncHandler(
           total_bookings: station._count.bookings,
           total_transactions: station._count.transactions,
           staff_count: station.users.length,
+          staff: station.users, // ✅ Map users to staff for frontend consistency
           daily_swaps: dailySwaps,
           daily_revenue: Number(dailyRevenue),
         };
@@ -232,17 +224,20 @@ export const getStationDetails = asyncHandler(
 
     const avgRating =
       station.station_ratings.length > 0
-        ? station.station_ratings.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) /
-          station.station_ratings.length
+        ? station.station_ratings.reduce(
+            (sum: number, r: { rating: number }) => sum + r.rating,
+            0
+          ) / station.station_ratings.length
         : 0;
 
-    // Calculate daily swaps and revenue
+    // Calculate daily swaps and revenue (using UTC to avoid timezone issues)
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    today.setUTCHours(0, 0, 0, 0);
+    today.setUTCMilliseconds(0);
     const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
-    // Use swap_completed_at if available, otherwise use swap_at
+    // Check both swap_completed_at and swap_at to ensure we capture all swaps
     const dailySwaps = await prisma.transactions.count({
       where: {
         station_id: station.station_id,
@@ -255,15 +250,10 @@ export const getStationDetails = asyncHandler(
             },
           },
           {
-            AND: [
-              { swap_completed_at: null },
-              {
-                swap_at: {
-                  gte: today,
-                  lt: tomorrow,
-                },
-              },
-            ],
+            swap_at: {
+              gte: today,
+              lt: tomorrow,
+            },
           },
         ],
       },
@@ -281,15 +271,10 @@ export const getStationDetails = asyncHandler(
             },
           },
           {
-            AND: [
-              { swap_completed_at: null },
-              {
-                swap_at: {
-                  gte: today,
-                  lt: tomorrow,
-                },
-              },
-            ],
+            swap_at: {
+              gte: today,
+              lt: tomorrow,
+            },
           },
         ],
       },
@@ -311,7 +296,8 @@ export const getStationDetails = asyncHandler(
         total_ratings: station.station_ratings.length,
         total_bookings: station._count.bookings,
         total_transactions: station._count.transactions,
-          staff_count: station.users.length,
+        staff_count: station.users.length,
+        staff: station.users, // ✅ Map users to staff for frontend consistency
         daily_swaps: dailySwaps,
         daily_revenue: Number(dailyRevenue),
       },

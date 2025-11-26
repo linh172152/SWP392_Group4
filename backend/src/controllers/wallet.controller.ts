@@ -9,11 +9,8 @@ import { prisma } from "../server";
  */
 export const getWalletBalance = asyncHandler(
   async (req: Request, res: Response) => {
-    const userId = req.user?.userId;
-
-    if (!userId) {
-      throw new CustomError("User not authenticated", 401);
-    }
+    // Middleware already ensures req.user exists and role is DRIVER
+    const userId = req.user!.userId;
 
     // Get or create wallet
     let wallet = await prisma.wallets.findUnique({
@@ -46,12 +43,9 @@ export const getWalletBalance = asyncHandler(
  */
 export const getWalletTransactions = asyncHandler(
   async (req: Request, res: Response) => {
-    const userId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is DRIVER
+    const userId = req.user!.userId;
     const { page = 1, limit = 10 } = req.query;
-
-    if (!userId) {
-      throw new CustomError("User not authenticated", 401);
-    }
 
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
 
@@ -162,7 +156,8 @@ export const getWalletTransactions = asyncHandler(
  * Top up wallet
  */
 export const topUpWallet = asyncHandler(async (req: Request, res: Response) => {
-  const userId = req.user?.userId;
+  // Middleware already ensures req.user exists and role is DRIVER
+  const userId = req.user!.userId;
   const { package_id, payment_method = "vnpay" } = req.body;
 
   const forwardedFor = req.headers["x-forwarded-for"];
@@ -184,10 +179,6 @@ export const topUpWallet = asyncHandler(async (req: Request, res: Response) => {
     clientIp = clientIp.substring(7);
   } else if (clientIp === "::1") {
     clientIp = "127.0.0.1";
-  }
-
-  if (!userId) {
-    throw new CustomError("User not authenticated", 401);
   }
 
   if (!package_id) {

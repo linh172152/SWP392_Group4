@@ -11,12 +11,9 @@ import { safeToNumber } from "../utils/decimal.util";
  */
 export const getUserTransactions = asyncHandler(
   async (req: Request, res: Response) => {
-    const userId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is DRIVER
+    const userId = req.user!.userId;
     const { status, page = 1, limit = 10 } = req.query;
-
-    if (!userId) {
-      throw new CustomError("User not authenticated", 401);
-    }
 
     const whereClause: any = { user_id: userId };
     if (status && status !== "all" && status !== "undefined") {
@@ -135,12 +132,9 @@ export const getUserTransactions = asyncHandler(
  */
 export const getTransactionDetails = asyncHandler(
   async (req: Request, res: Response) => {
-    const userId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is DRIVER
+    const userId = req.user!.userId;
     const { id } = req.params;
-
-    if (!userId) {
-      throw new CustomError("User not authenticated", 401);
-    }
 
     const transaction = await prisma.transactions.findFirst({
       where: {
@@ -262,12 +256,9 @@ export const getTransactionDetails = asyncHandler(
  */
 export const getTransactionStats = asyncHandler(
   async (req: Request, res: Response) => {
-    const userId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is DRIVER
+    const userId = req.user!.userId;
     const { period = "30" } = req.query;
-
-    if (!userId) {
-      throw new CustomError("User not authenticated", 401);
-    }
 
     const days = parseInt(period as string);
     const startDate = new Date();
@@ -340,11 +331,8 @@ export const getTransactionStats = asyncHandler(
  */
 export const getPendingTransactions = asyncHandler(
   async (req: Request, res: Response) => {
-    const userId = req.user?.userId;
-
-    if (!userId) {
-      throw new CustomError("User not authenticated", 401);
-    }
+    // Middleware already ensures req.user exists and role is DRIVER
+    const userId = req.user!.userId;
 
     const transactions = await prisma.transactions.findMany({
       where: {
@@ -383,13 +371,10 @@ export const getPendingTransactions = asyncHandler(
  */
 export const payTransaction = asyncHandler(
   async (req: Request, res: Response) => {
-    const userId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is DRIVER
+    const userId = req.user!.userId;
     const { id } = req.params;
     const { payment_method = "vnpay" } = req.body;
-
-    if (!userId) {
-      throw new CustomError("User not authenticated", 401);
-    }
 
     // Get transaction
     const transaction = await prisma.transactions.findFirst({
@@ -499,12 +484,9 @@ export const payTransaction = asyncHandler(
  */
 export const createRefundRequest = asyncHandler(
   async (req: Request, res: Response) => {
-    const userId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is DRIVER
+    const userId = req.user!.userId;
     const { transaction_id, reason, amount } = req.body;
-
-    if (!userId) {
-      throw new CustomError("User not authenticated", 401);
-    }
 
     if (!transaction_id || !reason) {
       throw new CustomError("Transaction ID and reason are required", 400);

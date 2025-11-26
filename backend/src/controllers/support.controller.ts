@@ -322,8 +322,14 @@ export const getTicketReplies = asyncHandler(
  */
 export const adminListTickets = asyncHandler(
   async (req: Request, res: Response) => {
-    const { status, priority, category, assigned, page = 1, limit = 10 } =
-      req.query;
+    const {
+      status,
+      priority,
+      category,
+      assigned,
+      page = 1,
+      limit = 10,
+    } = req.query;
 
     const whereClause: any = {};
 
@@ -436,13 +442,9 @@ export const adminGetTicketDetails = asyncHandler(
  */
 export const adminAssignTicket = asyncHandler(
   async (req: Request, res: Response) => {
-    const adminId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is ADMIN
     const { id } = req.params;
     const { staff_id } = req.body;
-
-    if (!adminId) {
-      throw new CustomError("Admin not authenticated", 401);
-    }
 
     if (!staff_id) {
       throw new CustomError("staff_id is required", 400);
@@ -494,13 +496,9 @@ export const adminAssignTicket = asyncHandler(
  */
 export const adminUpdateTicketStatus = asyncHandler(
   async (req: Request, res: Response) => {
-    const adminId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is ADMIN
     const { id } = req.params;
     const { status } = req.body;
-
-    if (!adminId) {
-      throw new CustomError("Admin not authenticated", 401);
-    }
 
     if (!status) {
       throw new CustomError("status is required", 400);
@@ -529,13 +527,10 @@ export const adminUpdateTicketStatus = asyncHandler(
  */
 export const adminReplyTicket = asyncHandler(
   async (req: Request, res: Response) => {
-    const adminId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is ADMIN
+    const adminId = req.user!.userId;
     const { id } = req.params;
     const { message } = req.body;
-
-    if (!adminId) {
-      throw new CustomError("Admin not authenticated", 401);
-    }
 
     if (!message || typeof message !== "string") {
       throw new CustomError("message is required", 400);

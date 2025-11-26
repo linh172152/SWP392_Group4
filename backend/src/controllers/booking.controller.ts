@@ -429,12 +429,9 @@ const createBatteryHistoryEntry = async (
  */
 export const getUserBookings = asyncHandler(
   async (req: Request, res: Response) => {
-    const userId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is DRIVER
+    const userId = req.user!.userId;
     const { status, page = 1, limit = 10 } = req.query;
-
-    if (!userId) {
-      throw new CustomError("User not authenticated", 401);
-    }
 
     const whereClause: any = { user_id: userId };
     if (status) {
@@ -565,7 +562,8 @@ export const getUserBookings = asyncHandler(
  */
 export const createBooking = asyncHandler(
   async (req: Request, res: Response) => {
-    const userId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is DRIVER
+    const userId = req.user!.userId;
     const {
       vehicle_id,
       station_id,
@@ -686,6 +684,35 @@ export const createBooking = asyncHandler(
     if (scheduledTime > maxTime) {
       throw new CustomError(
         `Scheduled time cannot be more than ${BOOKING_MAX_LEAD_HOURS} hours from now`,
+        400
+      );
+    }
+
+    // ✅ Check if vehicle already has an active booking (pending or confirmed)
+    // This prevents multiple bookings for the same vehicle, but allows bookings for different vehicles
+    const existingBooking = await prisma.bookings.findFirst({
+      where: {
+        vehicle_id,
+        status: { in: ["pending", "confirmed"] },
+      },
+      select: {
+        booking_id: true,
+        booking_code: true,
+        station_id: true,
+        scheduled_at: true,
+        status: true,
+        stations: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    });
+
+    if (existingBooking) {
+      const stationName = existingBooking.stations?.name ?? "trạm";
+      throw new CustomError(
+        `Xe này đã có booking đang chờ xử lý (${existingBooking.booking_code}) tại ${stationName}. Vui lòng hoàn thành hoặc hủy booking hiện tại trước khi đặt mới.`,
         400
       );
     }
@@ -1096,12 +1123,9 @@ export const createBooking = asyncHandler(
  */
 export const getBookingDetails = asyncHandler(
   async (req: Request, res: Response) => {
-    const userId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is DRIVER
+    const userId = req.user!.userId;
     const { id } = req.params;
-
-    if (!userId) {
-      throw new CustomError("User not authenticated", 401);
-    }
 
     const booking = await prisma.bookings.findFirst({
       where: {
@@ -1215,13 +1239,10 @@ export const getBookingDetails = asyncHandler(
  */
 export const updateBooking = asyncHandler(
   async (req: Request, res: Response) => {
-    const userId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is DRIVER
+    const userId = req.user!.userId;
     const { id } = req.params;
     const { scheduled_at, notes } = req.body;
-
-    if (!userId) {
-      throw new CustomError("User not authenticated", 401);
-    }
 
     // ✅ Check booking exists, belongs to user, is pending, and is NOT instant
     const booking = await prisma.bookings.findFirst({
@@ -1450,7 +1471,8 @@ export const updateBooking = asyncHandler(
  */
 export const createInstantBooking = asyncHandler(
   async (req: Request, res: Response) => {
-    const userId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is DRIVER
+    const userId = req.user!.userId;
     const {
       vehicle_id,
       station_id,
@@ -1458,10 +1480,6 @@ export const createInstantBooking = asyncHandler(
       notes,
       use_subscription: useSubscriptionInput,
     } = req.body;
-
-    if (!userId) {
-      throw new CustomError("User not authenticated", 401);
-    }
 
     if (!vehicle_id || !station_id || !battery_model) {
       throw new CustomError(
@@ -1530,6 +1548,35 @@ export const createInstantBooking = asyncHandler(
     ) {
       throw new CustomError(
         `Battery model "${battery_model}" is not compatible with your vehicle (requires "${vehicle.battery_model}")`,
+        400
+      );
+    }
+
+    // ✅ Check if vehicle already has an active booking (pending or confirmed)
+    // This prevents multiple bookings for the same vehicle, but allows bookings for different vehicles
+    const existingBooking = await prisma.bookings.findFirst({
+      where: {
+        vehicle_id,
+        status: { in: ["pending", "confirmed"] },
+      },
+      select: {
+        booking_id: true,
+        booking_code: true,
+        station_id: true,
+        scheduled_at: true,
+        status: true,
+        stations: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    });
+
+    if (existingBooking) {
+      const stationName = existingBooking.stations?.name ?? "trạm";
+      throw new CustomError(
+        `Xe này đã có booking đang chờ xử lý (${existingBooking.booking_code}) tại ${stationName}. Vui lòng hoàn thành hoặc hủy booking hiện tại trước khi đặt mới.`,
         400
       );
     }
@@ -1926,12 +1973,9 @@ export const createInstantBooking = asyncHandler(
  */
 export const cancelBooking = asyncHandler(
   async (req: Request, res: Response) => {
-    const userId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is DRIVER
+    const userId = req.user!.userId;
     const { id } = req.params;
-
-    if (!userId) {
-      throw new CustomError("User not authenticated", 401);
-    }
 
     const booking = await prisma.bookings.findFirst({
       where: {

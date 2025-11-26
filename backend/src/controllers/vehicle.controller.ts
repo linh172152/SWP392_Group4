@@ -9,11 +9,8 @@ import { prisma } from "../server";
  */
 export const getUserVehicles = asyncHandler(
   async (req: Request, res: Response) => {
-    const userId = req.user?.userId;
-
-    if (!userId) {
-      throw new CustomError("User not authenticated", 401);
-    }
+    // Middleware already ensures req.user exists and role is DRIVER
+    const userId = req.user!.userId;
 
     const vehicles = await prisma.vehicles.findMany({
       where: { user_id: userId },
@@ -54,7 +51,8 @@ export const getUserVehicles = asyncHandler(
  * Add new vehicle
  */
 export const addVehicle = asyncHandler(async (req: Request, res: Response) => {
-  const userId = req.user?.userId;
+  // Middleware already ensures req.user exists and role is DRIVER
+  const userId = req.user!.userId;
   const {
     license_plate,
     vehicle_type,
@@ -65,10 +63,6 @@ export const addVehicle = asyncHandler(async (req: Request, res: Response) => {
     battery_model,
     current_battery_code,
   } = req.body;
-
-  if (!userId) {
-    throw new CustomError("User not authenticated", 401);
-  }
 
   if (!license_plate || !vehicle_type || !battery_model) {
     throw new CustomError(
@@ -227,12 +221,9 @@ export const addVehicle = asyncHandler(async (req: Request, res: Response) => {
  */
 export const getVehicleDetails = asyncHandler(
   async (req: Request, res: Response) => {
-    const userId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is DRIVER
+    const userId = req.user!.userId;
     const { id } = req.params;
-
-    if (!userId) {
-      throw new CustomError("User not authenticated", 401);
-    }
 
     const vehicle = await prisma.vehicles.findFirst({
       where: {
@@ -267,7 +258,8 @@ export const getVehicleDetails = asyncHandler(
  */
 export const updateVehicle = asyncHandler(
   async (req: Request, res: Response) => {
-    const userId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is DRIVER
+    const userId = req.user!.userId;
     const { id } = req.params;
     const {
       license_plate,
@@ -279,10 +271,6 @@ export const updateVehicle = asyncHandler(
       battery_model,
       current_battery_code,
     } = req.body;
-
-    if (!userId) {
-      throw new CustomError("User not authenticated", 401);
-    }
 
     const vehicle = await prisma.vehicles.findFirst({
       where: {
@@ -411,12 +399,9 @@ export const updateVehicle = asyncHandler(
  */
 export const deleteVehicle = asyncHandler(
   async (req: Request, res: Response) => {
-    const userId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is DRIVER
+    const userId = req.user!.userId;
     const { id } = req.params;
-
-    if (!userId) {
-      throw new CustomError("User not authenticated", 401);
-    }
 
     const vehicle = await prisma.vehicles.findFirst({
       where: {

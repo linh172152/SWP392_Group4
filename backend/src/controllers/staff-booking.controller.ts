@@ -135,12 +135,9 @@ const parseChargePercentage = (value: unknown, fieldLabel: string): number => {
  */
 export const getStationBookings = asyncHandler(
   async (req: Request, res: Response) => {
-    const staffId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is STAFF
+    const staffId = req.user!.userId;
     const { status, page = 1, limit = 10 } = req.query;
-
-    if (!staffId) {
-      throw new CustomError("Staff not authenticated", 401);
-    }
 
     // Get staff's station
     const staff = await prisma.users.findUnique({
@@ -352,12 +349,9 @@ export const getStationBookings = asyncHandler(
  */
 export const getBookingDetails = asyncHandler(
   async (req: Request, res: Response) => {
-    const staffId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is STAFF
+    const staffId = req.user!.userId;
     const { id } = req.params;
-
-    if (!staffId) {
-      throw new CustomError("Staff not authenticated", 401);
-    }
 
     // Get staff's station
     const staff = await prisma.users.findUnique({
@@ -534,12 +528,9 @@ export const getBookingDetails = asyncHandler(
  */
 export const confirmBooking = asyncHandler(
   async (req: Request, res: Response) => {
-    const staffId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is STAFF
+    const staffId = req.user!.userId;
     const { id } = req.params;
-
-    if (!staffId) {
-      throw new CustomError("Staff not authenticated", 401);
-    }
 
     const booking = await prisma.bookings.findUnique({
       where: { booking_id: id },
@@ -688,7 +679,8 @@ export const confirmBooking = asyncHandler(
  */
 export const completeBooking = asyncHandler(
   async (req: Request, res: Response) => {
-    const staffId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is STAFF
+    const staffId = req.user!.userId;
     const { id } = req.params;
     const {
       old_battery_code,
@@ -699,10 +691,6 @@ export const completeBooking = asyncHandler(
       new_battery_charge,
       notes,
     } = req.body;
-
-    if (!staffId) {
-      throw new CustomError("Staff not authenticated", 401);
-    }
 
     // ✅ Validate old_battery_status
     if (!["good", "damaged", "maintenance"].includes(old_battery_status)) {
@@ -1327,13 +1315,10 @@ export const completeBooking = asyncHandler(
  */
 export const cancelBooking = asyncHandler(
   async (req: Request, res: Response) => {
-    const staffId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is STAFF
+    const staffId = req.user!.userId;
     const { id } = req.params;
     const { reason } = req.body;
-
-    if (!staffId) {
-      throw new CustomError("Staff not authenticated", 401);
-    }
 
     // Check if staff belongs to a station
     const staff = await prisma.users.findUnique({
@@ -1481,12 +1466,9 @@ export const cancelBooking = asyncHandler(
  */
 export const getAvailableBatteries = asyncHandler(
   async (req: Request, res: Response) => {
-    const staffId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is STAFF
+    const staffId = req.user!.userId;
     const { id } = req.params;
-
-    if (!staffId) {
-      throw new CustomError("Staff not authenticated", 401);
-    }
 
     // Get staff's station
     const staff = await prisma.users.findUnique({

@@ -9,12 +9,9 @@ import { prisma } from "../server";
  */
 export const createRating = asyncHandler(
   async (req: Request, res: Response) => {
-    const userId = req.user?.userId;
+    // Middleware already ensures req.user exists (authenticateToken)
+    const userId = req.user!.userId;
     const { station_id, transaction_id, rating, comment } = req.body;
-
-    if (!userId) {
-      throw new CustomError("User not authenticated", 401);
-    }
 
     if (!station_id || !transaction_id || !rating) {
       throw new CustomError(
@@ -205,13 +202,10 @@ export const getRatingDetails = asyncHandler(
  */
 export const updateRating = asyncHandler(
   async (req: Request, res: Response) => {
-    const userId = req.user?.userId;
+    // Middleware already ensures req.user exists (authenticateToken)
+    const userId = req.user!.userId;
     const { id } = req.params;
     const { rating, comment } = req.body;
-
-    if (!userId) {
-      throw new CustomError("User not authenticated", 401);
-    }
 
     if (rating && (rating < 1 || rating > 5)) {
       throw new CustomError("Rating must be between 1 and 5", 400);
@@ -272,12 +266,9 @@ export const updateRating = asyncHandler(
  */
 export const deleteRating = asyncHandler(
   async (req: Request, res: Response) => {
-    const userId = req.user?.userId;
+    // Middleware already ensures req.user exists (authenticateToken)
+    const userId = req.user!.userId;
     const { id } = req.params;
-
-    if (!userId) {
-      throw new CustomError("User not authenticated", 401);
-    }
 
     const existingRating = await prisma.station_ratings.findFirst({
       where: {

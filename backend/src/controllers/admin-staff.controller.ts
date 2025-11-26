@@ -4,6 +4,7 @@ import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
 import bcrypt from "bcrypt";
 import { prisma } from "../server";
+import { randomUUID } from "crypto";
 
 /**
  * Get all staff (Admin)
@@ -55,12 +56,23 @@ export const getAllStaff = asyncHandler(async (req: Request, res: Response) => {
     take: parseInt(limit as string),
   });
 
-  // Remove password_hash from response
-  const staffWithoutPassword = staff.map((staffMember: typeof staff[number]) => {
-    const { password_hash, ...rest } = staffMember;
-    void password_hash;
-    return rest;
-  });
+  // Remove password_hash from response and ensure station data is properly formatted
+  const staffWithoutPassword = staff.map(
+    (staffMember: (typeof staff)[number]) => {
+      const { password_hash, ...rest } = staffMember;
+      void password_hash;
+      // Ensure station is properly formatted (stations is a single object, not array)
+      return {
+        ...rest,
+        station: rest.stations
+          ? {
+              id: rest.stations.station_id,
+              name: rest.stations.name,
+            }
+          : null,
+      };
+    }
+  );
 
   const total = await prisma.users.count({ where: whereClause });
 
@@ -130,14 +142,25 @@ export const getStaffDetails = asyncHandler(
       throw new CustomError("User is not a staff member", 400);
     }
 
-    // Remove password_hash from response
+    // Remove password_hash from response and ensure station data is properly formatted
     const { password_hash, ...staffWithoutPassword } = staff;
     void password_hash;
+
+    // Ensure station is properly formatted (stations is a single object, not array)
+    const formattedStaff = {
+      ...staffWithoutPassword,
+      station: staffWithoutPassword.stations
+        ? {
+            id: staffWithoutPassword.stations.station_id,
+            name: staffWithoutPassword.stations.name,
+          }
+        : null,
+    };
 
     res.status(200).json({
       success: true,
       message: "Staff details retrieved successfully",
-      data: staffWithoutPassword,
+      data: formattedStaff,
     });
   }
 );
@@ -186,6 +209,7 @@ export const createStaff = asyncHandler(async (req: Request, res: Response) => {
 
   const staff = await prisma.users.create({
     data: {
+      user_id: randomUUID(),
       full_name: full_name as string,
       email: email as string,
       password_hash: hashedPassword,

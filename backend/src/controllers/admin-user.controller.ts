@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
 import { prisma } from "../server";
+import { randomUUID } from "crypto";
 
 /**
  * Get all users
@@ -289,6 +290,7 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
 
   const user = await prisma.users.create({
     data: {
+      user_id: randomUUID(),
       full_name: full_name as string,
       email: email as string,
       password_hash: password_hash as string | null,

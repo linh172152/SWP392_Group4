@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { Prisma, ScheduleStatus, UserRole } from "@prisma/client";
+import { Prisma, ScheduleStatus } from "@prisma/client";
 import { prisma } from "../server";
 import { asyncHandler, CustomError } from "../middlewares/error.middleware";
 
@@ -26,7 +26,7 @@ const assertStaffUser = async (staffId: string) => {
     select: { user_id: true, role: true, station_id: true },
   });
 
-  if (!staff || staff.role !== UserRole.STAFF) {
+  if (!staff || staff.role !== "STAFF") {
     throw new CustomError("Staff user not found", 404);
   }
 
@@ -66,10 +66,8 @@ const normalizeStatus = (status?: string): ScheduleStatus | undefined => {
 
 export const getMyStaffSchedules = asyncHandler(
   async (req: Request, res: Response) => {
-    const staffId = req.user?.userId;
-    if (!staffId) {
-      throw new CustomError("Staff not authenticated", 401);
-    }
+    // Middleware already ensures req.user exists and role is STAFF
+    const staffId = req.user!.userId;
 
     const { from, to, status, include_past = "false" } = req.query;
 
@@ -120,13 +118,10 @@ export const getMyStaffSchedules = asyncHandler(
 
 export const updateMyScheduleStatus = asyncHandler(
   async (req: Request, res: Response) => {
-    const staffId = req.user?.userId;
+    // Middleware already ensures req.user exists and role is STAFF
+    const staffId = req.user!.userId;
     const { id } = req.params;
     const { status, notes } = req.body;
-
-    if (!staffId) {
-      throw new CustomError("Staff not authenticated", 401);
-    }
 
     if (!status) {
       throw new CustomError("status is required", 400);
