@@ -34,10 +34,12 @@ export const getUserVehicles = asyncHandler(
       orderBy: { created_at: "desc" },
     });
 
-    const vehiclesWithBattery = vehicles.map((vehicle: typeof vehicles[number]) => ({
-      ...vehicle,
-      batteries: vehicle.batteries ?? null,
-    }));
+    const vehiclesWithBattery = vehicles.map(
+      (vehicle: (typeof vehicles)[number]) => ({
+        ...vehicle,
+        batteries: vehicle.batteries ?? null,
+      })
+    );
 
     res.status(200).json({
       success: true,
@@ -433,6 +435,60 @@ export const deleteVehicle = asyncHandler(
     res.status(200).json({
       success: true,
       message: "Vehicle deleted successfully",
+    });
+  }
+);
+
+/**
+ * Get vehicle options (brands, models, battery models) from all vehicles in system
+ */
+export const getVehicleOptions = asyncHandler(
+  async (_req: Request, res: Response) => {
+    // Get all unique brands, models, and battery models from all vehicles
+    const allVehicles = await prisma.vehicles.findMany({
+      select: {
+        make: true,
+        model: true,
+        battery_model: true,
+      },
+      where: {
+        make: { not: null },
+        model: { not: null },
+      },
+    });
+
+    // Extract unique values
+    const brandsSet = new Set<string>();
+    const modelsSet = new Set<string>();
+    const batteryModelsSet = new Set<string>();
+
+    allVehicles.forEach((vehicle) => {
+      if (vehicle.make) brandsSet.add(vehicle.make.trim());
+      if (vehicle.model) modelsSet.add(vehicle.model.trim());
+      if (vehicle.battery_model)
+        batteryModelsSet.add(vehicle.battery_model.trim());
+    });
+
+    // Also get battery models from batteries table
+    const allBatteries = await prisma.batteries.findMany({
+      select: {
+        model: true,
+      },
+      distinct: ["model"],
+    });
+
+    allBatteries.forEach((battery) => {
+      if (battery.model) batteryModelsSet.add(battery.model.trim());
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Vehicle options retrieved successfully",
+      data: {
+        brands: Array.from(brandsSet).sort(),
+        vehicleModels: Array.from(modelsSet).sort(),
+        batteryModels: Array.from(batteryModelsSet).sort(),
+      },
     });
   }
 );

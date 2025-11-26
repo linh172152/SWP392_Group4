@@ -28,6 +28,7 @@ type ReleaseParams = {
   booking: BookingHoldFields;
   actorUserId?: string;
   notes?: string;
+  shouldRefund?: boolean; // ✅ Default true: hoàn tiền/lượt. false: không hoàn (forfeit)
 };
 
 type ReleaseResult = {
@@ -76,6 +77,7 @@ export async function releaseBookingHold({
   booking,
   actorUserId,
   notes,
+  shouldRefund = true, // ✅ Default: hoàn tiền/lượt
 }: ReleaseParams): Promise<ReleaseResult> {
   let walletRefundAmount = 0;
   let batteryReleasedId: string | null = null;
@@ -108,73 +110,101 @@ export async function releaseBookingHold({
     batteryReleasedId = booking.locked_battery_id;
   }
 
-  if (booking.locked_wallet_payment_id) {
-    const payment = await tx.payments.findUnique({
-      where: { payment_id: booking.locked_wallet_payment_id },
-    });
+  // ✅ Chỉ hoàn tiền/lượt nếu shouldRefund = true
+  if (shouldRefund) {
+    if (booking.locked_wallet_payment_id) {
+      const payment = await tx.payments.findUnique({
+        where: { payment_id: booking.locked_wallet_payment_id },
+      });
 
-    const amountDecimal =
-      booking.locked_wallet_amount ?? new Prisma.Decimal(0);
-    walletRefundAmount = Number(amountDecimal);
+      const amountDecimal =
+        booking.locked_wallet_amount ?? new Prisma.Decimal(0);
+      walletRefundAmount = Number(amountDecimal);
 
-    const wallet = await tx.wallets.upsert({
-      where: { user_id: booking.user_id },
-      update: {
-        balance: {
-          increment: amountDecimal,
+      const wallet = await tx.wallets.upsert({
+        where: { user_id: booking.user_id },
+        update: {
+          balance: {
+            increment: amountDecimal,
+          },
         },
-      },
-      create: {
-        user_id: booking.user_id,
-        balance: amountDecimal,
-      },
-    });
-
-    await tx.payments.update({
-      where: { payment_id: booking.locked_wallet_payment_id },
-      data: {
-        payment_status: PAYMENT_STATUS_REFUNDED,
-        paid_at: payment?.paid_at ?? new Date(),
-        metadata: {
-          ...((payment?.metadata as Record<string, unknown>) ?? {}),
-          refunded_at: new Date().toISOString(),
-          refunded_reason: notes ?? "booking_cancelled",
-          refunded_amount: walletRefundAmount,
-          wallet_balance_after: Number(wallet.balance),
+        create: {
+          user_id: booking.user_id,
+          balance: amountDecimal,
         },
-      },
-    });
-  }
+      });
 
-  if (
-    booking.locked_subscription_id &&
-    booking.locked_swap_count > 0
-  ) {
-    const now = new Date();
-    const subscription = await tx.user_subscriptions.findUnique({
-      where: { subscription_id: booking.locked_subscription_id },
-      select: {
-        remaining_swaps: true,
-        status: true,
-        end_date: true,
-      },
-    });
-
-    // ✅ Chỉ restore swaps nếu subscription còn active và chưa hết hạn
-    if (
-      subscription &&
-      subscription.remaining_swaps !== null &&
-      subscription.status === "active" &&
-      subscription.end_date >= now
-    ) {
-      await tx.user_subscriptions.update({
-        where: { subscription_id: booking.locked_subscription_id },
+      await tx.payments.update({
+        where: { payment_id: booking.locked_wallet_payment_id },
         data: {
-          remaining_swaps: subscription.remaining_swaps + booking.locked_swap_count,
+          payment_status: PAYMENT_STATUS_REFUNDED,
+          paid_at: payment?.paid_at ?? new Date(),
+          metadata: {
+            ...((payment?.metadata as Record<string, unknown>) ?? {}),
+            refunded_at: new Date().toISOString(),
+            refunded_reason: notes ?? "booking_cancelled",
+            refunded_amount: walletRefundAmount,
+            wallet_balance_after: Number(wallet.balance),
+          },
         },
       });
     }
-    // Nếu subscription đã hết hạn hoặc không active, không restore swaps (đã mất)
+
+    if (
+      booking.locked_subscription_id &&
+      booking.locked_swap_count > 0
+    ) {
+      const now = new Date();
+      const subscription = await tx.user_subscriptions.findUnique({
+        where: { subscription_id: booking.locked_subscription_id },
+        select: {
+          remaining_swaps: true,
+          status: true,
+          end_date: true,
+        },
+      });
+
+      // ✅ Chỉ restore swaps nếu subscription còn active và chưa hết hạn
+      if (
+        subscription &&
+        subscription.remaining_swaps !== null &&
+        subscription.status === "active" &&
+        subscription.end_date >= now
+      ) {
+        await tx.user_subscriptions.update({
+          where: { subscription_id: booking.locked_subscription_id },
+          data: {
+            remaining_swaps: subscription.remaining_swaps + booking.locked_swap_count,
+          },
+        });
+      }
+      // Nếu subscription đã hết hạn hoặc không active, không restore swaps (đã mất)
+    }
+  } else {
+    // ✅ Không hoàn tiền/lượt (forfeit) - chỉ update payment status và metadata
+    if (booking.locked_wallet_payment_id) {
+      const payment = await tx.payments.findUnique({
+        where: { payment_id: booking.locked_wallet_payment_id },
+      });
+
+      const amountDecimal =
+        booking.locked_wallet_amount ?? new Prisma.Decimal(0);
+      walletRefundAmount = Number(amountDecimal); // Track amount nhưng không hoàn
+
+      await tx.payments.update({
+        where: { payment_id: booking.locked_wallet_payment_id },
+        data: {
+          payment_status: "cancelled" as unknown as PaymentStatus, // Mark as cancelled, not refunded
+          metadata: {
+            ...((payment?.metadata as Record<string, unknown>) ?? {}),
+            forfeited_at: new Date().toISOString(),
+            forfeited_reason: notes ?? "customer_no_show",
+            forfeited_amount: walletRefundAmount,
+          },
+        },
+      });
+    }
+    // ✅ Không restore subscription swaps khi shouldRefund = false
   }
 
   const bookingUpdate: BookingUpdatePatch = {

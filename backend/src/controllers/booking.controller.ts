@@ -2018,37 +2018,28 @@ export const cancelBooking = asyncHandler(
       throw new CustomError("Booking not found or cannot be cancelled", 404);
     }
 
-    // ✅ Chính sách hủy muộn
-    const scheduledTime = new Date(booking.scheduled_at);
-    const now = new Date();
-    const minutesUntilScheduled =
-      (scheduledTime.getTime() - now.getTime()) / (1000 * 60);
-
-    const cancellationFee = 0;
-    const baseCancelMessage = "Booking cancelled successfully";
-
-    // Nếu hủy trong vòng 15 phút trước giờ hẹn → Không cho hủy HOẶC phạt phí
-    if (minutesUntilScheduled < 15 && minutesUntilScheduled > 0) {
-      // Option: Không cho hủy
-      throw new CustomError(
-        "Cannot cancel booking within 15 minutes of scheduled time. Please contact staff.",
-        400
-      );
-      // Hoặc Option: Phạt phí (uncomment nếu muốn)
-      // cancellationFee = 20000; // 20k VND phí hủy muộn
-      // cancelMessage = `Booking cancelled with late cancellation fee: ${cancellationFee.toLocaleString("vi-VN")}đ`;
+    // ✅ Cho hủy cả pending và confirmed
+    // Nếu confirmed: phí hủy muộn 20k VND
+    if (booking.status !== "pending" && booking.status !== "confirmed") {
+      throw new CustomError("Booking cannot be cancelled", 400);
     }
 
-    const releaseNote = "User cancelled booking before swap";
+    // ✅ Phí hủy muộn: 20k VND nếu đã được staff xác nhận
+    const LATE_CANCELLATION_FEE = 20000; // 20k VND
+    const cancellationFee =
+      booking.status === "confirmed" ? LATE_CANCELLATION_FEE : 0;
+    const baseCancelMessage =
+      cancellationFee > 0
+        ? `Booking cancelled with late cancellation fee: ${cancellationFee.toLocaleString("vi-VN")}đ`
+        : "Booking cancelled successfully";
+
+    const releaseNote =
+      cancellationFee > 0
+        ? `User cancelled booking after confirmation. Late cancellation fee: ${cancellationFee.toLocaleString("vi-VN")}đ`
+        : "User cancelled booking before swap";
 
     const result = await prisma.$transaction(async (tx) => {
-      const release = await releaseBookingHold({
-        tx,
-        booking: booking as unknown as BookingHoldFields,
-        actorUserId: userId,
-        notes: releaseNote,
-      });
-
+      // ✅ Trừ phí hủy muộn TRƯỚC khi release hold
       if (cancellationFee > 0) {
         let wallet = await tx.wallets.findUnique({
           where: { user_id: userId },
@@ -2064,18 +2055,33 @@ export const cancelBooking = asyncHandler(
         }
 
         const balance = decimalToNumber(wallet.balance);
-        if (balance >= cancellationFee) {
-          await tx.wallets.update({
-            where: { user_id: userId },
-            data: { balance: balance - cancellationFee },
-          });
-        } else {
+
+        // ✅ Chỉ check số dư hiện tại (không tính hold amount)
+        if (balance < cancellationFee) {
           throw new CustomError(
-            `Insufficient wallet balance. Cancellation fee: ${cancellationFee.toLocaleString("vi-VN")}đ, Balance: ${balance.toLocaleString("vi-VN")}đ`,
+            `Số dư ví không đủ để thanh toán phí hủy muộn. Phí hủy: ${cancellationFee.toLocaleString("vi-VN")}đ, Số dư hiện tại: ${balance.toLocaleString("vi-VN")}đ. Vui lòng nạp thêm tiền vào ví.`,
             400
           );
         }
+
+        // ✅ Trừ toàn bộ phí hủy muộn từ số dư hiện tại
+        await tx.wallets.update({
+          where: { user_id: userId },
+          data: {
+            balance: {
+              decrement: new Prisma.Decimal(cancellationFee),
+            },
+          },
+        });
       }
+
+      // Release hold (sẽ hoàn tiền hold về ví như bình thường)
+      const release = await releaseBookingHold({
+        tx,
+        booking: booking as unknown as BookingHoldFields,
+        actorUserId: userId,
+        notes: releaseNote,
+      });
 
       const bookingUpdateData: Prisma.bookingsUncheckedUpdateInput = {
         ...buildBookingUncheckedUpdate(release.bookingUpdate),

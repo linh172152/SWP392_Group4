@@ -1,17 +1,17 @@
-import React, { useEffect, useState } from 'react';
-import { Card, CardContent } from '../ui/card';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
-import { Combobox } from '../ui/combobox';
-import { 
+import React, { useEffect, useState } from "react";
+import { Card, CardContent } from "../ui/card";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import { Combobox } from "../ui/combobox";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '../ui/dialog';
+} from "../ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,17 +21,10 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '../ui/alert-dialog';
-import { 
-  Car, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Zap,
-  Loader2
-} from 'lucide-react';
-import API_ENDPOINTS, { fetchWithAuth } from '../../config/api';
-import { useNavigate } from 'react-router-dom';
+} from "../ui/alert-dialog";
+import { Car, Plus, Edit, Trash2, Zap, Loader2 } from "lucide-react";
+import API_ENDPOINTS, { fetchWithAuth } from "../../config/api";
+import { useNavigate } from "react-router-dom";
 // Removed hardcoded options - will fetch from API
 
 interface VehicleItem {
@@ -59,10 +52,12 @@ const VehicleManagement: React.FC = () => {
   const [error, setError] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [vehicleToDelete, setVehicleToDelete] = useState<VehicleItem | null>(null);
+  const [vehicleToDelete, setVehicleToDelete] = useState<VehicleItem | null>(
+    null
+  );
   const navigate = useNavigate();
   const [editingId, setEditingId] = useState<string | null>(null);
-  
+
   // Vehicle options from database
   const [vehicleOptions, setVehicleOptions] = useState<{
     brands: string[];
@@ -70,8 +65,8 @@ const VehicleManagement: React.FC = () => {
     batteryModels: string[];
   }>({
     brands: [],
-    vehicleModels: [],
-    batteryModels: [],
+    vehicleModels: [], // Will be loaded from existing vehicles
+    batteryModels: [], // Will be loaded from stations
   });
   const [editForm, setEditForm] = useState({
     make: "",
@@ -164,11 +159,19 @@ const VehicleManagement: React.FC = () => {
           current_battery: data.data.current_battery,
         });
       }
-      
+
       // Reset form và đóng dialog
-      setForm({ make: '', model: '', year: '', license_plate: '', vehicle_type: 'car', battery_model: '', current_battery_code: '' });
+      setForm({
+        make: "",
+        model: "",
+        year: "",
+        license_plate: "",
+        vehicle_type: "car",
+        battery_model: "",
+        current_battery_code: "",
+      });
       setShowAddForm(false);
-      setError('');
+      setError("");
       await loadVehicles();
     } catch (e: any) {
       console.error("[VehicleManagement] Error adding vehicle:", e);
@@ -185,11 +188,11 @@ const VehicleManagement: React.FC = () => {
 
   const deleteVehicle = async () => {
     if (!vehicleToDelete) return;
-    
+
     setLoading(true);
     setError("");
     setDeleteDialogOpen(false);
-    
+
     try {
       const res = await fetchWithAuth(
         `${API_ENDPOINTS.DRIVER.VEHICLES}/${vehicleToDelete.vehicle_id}`,
@@ -290,21 +293,21 @@ const VehicleManagement: React.FC = () => {
   // Helper function to normalize and deduplicate strings
   const normalizeAndDeduplicate = (items: string[]): string[] => {
     const normalizedMap = new Map<string, string>(); // Map normalized -> original
-    
-    items.forEach(item => {
+
+    items.forEach((item) => {
       if (!item) return;
       const trimmed = item.trim();
       if (!trimmed) return;
-      
+
       // Use lowercase as key for case-insensitive comparison
       const key = trimmed.toLowerCase();
-      
+
       // Keep the first occurrence (preserve original casing)
       if (!normalizedMap.has(key)) {
         normalizedMap.set(key, trimmed);
       }
     });
-    
+
     return Array.from(normalizedMap.values()).sort();
   };
 
@@ -312,47 +315,82 @@ const VehicleManagement: React.FC = () => {
   const loadBatteryModelsFromStations = async () => {
     try {
       // Load a few stations to get battery models
-      const stationsRes = await fetchWithAuth(`${API_ENDPOINTS.DRIVER.STATIONS}/nearby?latitude=10.762622&longitude=106.660172&radius=50000&limit=10`);
+      const stationsRes = await fetchWithAuth(
+        `${API_ENDPOINTS.DRIVER.STATIONS}/nearby?latitude=10.762622&longitude=106.660172&radius=50000&limit=10`
+      );
       const stationsData = await stationsRes.json();
-      
+
       if (stationsRes.ok && stationsData.success && stationsData.data) {
         const allBatteryModels: string[] = [];
-        
+
         // Extract battery models from stations
         stationsData.data.forEach((station: any) => {
           // From battery_inventory
-          if (station.battery_inventory && typeof station.battery_inventory === 'object') {
-            Object.keys(station.battery_inventory).forEach(model => {
+          if (
+            station.battery_inventory &&
+            typeof station.battery_inventory === "object"
+          ) {
+            Object.keys(station.battery_inventory).forEach((model) => {
               if (model && model.trim()) allBatteryModels.push(model.trim());
             });
           }
           // From batteries array if available
           if (station.batteries && Array.isArray(station.batteries)) {
             station.batteries.forEach((b: any) => {
-              if (b.model && b.model.trim()) allBatteryModels.push(b.model.trim());
+              if (b.model && b.model.trim())
+                allBatteryModels.push(b.model.trim());
             });
           }
         });
-        
+
         // Also add battery models from user's vehicles
-        vehicles.forEach(v => {
+        vehicles.forEach((v) => {
           if (v.battery_model && v.battery_model.trim()) {
             allBatteryModels.push(v.battery_model.trim());
           }
         });
-        
+
         // Deduplicate and normalize
         const uniqueBatteryModels = normalizeAndDeduplicate(allBatteryModels);
-        
-        setVehicleOptions(prev => ({
+
+        setVehicleOptions((prev) => ({
           ...prev,
           batteryModels: uniqueBatteryModels,
         }));
       }
     } catch (e) {
-      console.error('[VehicleManagement] Error loading battery models from stations:', e);
+      console.error(
+        "[VehicleManagement] Error loading battery models from stations:",
+        e
+      );
     }
   };
+
+  // Load vehicle options from API (brands, vehicleModels, batteryModels)
+  const loadVehicleOptions = async () => {
+    try {
+      const res = await fetchWithAuth(
+        `${API_ENDPOINTS.DRIVER.VEHICLES}/options`
+      );
+      const data = await res.json();
+
+      if (res.ok && data.success && data.data) {
+        setVehicleOptions((prev) => ({
+          brands: data.data.brands || prev.brands,
+          vehicleModels: data.data.vehicleModels || prev.vehicleModels,
+          batteryModels: data.data.batteryModels || prev.batteryModels,
+        }));
+      }
+    } catch (e) {
+      console.error("[VehicleManagement] Error loading vehicle options:", e);
+    }
+  };
+
+  // Load vehicle options and battery models from stations immediately (even if no vehicles yet)
+  useEffect(() => {
+    loadVehicleOptions();
+    loadBatteryModelsFromStations();
+  }, []);
 
   // Extract vehicle options from existing vehicles data
   useEffect(() => {
@@ -360,24 +398,29 @@ const VehicleManagement: React.FC = () => {
       const brands = normalizeAndDeduplicate(
         vehicles.map((v) => v.make).filter((m): m is string => !!m)
       );
-      
+
       const vehicleModels = normalizeAndDeduplicate(
         vehicles.map((v) => v.model).filter((m): m is string => !!m)
       );
-      
+
       // Initial battery models from vehicles
       const batteryModelsFromVehicles = normalizeAndDeduplicate(
         vehicles.map((v) => v.battery_model).filter((m): m is string => !!m)
       );
-      
-      setVehicleOptions(prev => ({
+
+      setVehicleOptions((prev) => ({
         brands,
         vehicleModels,
-        batteryModels: prev.batteryModels.length > 0 ? prev.batteryModels : batteryModelsFromVehicles,
+        batteryModels:
+          prev.batteryModels.length > 0
+            ? [
+                ...new Set([
+                  ...prev.batteryModels,
+                  ...batteryModelsFromVehicles,
+                ]),
+              ].sort()
+            : batteryModelsFromVehicles,
       }));
-      
-      // Load more battery models from stations
-      loadBatteryModelsFromStations();
     }
   }, [vehicles]);
 
@@ -449,7 +492,9 @@ const VehicleManagement: React.FC = () => {
                         <Combobox
                           options={vehicleOptions.brands}
                           value={editForm.make}
-                          onValueChange={(value) => setEditForm(f => ({ ...f, make: value }))}
+                          onValueChange={(value) =>
+                            setEditForm((f) => ({ ...f, make: value }))
+                          }
                           placeholder="Chọn hoặc nhập hãng xe..."
                           searchPlaceholder="Tìm hãng xe..."
                           emptyMessage="Không tìm thấy hãng xe"
@@ -461,7 +506,9 @@ const VehicleManagement: React.FC = () => {
                         <Combobox
                           options={vehicleOptions.vehicleModels}
                           value={editForm.model}
-                          onValueChange={(value) => setEditForm(f => ({ ...f, model: value }))}
+                          onValueChange={(value) =>
+                            setEditForm((f) => ({ ...f, model: value }))
+                          }
                           placeholder="Chọn hoặc nhập mẫu xe..."
                           searchPlaceholder="Tìm mẫu xe..."
                           emptyMessage="Không tìm thấy mẫu xe"
@@ -495,7 +542,9 @@ const VehicleManagement: React.FC = () => {
                         <Combobox
                           options={vehicleOptions.batteryModels}
                           value={editForm.battery_model}
-                          onValueChange={(value) => setEditForm(f => ({ ...f, battery_model: value }))}
+                          onValueChange={(value) =>
+                            setEditForm((f) => ({ ...f, battery_model: value }))
+                          }
                           placeholder="Chọn hoặc nhập model pin..."
                           searchPlaceholder="Tìm model pin..."
                           emptyMessage="Không tìm thấy model pin"
@@ -515,7 +564,9 @@ const VehicleManagement: React.FC = () => {
                           placeholder="VD: BAT-TD-007"
                           className="bg-white dark:bg-slate-800"
                         />
-                        <p className="text-xs text-slate-500 dark:text-slate-400">Vui lòng nhập mã pin hiện tại</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          Vui lòng nhập mã pin hiện tại
+                        </p>
                       </div>
                       <div className="space-y-2 md:col-span-2">
                         <Label>Loại xe</Label>
@@ -606,25 +657,43 @@ const VehicleManagement: React.FC = () => {
         })}
       </div>
 
-      <Dialog open={showAddForm} onOpenChange={(open) => {
-        if (!open) {
-          setShowAddForm(false);
-          setForm({ make: '', model: '', year: '', license_plate: '', vehicle_type: 'car', battery_model: '', current_battery_code: '' });
-          setError('');
-        }
-      }}>
+      <Dialog
+        open={showAddForm}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowAddForm(false);
+            setForm({
+              make: "",
+              model: "",
+              year: "",
+              license_plate: "",
+              vehicle_type: "car",
+              battery_model: "",
+              current_battery_code: "",
+            });
+            setError("");
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-slate-900 dark:text-white">Thêm xe mới</DialogTitle>
+            <DialogTitle className="text-slate-900 dark:text-white">
+              Thêm xe mới
+            </DialogTitle>
             <DialogDescription className="text-slate-600 dark:text-slate-400">
               Nhập thông tin xe để đăng ký sử dụng dịch vụ thay pin
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="make" className="text-slate-700 dark:text-slate-300">Hãng xe</Label>
+                <Label
+                  htmlFor="make"
+                  className="text-slate-700 dark:text-slate-300"
+                >
+                  Hãng xe
+                </Label>
                 <Combobox
                   options={vehicleOptions.brands}
                   value={form.make}
@@ -636,7 +705,12 @@ const VehicleManagement: React.FC = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="model" className="text-slate-700 dark:text-slate-300">Mẫu xe</Label>
+                <Label
+                  htmlFor="model"
+                  className="text-slate-700 dark:text-slate-300"
+                >
+                  Mẫu xe
+                </Label>
                 <Combobox
                   options={vehicleOptions.vehicleModels}
                   value={form.model}
@@ -648,32 +722,51 @@ const VehicleManagement: React.FC = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="year" className="text-slate-700 dark:text-slate-300">Năm sản xuất</Label>
-                <Input 
-                  id="year" 
-                  type="number" 
-                  value={form.year} 
-                  onChange={(e) => setForm({ ...form, year: e.target.value })} 
-                  placeholder="2023" 
-                  className="bg-white dark:bg-slate-800 border-slate-200/50 dark:border-slate-700/50" 
+                <Label
+                  htmlFor="year"
+                  className="text-slate-700 dark:text-slate-300"
+                >
+                  Năm sản xuất
+                </Label>
+                <Input
+                  id="year"
+                  type="number"
+                  value={form.year}
+                  onChange={(e) => setForm({ ...form, year: e.target.value })}
+                  placeholder="2023"
+                  className="bg-white dark:bg-slate-800 border-slate-200/50 dark:border-slate-700/50"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="plate" className="text-slate-700 dark:text-slate-300">Biển số xe</Label>
-                <Input 
-                  id="plate" 
-                  value={form.license_plate} 
-                  onChange={(e) => setForm({ ...form, license_plate: e.target.value })} 
-                  placeholder="30A-12345" 
-                  className="bg-white dark:bg-slate-800 border-slate-200/50 dark:border-slate-700/50" 
+                <Label
+                  htmlFor="plate"
+                  className="text-slate-700 dark:text-slate-300"
+                >
+                  Biển số xe
+                </Label>
+                <Input
+                  id="plate"
+                  value={form.license_plate}
+                  onChange={(e) =>
+                    setForm({ ...form, license_plate: e.target.value })
+                  }
+                  placeholder="30A-12345"
+                  className="bg-white dark:bg-slate-800 border-slate-200/50 dark:border-slate-700/50"
                 />
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="bmodel" className="text-slate-700 dark:text-slate-300">Model Pin</Label>
+                <Label
+                  htmlFor="bmodel"
+                  className="text-slate-700 dark:text-slate-300"
+                >
+                  Model Pin
+                </Label>
                 <Combobox
                   options={vehicleOptions.batteryModels}
                   value={form.battery_model}
-                  onValueChange={(value) => setForm({ ...form, battery_model: value })}
+                  onValueChange={(value) =>
+                    setForm({ ...form, battery_model: value })
+                  }
                   placeholder="Chọn hoặc nhập model pin..."
                   searchPlaceholder="Tìm model pin..."
                   emptyMessage="Không tìm thấy model pin"
@@ -681,15 +774,20 @@ const VehicleManagement: React.FC = () => {
                 />
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="battery_code" className="text-slate-700 dark:text-slate-300">
+                <Label
+                  htmlFor="battery_code"
+                  className="text-slate-700 dark:text-slate-300"
+                >
                   Mã Pin hiện tại <span className="text-red-500">*</span>
                 </Label>
-                <Input 
-                  id="battery_code" 
-                  value={form.current_battery_code} 
-                  onChange={(e) => setForm({ ...form, current_battery_code: e.target.value })} 
-                  placeholder="VD: BAT-TD-007" 
-                  className="bg-white dark:bg-slate-800 border-slate-200/50 dark:border-slate-700/50" 
+                <Input
+                  id="battery_code"
+                  value={form.current_battery_code}
+                  onChange={(e) =>
+                    setForm({ ...form, current_battery_code: e.target.value })
+                  }
+                  placeholder="VD: BAT-TD-007"
+                  className="bg-white dark:bg-slate-800 border-slate-200/50 dark:border-slate-700/50"
                   required
                 />
                 <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -697,38 +795,51 @@ const VehicleManagement: React.FC = () => {
                 </p>
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="vtype" className="text-slate-700 dark:text-slate-300">Loại xe</Label>
-                <Input 
-                  id="vtype" 
-                  value={form.vehicle_type} 
-                  disabled 
-                  className="bg-white dark:bg-slate-800 border-slate-200/50 dark:border-slate-700/50" 
+                <Label
+                  htmlFor="vtype"
+                  className="text-slate-700 dark:text-slate-300"
+                >
+                  Loại xe
+                </Label>
+                <Input
+                  id="vtype"
+                  value={form.vehicle_type}
+                  disabled
+                  className="bg-white dark:bg-slate-800 border-slate-200/50 dark:border-slate-700/50"
                 />
               </div>
             </div>
-            
+
             {error && (
               <div className="text-sm text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-500/10 p-3 rounded-lg border border-red-200/50 dark:border-red-500/20">
                 {error}
               </div>
             )}
           </div>
-          
+
           <DialogFooter>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => {
                 setShowAddForm(false);
-                setForm({ make: '', model: '', year: '', license_plate: '', vehicle_type: 'car', battery_model: '', current_battery_code: '' });
-                setError('');
+                setForm({
+                  make: "",
+                  model: "",
+                  year: "",
+                  license_plate: "",
+                  vehicle_type: "car",
+                  battery_model: "",
+                  current_battery_code: "",
+                });
+                setError("");
               }}
               disabled={loading}
             >
               Hủy
             </Button>
-            <Button 
-              className="gradient-primary text-white shadow-lg" 
-              onClick={addVehicle} 
+            <Button
+              className="gradient-primary text-white shadow-lg"
+              onClick={addVehicle}
               disabled={loading}
             >
               {loading ? (

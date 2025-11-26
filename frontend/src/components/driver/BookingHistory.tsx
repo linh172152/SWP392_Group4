@@ -417,8 +417,9 @@ const BookingHistory: React.FC = () => {
     canCancel: boolean;
     reason?: string;
     minutesUntilScheduled?: number;
+    cancellationFee?: number; // ✅ Phí hủy muộn nếu có
   } => {
-    // Chỉ cho hủy booking pending hoặc confirmed
+    // ✅ Cho hủy cả pending và confirmed
     if (booking.status !== "pending" && booking.status !== "confirmed") {
       return {
         canCancel: false,
@@ -426,31 +427,15 @@ const BookingHistory: React.FC = () => {
       };
     }
 
-    // Tính thời gian còn lại đến giờ hẹn
-    const scheduledTime = new Date(booking.scheduled_at);
-    const now = new Date();
-    const minutesUntilScheduled =
-      (scheduledTime.getTime() - now.getTime()) / (1000 * 60);
+    // ✅ Nếu confirmed: có phí hủy muộn 20k VND
+    const LATE_CANCELLATION_FEE = 20000;
+    const cancellationFee =
+      booking.status === "confirmed" ? LATE_CANCELLATION_FEE : 0;
 
-    // Nếu đã qua giờ hẹn → Không thể hủy (đã quá hạn)
-    if (minutesUntilScheduled < 0) {
-      return {
-        canCancel: false,
-        reason: "Không thể hủy đặt chỗ đã quá giờ hẹn",
-      };
-    }
-
-    // Nếu < 15 phút trước giờ hẹn → Không cho hủy
-    if (minutesUntilScheduled < 15) {
-      return {
-        canCancel: false,
-        reason:
-          "Không thể hủy đặt chỗ trong vòng 15 phút trước giờ hẹn. Vui lòng liên hệ nhân viên nếu cần hỗ trợ.",
-        minutesUntilScheduled,
-      };
-    }
-
-    return { canCancel: true, minutesUntilScheduled };
+    return {
+      canCancel: true,
+      cancellationFee,
+    };
   };
 
   const handleOpenCancelDialog = (id: string) => {
@@ -468,14 +453,21 @@ const BookingHistory: React.FC = () => {
       return;
     }
 
-    // Tạo message xác nhận
-    const confirmMessage =
+    // Tạo message xác nhận với cảnh báo phí phạt
+    let confirmMessage = "Bạn có chắc muốn hủy đặt chỗ này?";
+
+    if (cancelCheck.cancellationFee && cancelCheck.cancellationFee > 0) {
+      confirmMessage = `⚠️ CẢNH BÁO: Đặt chỗ này đã được nhân viên xác nhận. Hủy đặt chỗ sẽ bị trừ phí hủy muộn ${cancelCheck.cancellationFee.toLocaleString(
+        "vi-VN"
+      )}đ từ ví của bạn. Bạn có chắc muốn tiếp tục?`;
+    } else if (
       cancelCheck.minutesUntilScheduled &&
       cancelCheck.minutesUntilScheduled < 30
-        ? `Bạn có chắc muốn hủy đặt chỗ này? Còn ${Math.round(
-            cancelCheck.minutesUntilScheduled
-          )} phút nữa đến giờ hẹn.`
-        : "Bạn có chắc muốn hủy đặt chỗ này?";
+    ) {
+      confirmMessage = `Bạn có chắc muốn hủy đặt chỗ này? Còn ${Math.round(
+        cancelCheck.minutesUntilScheduled
+      )} phút nữa đến giờ hẹn.`;
+    }
 
     setBookingToCancel(booking);
     setCancelConfirmMessage(confirmMessage);
@@ -517,6 +509,14 @@ const BookingHistory: React.FC = () => {
           throw new Error(
             "Không tìm thấy đặt chỗ hoặc không thể hủy đặt chỗ này."
           );
+        }
+
+        // ✅ Xử lý lỗi số dư ví không đủ
+        if (
+          errorMessage.includes("Số dư ví không đủ") ||
+          errorMessage.includes("Insufficient wallet balance")
+        ) {
+          throw new Error(errorMessage);
         }
 
         throw new Error(errorMessage);
@@ -574,7 +574,7 @@ const BookingHistory: React.FC = () => {
   const exportConfirmationVoucher = async (booking: BookingItem) => {
     setSelectedBookingForVoucher(booking);
     setVoucherDialogOpen(true);
-    
+
     // Load user info for voucher
     try {
       const profileData = await authService.getProfile();
@@ -975,6 +975,18 @@ const BookingHistory: React.FC = () => {
                               </p>
                             )}
                             {cancelCheck.canCancel &&
+                              cancelCheck.cancellationFee &&
+                              cancelCheck.cancellationFee > 0 && (
+                                <p className="text-xs text-red-600 dark:text-red-400 mt-1 font-semibold">
+                                  ⚠️ Phí hủy muộn:{" "}
+                                  {cancelCheck.cancellationFee.toLocaleString(
+                                    "vi-VN"
+                                  )}
+                                  đ
+                                </p>
+                              )}
+                            {cancelCheck.canCancel &&
+                              !cancelCheck.cancellationFee &&
                               cancelCheck.minutesUntilScheduled !== undefined &&
                               cancelCheck.minutesUntilScheduled < 30 && (
                                 <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
@@ -1065,8 +1077,18 @@ const BookingHistory: React.FC = () => {
               <AlertCircle className="h-5 w-5 text-orange-600" />
               Xác nhận hủy đặt chỗ
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              {cancelConfirmMessage || "Bạn có chắc muốn hủy đặt chỗ này?"}
+            <AlertDialogDescription className="space-y-2">
+              {bookingToCancel && (
+                <div className="text-sm text-slate-600 dark:text-slate-400">
+                  Mã đặt chỗ:{" "}
+                  <span className="font-semibold text-slate-900 dark:text-white">
+                    {bookingToCancel.booking_code}
+                  </span>
+                </div>
+              )}
+              <div>
+                {cancelConfirmMessage || "Bạn có chắc muốn hủy đặt chỗ này?"}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1183,7 +1205,8 @@ const BookingHistory: React.FC = () => {
                     const isSameDay =
                       createdDate &&
                       scheduledDate &&
-                      createdDate.toDateString() === scheduledDate.toDateString();
+                      createdDate.toDateString() ===
+                        scheduledDate.toDateString();
 
                     return (
                       <div className="flex justify-between items-center py-2 border-b border-slate-200 dark:border-slate-700">

@@ -15,7 +15,9 @@ export async function autoCancelExpiredBookings() {
   try {
     // Check if DATABASE_URL is available
     if (!process.env.DATABASE_URL) {
-      console.warn("⚠️ DATABASE_URL not found, skipping auto-cancel expired bookings");
+      console.warn(
+        "⚠️ DATABASE_URL not found, skipping auto-cancel expired bookings"
+      );
       return { cancelled: 0, errors: [] };
     }
 
@@ -23,13 +25,13 @@ export async function autoCancelExpiredBookings() {
     const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000); // 30 minutes ago
 
     // Find bookings that:
-    // 1. Are confirmed
+    // 1. Are pending or confirmed (not completed/cancelled)
     // 2. Scheduled time was more than 30 minutes ago
     // 3. Not checked in yet (checked_in_at is null)
     // 4. Not already completed or cancelled
     const expiredBookings = await prisma.bookings.findMany({
       where: {
-        status: "confirmed", // Only confirmed bookings can be auto-cancelled
+        status: { in: ["pending", "confirmed"] }, // ✅ Cancel both pending and confirmed bookings
         scheduled_at: {
           lte: thirtyMinutesAgo, // Scheduled time was more than 30 minutes ago
         },
@@ -63,16 +65,21 @@ export async function autoCancelExpiredBookings() {
     }[] = [];
 
     for (const booking of expiredBookings) {
+      // Tạo message rõ ràng: khách hàng không đến
       const autoCancelNote =
-        "Auto-cancelled: User did not arrive within 30 minutes of scheduled time.";
+        booking.status === "confirmed"
+          ? "Tự động hủy: Khách hàng không đến trong vòng 30 phút sau giờ hẹn đã được xác nhận."
+          : "Tự động hủy: Khách hàng không đến trong vòng 30 phút sau giờ hẹn.";
 
-      const { updatedBooking, walletRefundAmount } =
-        await prisma.$transaction(async (tx) => {
+      const { updatedBooking, walletRefundAmount } = await prisma.$transaction(
+        async (tx) => {
+          // ✅ Không hoàn tiền/lượt khi hủy do khách hàng không đến (shouldRefund = false)
           const release = await releaseBookingHold({
             tx,
             booking: booking as unknown as BookingHoldFields,
             actorUserId: booking.user_id,
             notes: autoCancelNote,
+            shouldRefund: false, // ✅ Forfeit: không hoàn tiền/lượt
           });
 
           const bookingUpdateData: Prisma.bookingsUncheckedUpdateInput = {
@@ -92,7 +99,8 @@ export async function autoCancelExpiredBookings() {
             updatedBooking: updated,
             walletRefundAmount: release.walletRefundAmount,
           };
-        });
+        }
+      );
 
       cancelledBookings.push({
         original: booking,
@@ -101,16 +109,12 @@ export async function autoCancelExpiredBookings() {
       });
 
       try {
-        const walletMessage =
-          walletRefundAmount > 0
-            ? ` Khoản giữ ${walletRefundAmount.toLocaleString("vi-VN")}đ đã được hoàn lại vào ví.`
-            : "";
-
+        // ✅ Không có message hoàn tiền vì đã forfeit (không hoàn)
         await notificationService.sendNotification({
           type: "booking_cancelled",
           userId: booking.user_id,
           title: "Đặt chỗ đã bị hủy tự động",
-            message: `Đặt chỗ của bạn tại ${booking.stations.name} đã bị hủy tự động do bạn không có mặt trong vòng 30 phút sau giờ đã đặt.${walletMessage}`,
+          message: `Đặt chỗ của bạn tại ${booking.stations.name} đã bị hủy tự động do bạn không đến trong vòng 30 phút sau giờ hẹn. Khoản giữ và lượt đổi pin đã bị hủy do không đến đúng giờ.`,
           data: {
             email: booking.users_bookings_user_idTousers.email,
             userName: booking.users_bookings_user_idTousers.full_name,
@@ -190,7 +194,7 @@ export async function sendBookingReminders() {
           type: "booking_reminder",
           userId: booking.user_id,
           title: "Nhắc nhở đặt chỗ",
-            message: `Bạn có đặt chỗ tại ${booking.stations.name} sau 30 phút nữa. Vui lòng chuẩn bị đến đúng giờ.`,
+          message: `Bạn có đặt chỗ tại ${booking.stations.name} sau 30 phút nữa. Vui lòng chuẩn bị đến đúng giờ.`,
           data: {
             email: booking.users_bookings_user_idTousers.email,
             userName: booking.users_bookings_user_idTousers.full_name,
@@ -241,7 +245,7 @@ export async function sendBookingReminders() {
           type: "booking_final_reminder",
           userId: booking.user_id,
           title: "Nhắc nhở cuối cùng",
-            message: `Bạn có đặt chỗ tại ${booking.stations.name} sau 10 phút nữa. Vui lòng đến đúng giờ để tránh bị hủy tự động.`,
+          message: `Bạn có đặt chỗ tại ${booking.stations.name} sau 10 phút nữa. Vui lòng đến đúng giờ để tránh bị hủy tự động.`,
           data: {
             email: booking.users_bookings_user_idTousers.email,
             userName: booking.users_bookings_user_idTousers.full_name,
@@ -280,7 +284,9 @@ export async function autoCancelInstantBookings() {
   try {
     // Check if DATABASE_URL is available
     if (!process.env.DATABASE_URL) {
-      console.warn("⚠️ DATABASE_URL not found, skipping auto-cancel instant bookings");
+      console.warn(
+        "⚠️ DATABASE_URL not found, skipping auto-cancel instant bookings"
+      );
       return { cancelled: 0, errors: [] };
     }
     const now = new Date();
@@ -331,13 +337,15 @@ export async function autoCancelInstantBookings() {
       const autoCancelNote =
         "Auto-cancelled: Instant booking expired - User did not arrive within 30 minutes.";
 
-      const { updatedBooking, walletRefundAmount } =
-        await prisma.$transaction(async (tx) => {
+      const { updatedBooking, walletRefundAmount } = await prisma.$transaction(
+        async (tx) => {
+          // ✅ Không hoàn tiền/lượt khi hủy do khách hàng không đến (shouldRefund = false)
           const release = await releaseBookingHold({
             tx,
             booking: booking as unknown as BookingHoldFields,
             actorUserId: booking.user_id,
             notes: autoCancelNote,
+            shouldRefund: false, // ✅ Forfeit: không hoàn tiền/lượt
           });
 
           const bookingUpdateData: Prisma.bookingsUncheckedUpdateInput = {
@@ -357,7 +365,8 @@ export async function autoCancelInstantBookings() {
             updatedBooking: updated,
             walletRefundAmount: release.walletRefundAmount,
           };
-        });
+        }
+      );
 
       cancelledBookings.push({
         original: booking,
@@ -366,16 +375,12 @@ export async function autoCancelInstantBookings() {
       });
 
       try {
-        const walletMessage =
-          walletRefundAmount > 0
-            ? ` Khoản giữ ${walletRefundAmount.toLocaleString("vi-VN")}đ đã được hoàn lại vào ví.`
-            : "";
-
+        // ✅ Không có message hoàn tiền vì đã forfeit (không hoàn)
         await notificationService.sendNotification({
           type: "booking_cancelled",
           userId: booking.user_id,
           title: "Đặt chỗ ngay đã bị hủy tự động",
-            message: `Đặt chỗ ngay của bạn tại ${booking.stations.name} đã bị hủy tự động do bạn không có mặt trong vòng 30 phút.${walletMessage}`,
+          message: `Đặt chỗ ngay của bạn tại ${booking.stations.name} đã bị hủy tự động do bạn không đến trong vòng 30 phút sau giờ hẹn. Khoản giữ và lượt đổi pin đã bị hủy do không đến đúng giờ.`,
           data: {
             email: booking.users_bookings_user_idTousers.email,
             userName: booking.users_bookings_user_idTousers.full_name,

@@ -5,6 +5,7 @@ import {
   getVehicleDetails,
   updateVehicle,
   deleteVehicle,
+  getVehicleOptions,
 } from "../controllers/vehicle.controller";
 import { authenticateToken, authorizeRole } from "../middlewares/auth.middleware";
 
@@ -72,6 +73,44 @@ router.use(authorizeRole("DRIVER"));
  *         description: Unauthorized
  */
 router.get("/", getUserVehicles);
+
+/**
+ * @swagger
+ * /api/driver/vehicles/options:
+ *   get:
+ *     summary: Get vehicle options (brands, models, battery models) from all vehicles in system
+ *     tags: [Driver - Vehicles]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Vehicle options retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     brands:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *                     vehicleModels:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *                     batteryModels:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *       401:
+ *         description: Unauthorized
+ */
+router.get("/options", getVehicleOptions);
 
 /**
  * @swagger
