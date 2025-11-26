@@ -477,6 +477,34 @@ const BatteryInventory: React.FC = () => {
     return "text-red-600 dark:text-red-400";
   };
 
+  const getChargeGradient = (charge: number) => {
+    if (charge >= 80) return "from-green-500 via-emerald-500 to-green-600";
+    if (charge >= 40) return "from-yellow-500 via-amber-500 to-orange-500";
+    return "from-red-500 via-rose-500 to-red-600";
+  };
+
+  // Skeleton Loading Component
+  const BatteryCardSkeleton = () => (
+    <Card className="glass-card border-0 animate-pulse">
+      <CardContent className="p-6">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="h-6 w-32 bg-slate-200 dark:bg-slate-700 rounded"></div>
+            <div className="h-6 w-20 bg-slate-200 dark:bg-slate-700 rounded"></div>
+          </div>
+          <div className="space-y-3">
+            <div className="h-4 w-24 bg-slate-200 dark:bg-slate-700 rounded"></div>
+            <div className="h-2 w-full bg-slate-200 dark:bg-slate-700 rounded"></div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded"></div>
+              <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded"></div>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   // Pagination states
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
@@ -495,8 +523,42 @@ const BatteryInventory: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="p-6 space-y-6">
+        {/* Header Skeleton */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <div className="h-9 w-48 bg-slate-200 dark:bg-slate-700 rounded-lg mb-2 animate-pulse"></div>
+            <div className="h-5 w-64 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
+          </div>
+          <div className="flex gap-3">
+            <div className="h-10 w-32 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
+            <div className="h-10 w-32 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
+          </div>
+        </div>
+
+        {/* Stats Cards Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i} className="glass-card border-0 animate-pulse">
+              <CardContent className="p-5">
+                <div className="flex items-center space-x-4">
+                  <div className="h-14 w-14 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
+                  <div className="flex-1">
+                    <div className="h-4 w-20 bg-slate-200 dark:bg-slate-700 rounded mb-2"></div>
+                    <div className="h-8 w-12 bg-slate-200 dark:bg-slate-700 rounded"></div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Battery Grid Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <BatteryCardSkeleton key={i} />
+          ))}
+        </div>
       </div>
     );
   }
@@ -539,73 +601,85 @@ const BatteryInventory: React.FC = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <Battery className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Tổng pin
-                </p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                  {totalBatteries}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-green-600 to-green-700 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <CheckCircle className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Đầy
-                </p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                  {fullBatteries}
-                </p>
+        <Card className="glass-card border-0 glow-hover group overflow-hidden relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          <CardContent className="p-5 relative">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="p-3.5 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+                  <Battery className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
+                    Tổng pin
+                  </p>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 dark:from-green-400 dark:to-emerald-400 bg-clip-text text-transparent">
+                    {totalBatteries}
+                  </p>
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <Zap className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Đang sạc
-                </p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                  {chargingBatteries}
-                </p>
+        <Card className="glass-card border-0 glow-hover group overflow-hidden relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-green-600/10 to-green-700/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          <CardContent className="p-5 relative">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="p-3.5 bg-gradient-to-br from-green-600 to-green-700 rounded-xl shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+                  <CheckCircle className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
+                    Đầy
+                  </p>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-green-700 to-green-800 dark:from-green-500 dark:to-green-600 bg-clip-text text-transparent">
+                    {fullBatteries}
+                  </p>
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <Wrench className="h-5 w-5 text-white" />
+        <Card className="glass-card border-0 glow-hover group overflow-hidden relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-cyan-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          <CardContent className="p-5 relative">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="p-3.5 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+                  <Zap className="h-6 w-6 text-white animate-pulse" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
+                    Đang sạc
+                  </p>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400 bg-clip-text text-transparent">
+                    {chargingBatteries}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Bảo trì
-                </p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                  {maintenanceBatteries}
-                </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card border-0 glow-hover group overflow-hidden relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 to-orange-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          <CardContent className="p-5 relative">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="p-3.5 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-xl shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+                  <Wrench className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
+                    Bảo trì
+                  </p>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-yellow-600 to-orange-600 dark:from-yellow-400 dark:to-orange-400 bg-clip-text text-transparent">
+                    {maintenanceBatteries}
+                  </p>
+                </div>
               </div>
             </div>
           </CardContent>
@@ -723,142 +797,184 @@ const BatteryInventory: React.FC = () => {
       </Card>
 
       {/* Battery Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {batteries.map((battery) => (
-          <Card
-            key={battery.battery_id}
-            className="glass-card border-0 glow-hover group"
-          >
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                    {battery.battery_code}
-                  </h3>
-                  <Badge className={getStatusColor(battery.status)}>
-                    {getStatusIcon(battery.status)}
-                    <span className="ml-1">
-                      {getStatusLabel(battery.status)}
-                    </span>
-                  </Badge>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-600 dark:text-slate-400">
-                      Model
-                    </span>
-                    <span className="font-medium text-slate-900 dark:text-white">
-                      {battery.model}
-                    </span>
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <BatteryCardSkeleton key={i} />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {batteries.map((battery) => (
+            <Card
+              key={battery.battery_id}
+              className="glass-card border-0 glow-hover group overflow-hidden relative transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl"
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-500/10 to-emerald-500/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+              <CardContent className="p-6 relative">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 rounded-lg group-hover:scale-110 transition-transform duration-300">
+                        <Battery className="h-5 w-5 text-slate-700 dark:text-slate-300" />
+                      </div>
+                      <h3 className="text-lg font-bold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
+                        {battery.battery_code}
+                      </h3>
+                    </div>
+                    <Badge className={`${getStatusColor(battery.status)} shadow-sm`}>
+                      {getStatusIcon(battery.status)}
+                      <span className="ml-1.5 font-medium">
+                        {getStatusLabel(battery.status)}
+                      </span>
+                    </Badge>
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-600 dark:text-slate-400">
-                        Mức sạc hiện tại
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-slate-600 dark:text-slate-400 font-medium">
+                        Model
                       </span>
-                      <span
-                        className={`font-medium ${getChargeColor(
-                          battery.current_charge
-                        )}`}
-                      >
-                        {battery.current_charge}%
+                      <span className="font-semibold text-slate-900 dark:text-white px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-md">
+                        {battery.model}
                       </span>
                     </div>
-                    <Progress value={battery.current_charge} className="h-2" />
-                  </div>
 
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    {battery.capacity_kwh && (
-                      <div>
-                        <p className="text-slate-600 dark:text-slate-400">
-                          Dung lượng
-                        </p>
-                        <p className="font-medium text-slate-900 dark:text-white">
-                          {battery.capacity_kwh} kWh
-                        </p>
+                    <div className="space-y-2.5">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-slate-600 dark:text-slate-400 font-medium">
+                          Mức sạc hiện tại
+                        </span>
+                        <span
+                          className={`font-bold text-base ${getChargeColor(
+                            battery.current_charge
+                          )}`}
+                        >
+                          {battery.current_charge}%
+                        </span>
                       </div>
-                    )}
-                    {battery.voltage && (
-                      <div>
-                        <p className="text-slate-600 dark:text-slate-400">
-                          Điện áp
-                        </p>
-                        <p className="font-medium text-slate-900 dark:text-white">
-                          {battery.voltage}V
-                        </p>
+                      <div className="relative h-3 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full bg-gradient-to-r ${getChargeGradient(
+                            battery.current_charge
+                          )} rounded-full transition-all duration-500 ease-out shadow-lg relative`}
+                          style={{ width: `${battery.current_charge}%` }}
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-r from-white/30 to-transparent"></div>
+                        </div>
                       </div>
-                    )}
-                    <div>
-                      <p className="text-slate-600 dark:text-slate-400">Trạm</p>
-                      <p className="font-medium text-slate-900 dark:text-white">
-                        {battery.stations?.name || "N/A"}
-                      </p>
                     </div>
-                    {battery.last_charged_at && (
-                      <div>
-                        <p className="text-slate-600 dark:text-slate-400">
-                          Sạc lần cuối
+
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      {battery.capacity_kwh && (
+                        <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200/50 dark:border-slate-700/50">
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                            Dung lượng
+                          </p>
+                          <p className="font-semibold text-slate-900 dark:text-white">
+                            {battery.capacity_kwh} kWh
+                          </p>
+                        </div>
+                      )}
+                      {battery.voltage && (
+                        <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200/50 dark:border-slate-700/50">
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                            Điện áp
+                          </p>
+                          <p className="font-semibold text-slate-900 dark:text-white">
+                            {battery.voltage}V
+                          </p>
+                        </div>
+                      )}
+                      <div className="p-2.5 bg-blue-50/50 dark:bg-blue-900/20 rounded-lg border border-blue-200/50 dark:border-blue-800/50">
+                        <p className="text-xs text-blue-600 dark:text-blue-400 mb-1 flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          Trạm
                         </p>
-                        <p className="font-medium text-slate-900 dark:text-white">
-                          {new Date(battery.last_charged_at).toLocaleDateString(
-                            "vi-VN"
-                          )}
+                        <p className="font-semibold text-slate-900 dark:text-white truncate">
+                          {battery.stations?.name || "N/A"}
                         </p>
                       </div>
-                    )}
+                      {battery.last_charged_at && (
+                        <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200/50 dark:border-slate-700/50">
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            Sạc lần cuối
+                          </p>
+                          <p className="font-semibold text-slate-900 dark:text-white text-xs">
+                            {new Date(battery.last_charged_at).toLocaleDateString(
+                              "vi-VN"
+                            )}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-3 border-t border-slate-200/50 dark:border-slate-700/50">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 glass border-blue-300/50 hover:bg-blue-50 dark:border-blue-700/50 dark:hover:bg-blue-900/20 hover:scale-105 transition-transform duration-200"
+                      onClick={() => handleViewDetail(battery)}
+                    >
+                      <Eye className="mr-2 h-4 w-4" />
+                      Chi tiết
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 glass border-green-300/50 hover:bg-green-50 dark:border-green-700/50 dark:hover:bg-green-900/20 hover:scale-105 transition-transform duration-200"
+                      onClick={() => handleEdit(battery)}
+                    >
+                      <Edit className="mr-2 h-4 w-4" />
+                      Sửa
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="glass border-red-300/50 hover:bg-red-50 dark:border-red-700/50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 hover:scale-105 transition-transform duration-200"
+                      onClick={() => handleDelete(battery)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
-
-                <div className="flex gap-2 pt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 glass border-blue-300/50 hover:bg-blue-50 dark:border-blue-700/50 dark:hover:bg-blue-900/20"
-                    onClick={() => handleViewDetail(battery)}
-                  >
-                    <Eye className="mr-2 h-4 w-4" />
-                    Chi tiết
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 glass border-green-300/50 hover:bg-green-50 dark:border-green-700/50 dark:hover:bg-green-900/20"
-                    onClick={() => handleEdit(battery)}
-                  >
-                    <Edit className="mr-2 h-4 w-4" />
-                    Sửa
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="glass border-red-300/50 hover:bg-red-50 dark:border-red-700/50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400"
-                    onClick={() => handleDelete(battery)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {batteries.length === 0 && !loading && (
-        <Card className="glass-card border-0">
-          <CardContent className="p-12 text-center">
-            <Battery className="h-12 w-12 text-slate-400 dark:text-slate-500 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+        <Card className="glass-card border-0 overflow-hidden relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-50/50 to-slate-100/30 dark:from-slate-900/50 dark:to-slate-800/30"></div>
+          <CardContent className="p-16 text-center relative">
+            <div className="relative inline-block mb-6">
+              <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full blur-2xl opacity-20 animate-pulse"></div>
+              <div className="relative p-6 bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 rounded-full">
+                <Battery className="h-16 w-16 text-green-600 dark:text-green-400" />
+              </div>
+            </div>
+            <h3 className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent mb-3">
               {searchTerm || statusFilter !== "all" || modelFilter !== "all"
                 ? "Không tìm thấy pin"
                 : "Chưa có pin nào"}
             </h3>
-            <p className="text-slate-600 dark:text-slate-400">
+            <p className="text-slate-600 dark:text-slate-400 mb-6 max-w-md mx-auto">
               {searchTerm || statusFilter !== "all" || modelFilter !== "all"
-                ? "Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm"
-                : "Thêm pin mới để bắt đầu quản lý kho"}
+                ? "Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm để tìm pin bạn cần"
+                : "Thêm pin mới để bắt đầu quản lý kho pin của bạn"}
             </p>
+            {(!searchTerm && statusFilter === "all" && modelFilter === "all") && (
+              <Button
+                className="bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
+                onClick={() => setAddDialogOpen(true)}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Thêm pin đầu tiên
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}
@@ -943,56 +1059,74 @@ const BatteryInventory: React.FC = () => {
 
       {/* Battery Detail Dialog */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Battery className="h-5 w-5 text-blue-600" />
-              Chi tiết Pin
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto glass-card border-0">
+          <DialogHeader className="pb-4 border-b border-slate-200/50 dark:border-slate-700/50">
+            <DialogTitle className="flex items-center gap-3 text-2xl">
+              <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg">
+                <Battery className="h-6 w-6 text-white" />
+              </div>
+              <span className="bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
+                Chi tiết Pin
+              </span>
             </DialogTitle>
-            <DialogDescription>
-              Thông tin chi tiết về pin {selectedBattery?.battery_code}
+            <DialogDescription className="text-base mt-2">
+              Thông tin chi tiết về pin{" "}
+              <span className="font-semibold text-slate-900 dark:text-white">
+                {selectedBattery?.battery_code}
+              </span>
             </DialogDescription>
           </DialogHeader>
 
           {selectedBattery && (
-            <div className="space-y-6 py-4">
+            <div className="space-y-6 py-6">
               {/* Status Badge */}
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold">Trạng thái</h3>
-                <Badge className={getDetailStatusColor(selectedBattery.status)}>
-                  {getStatusLabel(selectedBattery.status)}
+              <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200/50 dark:border-slate-700/50">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                  Trạng thái
+                </h3>
+                <Badge className={`${getDetailStatusColor(selectedBattery.status)} text-base px-4 py-1.5`}>
+                  {getStatusIcon(selectedBattery.status)}
+                  <span className="ml-2">{getStatusLabel(selectedBattery.status)}</span>
                 </Badge>
               </div>
 
               {/* Battery Info Grid */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2 bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
-                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-1">
-                    <Battery className="h-4 w-4" />
+                <div className="col-span-2 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-xl p-5 border border-blue-200/50 dark:border-blue-800/50">
+                  <div className="flex items-center gap-2 text-sm font-medium text-blue-700 dark:text-blue-300 mb-2">
+                    <Battery className="h-5 w-5" />
                     <span>Mã Pin</span>
                   </div>
-                  <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                  <p className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400 bg-clip-text text-transparent">
                     {selectedBattery.battery_code}
                   </p>
                 </div>
 
-                <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
-                  <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200/50 dark:border-slate-700/50 hover:shadow-md transition-shadow duration-200">
+                  <div className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
                     Model
                   </div>
-                  <p className="font-semibold text-gray-900 dark:text-white">
+                  <p className="text-lg font-bold text-slate-900 dark:text-white">
                     {selectedBattery.model}
                   </p>
                 </div>
 
-                <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
-                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-1">
-                    <Zap className="h-4 w-4" />
+                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200/50 dark:border-slate-700/50 hover:shadow-md transition-shadow duration-200">
+                  <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
+                    <Zap className="h-4 w-4 text-yellow-500" />
                     <span>Mức sạc</span>
                   </div>
-                  <p className="font-semibold text-gray-900 dark:text-white">
+                  <p className={`text-lg font-bold ${getChargeColor(selectedBattery.current_charge)}`}>
                     {selectedBattery.current_charge}%
                   </p>
+                  <div className="mt-2 relative h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full bg-gradient-to-r ${getChargeGradient(
+                        selectedBattery.current_charge
+                      )} rounded-full transition-all duration-500`}
+                      style={{ width: `${selectedBattery.current_charge}%` }}
+                    ></div>
+                  </div>
                 </div>
 
                 {selectedBattery.capacity_kwh && (
@@ -1018,27 +1152,29 @@ const BatteryInventory: React.FC = () => {
                 )}
 
                 {selectedBattery.health_percentage && (
-                  <div className="col-span-2 bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-2">
-                      <Activity className="h-4 w-4" />
+                  <div className="col-span-2 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-900/50 rounded-xl p-5 border border-slate-200/50 dark:border-slate-700/50">
+                    <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400 mb-3">
+                      <Activity className="h-5 w-5 text-emerald-500" />
                       <span>Tình trạng sức khỏe</span>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1 relative h-3 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
                         <div
-                          className={`h-2 rounded-full transition-all ${
+                          className={`h-full rounded-full transition-all duration-500 ${
                             selectedBattery.health_percentage >= 80
-                              ? "bg-green-500"
+                              ? "bg-gradient-to-r from-green-500 to-emerald-600"
                               : selectedBattery.health_percentage >= 50
-                              ? "bg-yellow-500"
-                              : "bg-red-500"
+                              ? "bg-gradient-to-r from-yellow-500 to-orange-500"
+                              : "bg-gradient-to-r from-red-500 to-rose-600"
                           }`}
                           style={{
                             width: `${selectedBattery.health_percentage}%`,
                           }}
-                        />
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-r from-white/30 to-transparent"></div>
+                        </div>
                       </div>
-                      <span className="font-semibold text-gray-900 dark:text-white">
+                      <span className="text-xl font-bold text-slate-900 dark:text-white min-w-[3rem] text-right">
                         {selectedBattery.health_percentage}%
                       </span>
                     </div>
@@ -1059,15 +1195,15 @@ const BatteryInventory: React.FC = () => {
               </div>
 
               {selectedBattery.stations && (
-                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
-                  <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300 mb-2">
-                    <MapPin className="h-4 w-4" />
-                    <span className="font-semibold">Trạm</span>
+                <div className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/30 dark:to-cyan-900/20 rounded-xl p-5 border border-blue-200/50 dark:border-blue-800/50">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-blue-700 dark:text-blue-300 mb-3">
+                    <MapPin className="h-5 w-5" />
+                    <span>Trạm</span>
                   </div>
-                  <p className="text-gray-900 dark:text-white font-medium">
+                  <p className="text-lg font-bold text-slate-900 dark:text-white mb-1">
                     {selectedBattery.stations.name}
                   </p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
                     {selectedBattery.stations.address}
                   </p>
                 </div>
@@ -1101,56 +1237,64 @@ const BatteryInventory: React.FC = () => {
               </div>
 
               {/* Battery History */}
-              <div className="border-t pt-4 mt-4">
-                <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                  <Activity className="h-5 w-5" />
+              <div className="border-t border-slate-200/50 dark:border-slate-700/50 pt-6 mt-6">
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-slate-900 dark:text-white">
+                  <Activity className="h-5 w-5 text-emerald-500" />
                   Lịch sử chuyển trạm
                 </h3>
                 {loadingHistory ? (
-                  <div className="flex items-center justify-center py-4">
-                    <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
                   </div>
                 ) : batteryHistory.length > 0 ? (
-                  <div className="space-y-3 max-h-64 overflow-y-auto">
-                    {batteryHistory.map((log) => (
+                  <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
+                    {batteryHistory.map((log, index) => (
                       <div
                         key={log.transfer_id}
-                        className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3 text-sm"
+                        className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-900/50 rounded-xl p-4 border border-slate-200/50 dark:border-slate-700/50 hover:shadow-md transition-all duration-200"
                       >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-medium text-gray-900 dark:text-white">
-                            {new Date(log.transferred_at).toLocaleString(
-                              "vi-VN"
-                            )}
-                          </span>
-                          <Badge variant="outline" className="text-xs">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                            <span className="font-semibold text-slate-900 dark:text-white">
+                              {new Date(log.transferred_at).toLocaleString(
+                                "vi-VN"
+                              )}
+                            </span>
+                          </div>
+                          <Badge variant="outline" className="text-xs border-emerald-300 dark:border-emerald-700">
                             {log.transfer_status || "completed"}
                           </Badge>
                         </div>
-                        <div className="space-y-1 text-gray-600 dark:text-gray-400">
-                          <p>
-                            <span className="font-medium">Từ:</span>{" "}
-                            {log.from_station?.name || "N/A"}
-                          </p>
-                          <p>
-                            <span className="font-medium">Đến:</span>{" "}
-                            {log.to_station?.name || "N/A"}
-                          </p>
-                          <p>
-                            <span className="font-medium">Lý do:</span>{" "}
-                            {log.transfer_reason}
-                          </p>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-slate-700 dark:text-slate-300 min-w-[3rem]">Từ:</span>
+                            <span className="text-slate-900 dark:text-white">{log.from_station?.name || "N/A"}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-slate-700 dark:text-slate-300 min-w-[3rem]">Đến:</span>
+                            <span className="text-slate-900 dark:text-white">{log.to_station?.name || "N/A"}</span>
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <span className="font-medium text-slate-700 dark:text-slate-300 min-w-[3rem]">Lý do:</span>
+                            <span className="text-slate-900 dark:text-white">{log.transfer_reason}</span>
+                          </div>
                           {log.notes && (
-                            <p className="text-xs italic mt-1">{log.notes}</p>
+                            <div className="mt-2 p-2 bg-slate-100 dark:bg-slate-800 rounded-lg">
+                              <p className="text-xs italic text-slate-600 dark:text-slate-400">{log.notes}</p>
+                            </div>
                           )}
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-                    Chưa có lịch sử chuyển trạm
-                  </p>
+                  <div className="text-center py-8">
+                    <Activity className="h-12 w-12 text-slate-400 dark:text-slate-500 mx-auto mb-3 opacity-50" />
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      Chưa có lịch sử chuyển trạm
+                    </p>
+                  </div>
                 )}
               </div>
             </div>

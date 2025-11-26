@@ -13,7 +13,8 @@ import {
   Loader2,
   X,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  RefreshCw
 } from 'lucide-react';
 import { authService, UserProfile } from '../../services/auth.service';
 import { useToast } from '../../hooks/use-toast';
@@ -425,8 +426,42 @@ const PersonalProfile: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="p-6 space-y-6">
+        {/* Header Skeleton */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <div className="h-9 w-64 bg-slate-200 dark:bg-slate-700 rounded-lg mb-2 animate-pulse"></div>
+            <div className="h-5 w-80 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
+          </div>
+          <div className="h-10 w-32 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
+        </div>
+
+        {/* Profile Cards Skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card className="glass-card border-0 animate-pulse">
+            <CardContent className="p-6 text-center">
+              <div className="h-24 w-24 bg-slate-200 dark:bg-slate-700 rounded-full mx-auto mb-4"></div>
+              <div className="h-6 w-48 bg-slate-200 dark:bg-slate-700 rounded mx-auto mb-2"></div>
+              <div className="h-4 w-32 bg-slate-200 dark:bg-slate-700 rounded mx-auto mb-4"></div>
+            </CardContent>
+          </Card>
+          <Card className="lg:col-span-2 glass-card border-0 animate-pulse">
+            <CardHeader>
+              <div className="h-6 w-48 bg-slate-200 dark:bg-slate-700 rounded mb-2"></div>
+              <div className="h-4 w-64 bg-slate-200 dark:bg-slate-700 rounded"></div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="space-y-2">
+                    <div className="h-4 w-24 bg-slate-200 dark:bg-slate-700 rounded"></div>
+                    <div className="h-10 w-full bg-slate-200 dark:bg-slate-700 rounded"></div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -434,10 +469,26 @@ const PersonalProfile: React.FC = () => {
   if (!profile) {
     return (
       <div className="p-6">
-        <Card>
-          <CardContent className="p-12 text-center">
-            <p className="text-gray-600">Không thể tải thông tin profile</p>
-            <Button onClick={fetchProfile} className="mt-4">
+        <Card className="glass-card border-0 overflow-hidden relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-red-50/50 to-rose-50/30 dark:from-red-900/20 dark:to-rose-900/20"></div>
+          <CardContent className="p-16 text-center relative">
+            <div className="relative inline-block mb-6">
+              <div className="absolute inset-0 bg-gradient-to-r from-red-400 to-rose-500 rounded-full blur-2xl opacity-20 animate-pulse"></div>
+              <div className="relative p-6 bg-gradient-to-br from-red-100 to-rose-100 dark:from-red-900/30 dark:to-rose-900/30 rounded-full">
+                <AlertCircle className="h-16 w-16 text-red-600 dark:text-red-400" />
+              </div>
+            </div>
+            <h3 className="text-2xl font-bold bg-gradient-to-r from-red-900 to-rose-700 dark:from-red-200 dark:to-rose-200 bg-clip-text text-transparent mb-3">
+              Không thể tải thông tin
+            </h3>
+            <p className="text-slate-600 dark:text-slate-400 mb-6 max-w-md mx-auto">
+              Không thể tải thông tin profile. Vui lòng thử lại sau.
+            </p>
+            <Button 
+              onClick={fetchProfile} 
+              className="glass border-red-300/50 hover:bg-red-50 dark:border-red-700/50 dark:hover:bg-red-900/20 hover:scale-105 transition-all duration-200"
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
               Thử lại
             </Button>
           </CardContent>
@@ -460,6 +511,7 @@ const PersonalProfile: React.FC = () => {
               variant="outline"
               onClick={handleCancelEdit}
               disabled={saving}
+              className="glass border-slate-200/50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-800 hover:scale-105 transition-all duration-200"
             >
               <X className="mr-2 h-4 w-4" />
               Hủy
@@ -467,7 +519,7 @@ const PersonalProfile: React.FC = () => {
           )}
           <Button 
             onClick={() => isEditing ? handleSaveClick() : setIsEditing(true)}
-            className="bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+            className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200"
             disabled={saving || (isEditing && !isProfileFormValid())}
           >
             {saving ? (
@@ -492,48 +544,56 @@ const PersonalProfile: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Profile Card */}
-        <Card className="glass-card border-0 glow">
-          <CardContent className="p-6 text-center">
-            <div className="relative inline-block mb-4">
-              <Avatar className="w-24 h-24">
-                {profile.avatar && <AvatarImage src={profile.avatar} />}
-                <AvatarFallback className="text-2xl bg-gradient-to-r from-green-500 to-emerald-500 text-white">
-                  {profile.full_name.charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <input
-                type="file"
-                id="avatar-upload"
-                className="hidden"
-                accept="image/*"
-                onChange={handleAvatarUpload}
-              />
-              <Button 
-                size="sm" 
-                className="absolute bottom-0 right-0 rounded-full w-8 h-8 p-0"
-                onClick={() => document.getElementById('avatar-upload')?.click()}
-              >
-                <Camera className="h-4 w-4" />
-              </Button>
+        <Card className="glass-card border-0 glow overflow-hidden relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-emerald-500/5 opacity-50"></div>
+          <CardContent className="p-6 text-center relative">
+            <div className="relative inline-block mb-6">
+              <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full blur-2xl opacity-20 animate-pulse"></div>
+              <div className="relative">
+                <Avatar className="w-28 h-28 ring-4 ring-green-200 dark:ring-green-800 ring-offset-2 ring-offset-white dark:ring-offset-slate-900">
+                  {profile.avatar && <AvatarImage src={profile.avatar} />}
+                  <AvatarFallback className="text-3xl font-bold bg-gradient-to-br from-green-500 to-emerald-600 text-white">
+                    {profile.full_name.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <input
+                  type="file"
+                  id="avatar-upload"
+                  className="hidden"
+                  accept="image/*"
+                  onChange={handleAvatarUpload}
+                />
+                <Button 
+                  size="sm" 
+                  className="absolute bottom-0 right-0 rounded-full w-10 h-10 p-0 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-200"
+                  onClick={() => document.getElementById('avatar-upload')?.click()}
+                >
+                  <Camera className="h-5 w-5" />
+                </Button>
+              </div>
             </div>
             
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">{profile.full_name}</h2>
-            <p className="text-slate-600 dark:text-slate-400 mb-2">
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent mb-2">
+              {profile.full_name}
+            </h2>
+            <p className="text-slate-600 dark:text-slate-400 mb-2 font-medium">
               {profile.role === 'STAFF' ? 'Nhân viên' : profile.role === 'ADMIN' ? 'Quản trị viên' : 'Tài xế'}
             </p>
             <p className="text-sm text-slate-500 dark:text-slate-500 mb-4">{profile.email}</p>
             
             <div className="flex justify-center mb-4">
-              <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0">
-                <Shield className="mr-1 h-3 w-3" />
-                {profile.role === 'STAFF' ? 'Nhân viên Chính thức' : profile.role}
+              <Badge className="bg-gradient-to-r from-green-500 to-emerald-600 text-white border-0 shadow-md px-4 py-1.5">
+                <Shield className="mr-1.5 h-4 w-4" />
+                <span className="font-semibold">
+                  {profile.role === 'STAFF' ? 'Nhân viên Chính thức' : profile.role}
+                </span>
               </Badge>
             </div>
 
             {profile.station && (
-              <div className="text-sm text-slate-600 dark:text-slate-400 mb-2">
-                <p className="font-medium">Trạm làm việc:</p>
-                <p>{profile.station.name}</p>
+              <div className="p-3 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-xl border border-blue-200/50 dark:border-blue-800/50">
+                <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-1">Trạm làm việc</p>
+                <p className="text-sm font-bold text-blue-900 dark:text-blue-100">{profile.station.name}</p>
               </div>
             )}
           </CardContent>
@@ -689,21 +749,27 @@ const PersonalProfile: React.FC = () => {
       </div>
 
       {/* Account Settings */}
-      <Card className="glass-card border-0 glow">
-        <CardHeader>
-          <CardTitle className="text-slate-900 dark:text-white">Cài đặt Tài khoản</CardTitle>
+      <Card className="glass-card border-0 glow overflow-hidden relative">
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-500/5 to-slate-600/5 opacity-50"></div>
+        <CardHeader className="relative">
+          <CardTitle className="text-slate-900 dark:text-white text-xl">Cài đặt Tài khoản</CardTitle>
           <CardDescription className="text-slate-600 dark:text-slate-400">Quản lý bảo mật và tùy chọn cá nhân</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between p-4 glass rounded-lg">
-            <div>
-              <h4 className="font-medium text-slate-900 dark:text-white">Đổi mật khẩu</h4>
-              <p className="text-sm text-slate-600 dark:text-slate-400">Cập nhật mật khẩu đăng nhập hệ thống</p>
+        <CardContent className="space-y-4 relative">
+          <div className="flex items-center justify-between p-5 glass-card rounded-xl border-0 hover:shadow-lg transition-all duration-300 hover:scale-[1.01]">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg shadow-md">
+                <Shield className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h4 className="font-bold text-slate-900 dark:text-white">Đổi mật khẩu</h4>
+                <p className="text-sm text-slate-600 dark:text-slate-400">Cập nhật mật khẩu đăng nhập hệ thống</p>
+              </div>
             </div>
             <Button 
               variant="outline" 
               size="sm" 
-              className="glass border-slate-200/50 dark:border-slate-700/50"
+              className="glass border-blue-300/50 hover:bg-blue-50 dark:border-blue-700/50 dark:hover:bg-blue-900/20 hover:scale-105 transition-all duration-200"
               onClick={() => setChangePasswordOpen(true)}
             >
               Thay đổi
@@ -714,16 +780,23 @@ const PersonalProfile: React.FC = () => {
 
       {/* Change Password Dialog */}
       <Dialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Đổi Mật Khẩu</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="sm:max-w-[500px] glass-card border-0">
+          <DialogHeader className="pb-4 border-b border-slate-200/50 dark:border-slate-700/50">
+            <DialogTitle className="flex items-center gap-3 text-2xl">
+              <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg">
+                <Shield className="h-6 w-6 text-white" />
+              </div>
+              <span className="bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
+                Đổi Mật Khẩu
+              </span>
+            </DialogTitle>
+            <DialogDescription className="text-base mt-2">
               Nhập mật khẩu hiện tại và mật khẩu mới để thay đổi.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-5 py-6">
             <div className="space-y-2">
-              <Label htmlFor="current_password">
+              <Label htmlFor="current_password" className="text-sm font-semibold text-slate-900 dark:text-white">
                 Mật khẩu hiện tại <span className="text-red-500">*</span>
               </Label>
               <div className="relative">
@@ -757,7 +830,7 @@ const PersonalProfile: React.FC = () => {
                     }
                   }}
                   disabled={passwordLoading}
-                  className={`${
+                  className={`glass border-slate-200/50 dark:border-slate-700/50 bg-white dark:bg-slate-900 ${
                     touchedFields.has('current_password') && validationErrors.current_password
                       ? 'border-red-500 focus:border-red-500'
                       : ''
@@ -772,7 +845,7 @@ const PersonalProfile: React.FC = () => {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="new_password">
+              <Label htmlFor="new_password" className="text-sm font-semibold text-slate-900 dark:text-white">
                 Mật khẩu mới <span className="text-red-500">*</span>
               </Label>
               <div className="relative">
@@ -798,7 +871,7 @@ const PersonalProfile: React.FC = () => {
                     }
                   }}
                   disabled={passwordLoading}
-                  className={`${
+                  className={`glass border-slate-200/50 dark:border-slate-700/50 bg-white dark:bg-slate-900 ${
                     touchedFields.has('new_password') && validationErrors.new_password
                       ? 'border-red-500 focus:border-red-500'
                       : ''
@@ -819,7 +892,7 @@ const PersonalProfile: React.FC = () => {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirm_password">
+              <Label htmlFor="confirm_password" className="text-sm font-semibold text-slate-900 dark:text-white">
                 Xác nhận mật khẩu mới <span className="text-red-500">*</span>
               </Label>
               <div className="relative">
@@ -838,7 +911,7 @@ const PersonalProfile: React.FC = () => {
                     validateField('confirm_password', passwordData.confirm_password, passwordData.new_password);
                   }}
                   disabled={passwordLoading}
-                  className={`${
+                  className={`glass border-slate-200/50 dark:border-slate-700/50 bg-white dark:bg-slate-900 ${
                     touchedFields.has('confirm_password') && validationErrors.confirm_password
                       ? 'border-red-500 focus:border-red-500'
                       : ''
@@ -859,7 +932,7 @@ const PersonalProfile: React.FC = () => {
               </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-slate-200/50 dark:border-slate-700/50 pt-4 mt-4">
             <Button
               variant="outline"
               onClick={() => {
@@ -873,15 +946,26 @@ const PersonalProfile: React.FC = () => {
                 setTouchedFields(new Set());
               }}
               disabled={passwordLoading}
+              className="hover:scale-105 transition-all duration-200"
             >
               Hủy
             </Button>
             <Button 
               onClick={handleChangePasswordClick}
               disabled={passwordLoading || !isPasswordFormValid()}
+              className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200"
             >
-              {passwordLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Đổi mật khẩu
+              {passwordLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Đang xử lý...
+                </>
+              ) : (
+                <>
+                  <Shield className="mr-2 h-4 w-4" />
+                  Đổi mật khẩu
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

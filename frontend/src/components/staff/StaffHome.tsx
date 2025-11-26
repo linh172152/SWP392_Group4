@@ -14,7 +14,10 @@ import {
   Activity,
   RefreshCw,
   Play,
-  Pause
+  Pause,
+  CheckCircle2,
+  Wrench,
+  AlertTriangle
 } from 'lucide-react';
 import { getStationBatteries, getStationBookings, Battery as BatteryType, StaffBooking } from '../../services/staff.service';
 import {
@@ -246,7 +249,7 @@ const StaffHome: React.FC = () => {
       </div>
 
       {/* Key Metrics - Redesigned */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         <Card className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -303,25 +306,6 @@ const StaffHome: React.FC = () => {
             </div>
           </CardContent>
         </Card>
-
-        <Card className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Sử dụng</p>
-                <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">
-                  {batteryUtilization}%
-                </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  tỷ lệ sử dụng
-                </p>
-              </div>
-              <div className="p-4 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <TrendingUp className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Two Column Layout */}
@@ -339,78 +323,141 @@ const StaffHome: React.FC = () => {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-5">
+          <CardContent className="space-y-6">
             {totalBatteries === 0 ? (
-              <div className="text-center py-8">
-                <Battery className="h-12 w-12 mx-auto mb-3 text-slate-400" />
-                <p className="text-sm text-slate-500 dark:text-slate-400">
+              <div className="text-center py-12">
+                <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+                  <Battery className="h-10 w-10 text-slate-400" />
+                </div>
+                <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
                   Chưa có dữ liệu pin
                 </p>
               </div>
             ) : (
               <>
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Khả dụng</span>
+                  {/* Khả dụng */}
+                  <div className="group relative p-4 rounded-xl bg-gradient-to-r from-green-50/50 to-emerald-50/30 dark:from-green-950/20 dark:to-emerald-950/10 border border-green-200/50 dark:border-green-800/30 hover:shadow-md transition-all duration-300 hover:scale-[1.02]">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg shadow-sm group-hover:shadow-md transition-shadow">
+                          <CheckCircle2 className="h-4 w-4 text-white" />
+                        </div>
+                        <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">Khả dụng</span>
                       </div>
-                      <span className="text-sm font-bold text-green-600 dark:text-green-400">{availableBatteries}</span>
+                      <div className="text-right">
+                        <span className="text-2xl font-bold text-green-600 dark:text-green-400 block leading-none">
+                          {availableBatteries}
+                        </span>
+                      </div>
                     </div>
-                    <Progress 
-                      value={(availableBatteries / totalBatteries) * 100} 
-                      className="h-3 bg-slate-200 dark:bg-slate-700"
-                    />
+                    <div className="relative">
+                      <Progress 
+                        value={(availableBatteries / totalBatteries) * 100} 
+                        className="h-2.5 bg-green-100/50 dark:bg-green-900/20"
+                      />
+                      <div 
+                        className="absolute top-0 left-0 h-2.5 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full transition-all duration-500"
+                        style={{ width: `${(availableBatteries / totalBatteries) * 100}%` }}
+                      />
+                    </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Đang sạc</span>
+                  {/* Đang sạc */}
+                  <div className="group relative p-4 rounded-xl bg-gradient-to-r from-blue-50/50 to-cyan-50/30 dark:from-blue-950/20 dark:to-cyan-950/10 border border-blue-200/50 dark:border-blue-800/30 hover:shadow-md transition-all duration-300 hover:scale-[1.02]">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-lg shadow-sm group-hover:shadow-md transition-shadow">
+                          <Zap className="h-4 w-4 text-white" />
+                        </div>
+                        <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">Đang sạc</span>
                       </div>
-                      <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{chargingBatteries}</span>
+                      <div className="text-right">
+                        <span className="text-2xl font-bold text-blue-600 dark:text-blue-400 block leading-none">
+                          {chargingBatteries}
+                        </span>
+                      </div>
                     </div>
-                    <Progress 
-                      value={(chargingBatteries / totalBatteries) * 100} 
-                      className="h-3 bg-slate-200 dark:bg-slate-700"
-                    />
+                    <div className="relative">
+                      <Progress 
+                        value={(chargingBatteries / totalBatteries) * 100} 
+                        className="h-2.5 bg-blue-100/50 dark:bg-blue-900/20"
+                      />
+                      <div 
+                        className="absolute top-0 left-0 h-2.5 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-full transition-all duration-500"
+                        style={{ width: `${(chargingBatteries / totalBatteries) * 100}%` }}
+                      />
+                    </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Bảo trì</span>
+                  {/* Bảo trì */}
+                  <div className="group relative p-4 rounded-xl bg-gradient-to-r from-yellow-50/50 to-amber-50/30 dark:from-yellow-950/20 dark:to-amber-950/10 border border-yellow-200/50 dark:border-yellow-800/30 hover:shadow-md transition-all duration-300 hover:scale-[1.02]">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-gradient-to-br from-yellow-500 to-amber-600 rounded-lg shadow-sm group-hover:shadow-md transition-shadow">
+                          <Wrench className="h-4 w-4 text-white" />
+                        </div>
+                        <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">Bảo trì</span>
                       </div>
-                      <span className="text-sm font-bold text-yellow-600 dark:text-yellow-400">{maintenanceBatteries}</span>
+                      <div className="text-right">
+                        <span className="text-2xl font-bold text-yellow-600 dark:text-yellow-400 block leading-none">
+                          {maintenanceBatteries}
+                        </span>
+                      </div>
                     </div>
-                    <Progress 
-                      value={(maintenanceBatteries / totalBatteries) * 100} 
-                      className="h-3 bg-slate-200 dark:bg-slate-700"
-                    />
+                    <div className="relative">
+                      <Progress 
+                        value={(maintenanceBatteries / totalBatteries) * 100} 
+                        className="h-2.5 bg-yellow-100/50 dark:bg-yellow-900/20"
+                      />
+                      <div 
+                        className="absolute top-0 left-0 h-2.5 bg-gradient-to-r from-yellow-500 to-amber-600 rounded-full transition-all duration-500"
+                        style={{ width: `${(maintenanceBatteries / totalBatteries) * 100}%` }}
+                      />
+                    </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Hỏng</span>
+                  {/* Hỏng */}
+                  <div className="group relative p-4 rounded-xl bg-gradient-to-r from-red-50/50 to-rose-50/30 dark:from-red-950/20 dark:to-rose-950/10 border border-red-200/50 dark:border-red-800/30 hover:shadow-md transition-all duration-300 hover:scale-[1.02]">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-gradient-to-br from-red-500 to-rose-600 rounded-lg shadow-sm group-hover:shadow-md transition-shadow">
+                          <AlertTriangle className="h-4 w-4 text-white" />
+                        </div>
+                        <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">Hỏng</span>
                       </div>
-                      <span className="text-sm font-bold text-red-600 dark:text-red-400">{damagedBatteries}</span>
+                      <div className="text-right">
+                        <span className="text-2xl font-bold text-red-600 dark:text-red-400 block leading-none">
+                          {damagedBatteries}
+                        </span>
+                      </div>
                     </div>
-                    <Progress 
-                      value={(damagedBatteries / totalBatteries) * 100} 
-                      className="h-3 bg-slate-200 dark:bg-slate-700"
-                    />
+                    <div className="relative">
+                      <Progress 
+                        value={(damagedBatteries / totalBatteries) * 100} 
+                        className="h-2.5 bg-red-100/50 dark:bg-red-900/20"
+                      />
+                      <div 
+                        className="absolute top-0 left-0 h-2.5 bg-gradient-to-r from-red-500 to-rose-600 rounded-full transition-all duration-500"
+                        style={{ width: `${(damagedBatteries / totalBatteries) * 100}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-slate-200/50 dark:border-slate-700/50 mt-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Tổng số pin</span>
-                    <span className="text-lg font-bold text-slate-900 dark:text-white">{totalBatteries}</span>
+                {/* Tổng số pin - Enhanced */}
+                <div className="pt-5 border-t-2 border-slate-200/60 dark:border-slate-700/60">
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-slate-50 to-slate-100/50 dark:from-slate-800/50 dark:to-slate-900/50">
+                    <div className="flex items-center gap-2">
+                      <Battery className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+                      <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Tổng số pin</span>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-slate-100 dark:to-slate-300 bg-clip-text text-transparent">
+                        {totalBatteries}
+                      </span>
+                      <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">pin</span>
+                    </div>
                   </div>
                 </div>
               </>

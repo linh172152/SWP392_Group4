@@ -627,10 +627,59 @@ const SwapTransactions: React.FC = () => {
     }
   };
 
+  // Skeleton Loading Component
+  const BookingCardSkeleton = () => (
+    <Card className="glass-card border-0 animate-pulse">
+      <CardContent className="p-6">
+        <div className="flex flex-col lg:flex-row gap-4">
+          <div className="flex items-center space-x-4 flex-1">
+            <div className="h-12 w-12 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
+            <div className="flex-1 space-y-2">
+              <div className="h-5 w-32 bg-slate-200 dark:bg-slate-700 rounded"></div>
+              <div className="h-4 w-48 bg-slate-200 dark:bg-slate-700 rounded"></div>
+            </div>
+          </div>
+          <div className="h-10 w-24 bg-slate-200 dark:bg-slate-700 rounded"></div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="p-6 space-y-6">
+        {/* Header Skeleton */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <div className="h-9 w-64 bg-slate-200 dark:bg-slate-700 rounded-lg mb-2 animate-pulse"></div>
+            <div className="h-5 w-80 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
+          </div>
+          <div className="h-10 w-32 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
+        </div>
+
+        {/* Stats Cards Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i} className="glass-card border-0 animate-pulse">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="h-12 w-12 bg-slate-200 dark:bg-slate-700 rounded-lg"></div>
+                  <div className="flex-1">
+                    <div className="h-4 w-20 bg-slate-200 dark:bg-slate-700 rounded mb-2"></div>
+                    <div className="h-8 w-12 bg-slate-200 dark:bg-slate-700 rounded"></div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Booking Cards Skeleton */}
+        <div className="space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <BookingCardSkeleton key={i} />
+          ))}
+        </div>
       </div>
     );
   }
@@ -718,73 +767,85 @@ const SwapTransactions: React.FC = () => {
 
       {/* Queue Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg group-hover:scale-110 transition-transform duration-300">
-                <Clock className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Chờ xác nhận
-                </p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                  {bookings.filter((b) => b.status === "pending").length}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg group-hover:scale-110 transition-transform duration-300">
-                <CheckCircle className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Đã xác nhận
-                </p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                  {bookings.filter((b) => b.status === "confirmed").length}
-                </p>
+        <Card className="glass-card border-0 glow-hover group overflow-hidden relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 to-orange-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          <CardContent className="p-5 relative">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="p-3.5 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-xl shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+                  <Clock className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
+                    Chờ xác nhận
+                  </p>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-yellow-600 to-orange-600 dark:from-yellow-400 dark:to-orange-400 bg-clip-text text-transparent">
+                    {bookings.filter((b) => b.status === "pending").length}
+                  </p>
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg group-hover:scale-110 transition-transform duration-300">
-                <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Hoàn thành
-                </p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                  {bookings.filter((b) => b.status === "completed").length}
-                </p>
+        <Card className="glass-card border-0 glow-hover group overflow-hidden relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-cyan-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          <CardContent className="p-5 relative">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="p-3.5 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+                  <CheckCircle className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
+                    Đã xác nhận
+                  </p>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400 bg-clip-text text-transparent">
+                    {bookings.filter((b) => b.status === "confirmed").length}
+                  </p>
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg group-hover:scale-110 transition-transform duration-300">
-                <Zap className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+        <Card className="glass-card border-0 glow-hover group overflow-hidden relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          <CardContent className="p-5 relative">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="p-3.5 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+                  <CheckCircle className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
+                    Hoàn thành
+                  </p>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 dark:from-green-400 dark:to-emerald-400 bg-clip-text text-transparent">
+                    {bookings.filter((b) => b.status === "completed").length}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Tổng số
-                </p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                  {totalItems}
-                </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card border-0 glow-hover group overflow-hidden relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-500/10 to-slate-600/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          <CardContent className="p-5 relative">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="p-3.5 bg-gradient-to-br from-slate-500 to-slate-600 rounded-xl shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+                  <Zap className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
+                    Tổng số
+                  </p>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-slate-600 to-slate-700 dark:from-slate-400 dark:to-slate-500 bg-clip-text text-transparent">
+                    {totalItems}
+                  </p>
+                </div>
               </div>
             </div>
           </CardContent>
@@ -830,40 +891,47 @@ const SwapTransactions: React.FC = () => {
         {filteredAndSortedBookings.map((booking) => (
           <Card
             key={booking.booking_id}
-            className="glass-card border-0 glow-hover overflow-hidden"
+            className="glass-card border-0 glow-hover overflow-hidden relative transition-all duration-300 hover:scale-[1.01] hover:shadow-2xl"
           >
-            <CardContent className="p-6">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-500/10 to-cyan-500/5 rounded-full blur-3xl opacity-0 hover:opacity-100 transition-opacity duration-500"></div>
+            <CardContent className="p-6 relative">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 {/* Customer & Vehicle Info */}
-                <div className="flex items-center space-x-4">
-                  <Avatar>
-                    <AvatarFallback>
-                      {booking.user?.full_name
-                        ?.split(" ")
-                        .map((n) => n[0])
-                        .join("") || "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <h3 className="font-semibold text-lg">
+                <div className="flex items-center space-x-4 flex-1">
+                  <div className="relative">
+                    <Avatar className="ring-2 ring-blue-200 dark:ring-blue-800 ring-offset-2 ring-offset-white dark:ring-offset-slate-900">
+                      <AvatarFallback className="bg-gradient-to-br from-blue-500 to-cyan-500 text-white font-bold">
+                        {booking.user?.full_name
+                          ?.split(" ")
+                          .map((n) => n[0])
+                          .join("") || "U"}
+                      </AvatarFallback>
+                    </Avatar>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-bold text-lg bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
                       {booking.user?.full_name || "Khách hàng"}
                     </h3>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-1 mt-1">
+                      <Phone className="h-3.5 w-3.5" />
                       {booking.user?.phone || booking.user?.email}
                     </p>
-                    <div className="flex items-center space-x-2 mt-1">
-                      <Car className="h-4 w-4 text-gray-400" />
-                      <span className="text-sm">
-                        {booking.vehicle?.make} {booking.vehicle?.model} •{" "}
+                    <div className="flex items-center space-x-2 mt-2 p-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200/50 dark:border-slate-700/50">
+                      <Car className="h-4 w-4 text-blue-500" />
+                      <span className="text-sm font-medium text-slate-900 dark:text-white">
+                        {booking.vehicle?.make} {booking.vehicle?.model}
+                      </span>
+                      <span className="text-slate-400">•</span>
+                      <span className="text-sm font-mono font-semibold text-slate-700 dark:text-slate-300">
                         {booking.vehicle?.license_plate}
                       </span>
                     </div>
                     {booking.vehicle?.current_battery?.battery_code && (
-                      <div className="flex items-center space-x-2 mt-1">
-                        <BatteryIcon className="h-4 w-4 text-blue-500" />
-                        <span className="text-sm text-slate-600 dark:text-slate-400">
+                      <div className="flex items-center space-x-2 mt-2 p-2 bg-blue-50/50 dark:bg-blue-900/20 rounded-lg border border-blue-200/50 dark:border-blue-800/50">
+                        <BatteryIcon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        <span className="text-sm text-blue-700 dark:text-blue-300">
                           Pin hiện tại:{" "}
-                          <span className="font-mono font-semibold">
+                          <span className="font-mono font-bold text-blue-900 dark:text-blue-100">
                             {booking.vehicle.current_battery.battery_code}
                           </span>
                         </span>
@@ -873,25 +941,28 @@ const SwapTransactions: React.FC = () => {
                 </div>
 
                 {/* Transaction Details */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <p className="text-gray-500">Loại pin</p>
-                    <p className="font-medium">{booking.battery_model}</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200/50 dark:border-slate-700/50">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Loại pin</p>
+                    <p className="font-semibold text-slate-900 dark:text-white">{booking.battery_model}</p>
                   </div>
-                  <div>
-                    <p className="text-gray-500">Mã booking</p>
-                    <p className="font-medium">{booking.booking_code}</p>
+                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200/50 dark:border-slate-700/50">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Mã booking</p>
+                    <p className="font-mono font-semibold text-slate-900 dark:text-white">{booking.booking_code}</p>
                   </div>
-                  <div>
-                    <p className="text-gray-500">Thời gian đặt</p>
-                    <p className="font-medium">
+                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200/50 dark:border-slate-700/50">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      Thời gian đặt
+                    </p>
+                    <p className="font-semibold text-slate-900 dark:text-white text-xs">
                       {new Date(booking.scheduled_at).toLocaleString("vi-VN")}
                     </p>
                   </div>
                   {booking.checked_in_by_staff && (
-                    <div>
-                      <p className="text-gray-500">Xác nhận bởi</p>
-                      <p className="font-medium">
+                    <div className="p-2.5 bg-blue-50/50 dark:bg-blue-900/20 rounded-lg border border-blue-200/50 dark:border-blue-800/50">
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">Xác nhận bởi</p>
+                      <p className="font-semibold text-blue-900 dark:text-blue-100">
                         {booking.checked_in_by_staff.full_name}
                       </p>
                     </div>
@@ -900,19 +971,20 @@ const SwapTransactions: React.FC = () => {
 
                 {/* Status & Actions */}
                 <div className="flex flex-col items-end space-y-3">
-                  <Badge className={getStatusColor(booking.status)}>
+                  <Badge className={`${getStatusColor(booking.status)} shadow-sm text-sm px-3 py-1.5`}>
                     {getStatusIcon(booking.status)}
-                    <span className="ml-1">
+                    <span className="ml-1.5 font-medium">
                       {getStatusText(booking.status)}
                     </span>
                   </Badge>
 
-                  <div className="flex space-x-2">
+                  <div className="flex flex-wrap gap-2">
                     {booking.status === "pending" && (
                       <Button
                         size="sm"
                         onClick={() => handleOpenConfirmDialog(booking)}
                         disabled={actionLoading === booking.booking_id}
+                        className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200"
                       >
                         {actionLoading === booking.booking_id ? (
                           <Loader2 className="mr-1 h-3 w-3 animate-spin" />
@@ -927,6 +999,7 @@ const SwapTransactions: React.FC = () => {
                         size="sm"
                         onClick={() => handleOpenCompleteDialog(booking)}
                         disabled={actionLoading === booking.booking_id}
+                        className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200"
                       >
                         {actionLoading === booking.booking_id ? (
                           <Loader2 className="mr-1 h-3 w-3 animate-spin" />
@@ -940,6 +1013,7 @@ const SwapTransactions: React.FC = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => handleViewDetail(booking)}
+                      className="glass border-blue-300/50 hover:bg-blue-50 dark:border-blue-700/50 dark:hover:bg-blue-900/20 hover:scale-105 transition-all duration-200"
                     >
                       <Eye className="mr-1 h-3 w-3" />
                       Chi tiết
@@ -950,7 +1024,7 @@ const SwapTransactions: React.FC = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="text-red-600 hover:text-red-700"
+                          className="glass border-red-300/50 hover:bg-red-50 dark:border-red-700/50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 hover:text-red-700 hover:scale-105 transition-all duration-200"
                           onClick={() => handleOpenCancelDialog(booking)}
                           disabled={actionLoading === booking.booking_id}
                         >
@@ -1034,18 +1108,26 @@ const SwapTransactions: React.FC = () => {
 
       {/* Empty State */}
       {bookings.length === 0 && !loading && (
-        <Card className="glass-card border-0 p-12 text-center">
-          <Zap className="mx-auto h-12 w-12 text-slate-400 dark:text-slate-500 mb-4" />
-          <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">
-            {searchTerm || statusFilter !== "all"
-              ? "Không tìm thấy kết quả"
-              : "Không có giao dịch đang hoạt động"}
-          </h3>
-          <p className="text-slate-600 dark:text-slate-400">
-            {searchTerm || statusFilter !== "all"
-              ? "Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm"
-              : "Hàng đợi trống. Khách hàng mới sẽ xuất hiện tại đây khi họ đến."}
-          </p>
+        <Card className="glass-card border-0 overflow-hidden relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-50/50 to-slate-100/30 dark:from-slate-900/50 dark:to-slate-800/30"></div>
+          <CardContent className="p-16 text-center relative">
+            <div className="relative inline-block mb-6">
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-cyan-500 rounded-full blur-2xl opacity-20 animate-pulse"></div>
+              <div className="relative p-6 bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-900/30 dark:to-cyan-900/30 rounded-full">
+                <Zap className="h-16 w-16 text-blue-600 dark:text-blue-400" />
+              </div>
+            </div>
+            <h3 className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent mb-3">
+              {searchTerm || statusFilter !== "all"
+                ? "Không tìm thấy kết quả"
+                : "Không có giao dịch đang hoạt động"}
+            </h3>
+            <p className="text-slate-600 dark:text-slate-400 max-w-md mx-auto">
+              {searchTerm || statusFilter !== "all"
+                ? "Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm để tìm giao dịch bạn cần"
+                : "Hàng đợi trống. Khách hàng mới sẽ xuất hiện tại đây khi họ đến trạm."}
+            </p>
+          </CardContent>
         </Card>
       )}
 

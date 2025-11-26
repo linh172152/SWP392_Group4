@@ -373,57 +373,77 @@ const WorkSchedule: React.FC = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <Clock className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Ca sắp tới</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{totalScheduled}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <CheckCircle className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Đã hoàn thành</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{totalCompleted}</p>
+        <Card className="glass-card border-0 glow-hover group overflow-hidden relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-cyan-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          <CardContent className="p-5 relative">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="p-3.5 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+                  <Clock className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Ca sắp tới</p>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400 bg-clip-text text-transparent">
+                    {totalScheduled}
+                  </p>
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-slate-500 to-slate-600 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <XCircle className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Vắng mặt</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{totalAbsent}</p>
+        <Card className="glass-card border-0 glow-hover group overflow-hidden relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          <CardContent className="p-5 relative">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="p-3.5 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+                  <CheckCircle className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Đã hoàn thành</p>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 dark:from-green-400 dark:to-emerald-400 bg-clip-text text-transparent">
+                    {totalCompleted}
+                  </p>
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass-card border-0 glow-hover group">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-purple-500 to-violet-500 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <Briefcase className="h-5 w-5 text-white" />
+        <Card className="glass-card border-0 glow-hover group overflow-hidden relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-red-500/10 to-rose-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          <CardContent className="p-5 relative">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="p-3.5 bg-gradient-to-br from-red-500 to-rose-600 rounded-xl shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+                  <XCircle className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Vắng mặt</p>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-red-600 to-rose-600 dark:from-red-400 dark:to-rose-400 bg-clip-text text-transparent">
+                    {totalAbsent}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Giờ làm tuần</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{totalHours}h</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card border-0 glow-hover group overflow-hidden relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-violet-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          <CardContent className="p-5 relative">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="p-3.5 bg-gradient-to-br from-purple-500 to-violet-600 rounded-xl shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+                  <Briefcase className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Giờ làm tuần</p>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-violet-600 dark:from-purple-400 dark:to-violet-400 bg-clip-text text-transparent">
+                    {totalHours}h
+                  </p>
+                </div>
               </div>
             </div>
           </CardContent>
@@ -608,105 +628,159 @@ const WorkSchedule: React.FC = () => {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-slate-500" />
+              <div className="space-y-4">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="p-5 glass-card rounded-xl border-0 animate-pulse">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="h-10 w-10 bg-slate-200 dark:bg-slate-700 rounded-lg"></div>
+                        <div className="space-y-2">
+                          <div className="h-5 w-48 bg-slate-200 dark:bg-slate-700 rounded"></div>
+                          <div className="h-4 w-24 bg-slate-200 dark:bg-slate-700 rounded"></div>
+                        </div>
+                      </div>
+                      <div className="h-8 w-24 bg-slate-200 dark:bg-slate-700 rounded"></div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="h-12 bg-slate-200 dark:bg-slate-700 rounded-lg"></div>
+                      <div className="h-12 bg-slate-200 dark:bg-slate-700 rounded-lg"></div>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : error ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
-                <p className="text-slate-600 dark:text-slate-400 mb-4">{error}</p>
-                <Button onClick={loadSchedules} variant="outline">
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Thử lại
-                </Button>
+              <div className="flex flex-col items-center justify-center py-16 text-center relative overflow-hidden rounded-lg">
+                <div className="absolute inset-0 bg-gradient-to-br from-red-50/50 to-rose-50/30 dark:from-red-900/20 dark:to-rose-900/20"></div>
+                <div className="relative">
+                  <div className="relative inline-block mb-6">
+                    <div className="absolute inset-0 bg-gradient-to-r from-red-400 to-rose-500 rounded-full blur-2xl opacity-20 animate-pulse"></div>
+                    <div className="relative p-6 bg-gradient-to-br from-red-100 to-rose-100 dark:from-red-900/30 dark:to-rose-900/30 rounded-full">
+                      <AlertCircle className="h-16 w-16 text-red-600 dark:text-red-400" />
+                    </div>
+                  </div>
+                  <h3 className="text-2xl font-bold bg-gradient-to-r from-red-900 to-rose-700 dark:from-red-200 dark:to-rose-200 bg-clip-text text-transparent mb-3">
+                    Có lỗi xảy ra
+                  </h3>
+                  <p className="text-slate-600 dark:text-slate-400 mb-6 max-w-md mx-auto">{error}</p>
+                  <Button 
+                    onClick={loadSchedules} 
+                    variant="outline"
+                    className="glass border-red-300/50 hover:bg-red-50 dark:border-red-700/50 dark:hover:bg-red-900/20 hover:scale-105 transition-all duration-200"
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Thử lại
+                  </Button>
+                </div>
               </div>
             ) : schedules.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <CalendarIcon className="h-12 w-12 text-slate-400 mb-4" />
-                {allSchedules.length === 0 ? (
-                  <>
-                    <p className="text-slate-600 dark:text-slate-400 mb-2 font-medium">
-                      Chưa có lịch làm việc nào
-                    </p>
-                    <p className="text-sm text-slate-500 dark:text-slate-500 mb-4">
-                      Vui lòng liên hệ quản trị viên để được phân ca làm việc.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-slate-600 dark:text-slate-400 mb-2 font-medium">
-                      Không tìm thấy lịch làm việc phù hợp với bộ lọc hiện tại
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        clearFilters();
-                        setSelectedDate(undefined);
-                      }}
-                      className="mt-4"
-                    >
-                      <X className="mr-2 h-4 w-4" />
-                      Xóa bộ lọc
-                    </Button>
-                  </>
-                )}
+              <div className="flex flex-col items-center justify-center py-16 text-center relative overflow-hidden rounded-lg">
+                <div className="absolute inset-0 bg-gradient-to-br from-slate-50/50 to-slate-100/30 dark:from-slate-900/50 dark:to-slate-800/30"></div>
+                <div className="relative">
+                  <div className="relative inline-block mb-6">
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-cyan-500 rounded-full blur-2xl opacity-20 animate-pulse"></div>
+                    <div className="relative p-6 bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-900/30 dark:to-cyan-900/30 rounded-full">
+                      <CalendarIcon className="h-16 w-16 text-blue-600 dark:text-blue-400" />
+                    </div>
+                  </div>
+                  {allSchedules.length === 0 ? (
+                    <>
+                      <h3 className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent mb-3">
+                        Chưa có lịch làm việc nào
+                      </h3>
+                      <p className="text-slate-600 dark:text-slate-400 max-w-md mx-auto">
+                        Vui lòng liên hệ quản trị viên để được phân ca làm việc.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <h3 className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent mb-3">
+                        Không tìm thấy lịch làm việc
+                      </h3>
+                      <p className="text-slate-600 dark:text-slate-400 mb-6 max-w-md mx-auto">
+                        Không có lịch làm việc phù hợp với bộ lọc hiện tại. Thử thay đổi bộ lọc để xem thêm.
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          clearFilters();
+                          setSelectedDate(undefined);
+                        }}
+                        className="glass border-blue-300/50 hover:bg-blue-50 dark:border-blue-700/50 dark:hover:bg-blue-900/20 hover:scale-105 transition-all duration-200"
+                      >
+                        <X className="mr-2 h-4 w-4" />
+                        Xóa bộ lọc
+                      </Button>
+                    </>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="space-y-4">
                 {schedules.map((schedule) => (
-                  <div key={schedule.schedule_id} className="p-4 glass rounded-lg hover:shadow-lg transition-all duration-300">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center space-x-3">
-                        <div className="text-lg font-semibold text-slate-900 dark:text-white">
-                          {new Date(schedule.shift_start).toLocaleDateString('vi-VN', { 
-                            weekday: 'long', 
-                            day: '2-digit', 
-                            month: '2-digit',
-                            year: 'numeric'
-                          })}
+                  <div 
+                    key={schedule.schedule_id} 
+                    className="p-5 glass-card rounded-xl border-0 hover:shadow-2xl transition-all duration-300 hover:scale-[1.01] overflow-hidden relative"
+                  >
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-500/10 to-cyan-500/5 rounded-full blur-3xl opacity-0 hover:opacity-100 transition-opacity duration-500"></div>
+                    <div className="relative">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="p-2.5 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg shadow-md">
+                            <CalendarIcon className="h-5 w-5 text-white" />
+                          </div>
+                          <div>
+                            <div className="text-lg font-bold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
+                              {new Date(schedule.shift_start).toLocaleDateString('vi-VN', { 
+                                weekday: 'long', 
+                                day: '2-digit', 
+                                month: '2-digit',
+                                year: 'numeric'
+                              })}
+                            </div>
+                          </div>
+                          <Badge className={`${getStatusColor(schedule.status)} shadow-sm text-sm px-3 py-1.5`}>
+                            {getStatusIcon(schedule.status)}
+                            <span className="ml-1.5 font-medium">{getStatusLabel(schedule.status)}</span>
+                          </Badge>
                         </div>
-                        <Badge className={getStatusColor(schedule.status)}>
-                          {getStatusIcon(schedule.status)}
-                          <span className="ml-1">{getStatusLabel(schedule.status)}</span>
-                        </Badge>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenUpdateDialog(schedule)}
+                          disabled={schedule.status !== 'scheduled'}
+                          className="glass border-blue-300/50 hover:bg-blue-50 dark:border-blue-700/50 dark:hover:bg-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 transition-all duration-200"
+                          title={schedule.status !== 'scheduled' ? 'Chỉ có thể cập nhật trạng thái cho các ca đã lên lịch' : 'Cập nhật trạng thái'}
+                        >
+                          <Edit2 className="h-4 w-4 mr-2" />
+                          Cập nhật
+                        </Button>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleOpenUpdateDialog(schedule)}
-                        disabled={schedule.status !== 'scheduled'}
-                        className="glass border-slate-200/50 dark:border-slate-700/50 disabled:opacity-50 disabled:cursor-not-allowed"
-                        title={schedule.status !== 'scheduled' ? 'Chỉ có thể cập nhật trạng thái cho các ca đã lên lịch' : 'Cập nhật trạng thái'}
-                      >
-                        <Edit2 className="h-4 w-4 mr-2" />
-                        Cập nhật
-                      </Button>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                      <div className="flex items-center space-x-2">
-                        <Clock className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-                        <span className="text-slate-600 dark:text-slate-300">
-                          {formatShiftTime(schedule.shift_start, schedule.shift_end)}
-                        </span>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="flex items-center space-x-2 p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200/50 dark:border-slate-700/50">
+                          <Clock className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                          <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                            {formatShiftTime(schedule.shift_start, schedule.shift_end)}
+                          </span>
+                        </div>
+                        {schedule.station && (
+                          <div className="flex items-center space-x-2 p-2.5 bg-blue-50/50 dark:bg-blue-900/20 rounded-lg border border-blue-200/50 dark:border-blue-800/50">
+                            <MapPin className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                            <span className="text-sm font-medium text-blue-900 dark:text-blue-100">{schedule.station.name}</span>
+                          </div>
+                        )}
                       </div>
-                      {schedule.station && (
-                        <div className="flex items-center space-x-2">
-                          <MapPin className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-                          <span className="text-slate-600 dark:text-slate-300">{schedule.station.name}</span>
+
+                      {schedule.notes && (
+                        <div className="mt-4 pt-4 border-t border-slate-200/50 dark:border-slate-700/50">
+                          <p className="text-sm text-slate-600 dark:text-slate-400">
+                            <span className="font-semibold text-slate-900 dark:text-white">Ghi chú: </span>
+                            {schedule.notes}
+                          </p>
                         </div>
                       )}
                     </div>
-
-                    {schedule.notes && (
-                      <div className="mt-3 pt-3 border-t border-slate-200/50 dark:border-slate-700/50">
-                        <p className="text-sm text-slate-600 dark:text-slate-400">
-                          <span className="font-medium">Ghi chú: </span>
-                          {schedule.notes}
-                        </p>
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
@@ -717,62 +791,79 @@ const WorkSchedule: React.FC = () => {
 
       {/* Update Status Dialog */}
       <Dialog open={updateDialogOpen} onOpenChange={setUpdateDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Cập nhật trạng thái lịch làm việc</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="sm:max-w-[500px] glass-card border-0">
+          <DialogHeader className="pb-4 border-b border-slate-200/50 dark:border-slate-700/50">
+            <DialogTitle className="flex items-center gap-3 text-2xl">
+              <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg">
+                <Edit2 className="h-6 w-6 text-white" />
+              </div>
+              <span className="bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
+                Cập nhật trạng thái
+              </span>
+            </DialogTitle>
+            <DialogDescription className="text-base mt-2">
               Cập nhật trạng thái cho ca làm việc của bạn
             </DialogDescription>
           </DialogHeader>
           
           {selectedSchedule && (
-            <div className="space-y-4 py-4">
+            <div className="space-y-5 py-6">
               <div className="space-y-2">
-                <Label>Thông tin ca làm việc</Label>
-                <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-md">
-                  <p className="text-sm font-medium text-slate-900 dark:text-white">
-                    {new Date(selectedSchedule.shift_start).toLocaleDateString('vi-VN', {
-                      weekday: 'long',
-                      day: '2-digit',
-                      month: '2-digit',
-                      year: 'numeric'
-                    })}
-                  </p>
-                  <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                    {formatShiftTime(selectedSchedule.shift_start, selectedSchedule.shift_end)}
-                  </p>
-                  {selectedSchedule.station && (
-                    <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                      <MapPin className="h-3 w-3 inline mr-1" />
-                      {selectedSchedule.station.name}
+                <Label className="text-sm font-semibold text-slate-900 dark:text-white">Thông tin ca làm việc</Label>
+                <div className="p-4 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-xl border border-blue-200/50 dark:border-blue-800/50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CalendarIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    <p className="text-base font-bold text-blue-900 dark:text-blue-100">
+                      {new Date(selectedSchedule.shift_start).toLocaleDateString('vi-VN', {
+                        weekday: 'long',
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                      })}
                     </p>
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                      {formatShiftTime(selectedSchedule.shift_start, selectedSchedule.shift_end)}
+                    </p>
+                  </div>
+                  {selectedSchedule.station && (
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                        {selectedSchedule.station.name}
+                      </p>
+                    </div>
                   )}
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="status">Trạng thái mới *</Label>
+                <Label htmlFor="status" className="text-sm font-semibold text-slate-900 dark:text-white">
+                  Trạng thái mới <span className="text-red-500">*</span>
+                </Label>
                 <Select value={newStatus} onValueChange={(value) => setNewStatus(value as 'completed' | 'absent' | 'cancelled')}>
-                  <SelectTrigger id="status" className="glass border-slate-200/50 dark:border-slate-700/50">
+                  <SelectTrigger id="status" className="glass border-slate-200/50 dark:border-slate-700/50 bg-white dark:bg-slate-900">
                     <SelectValue placeholder="Chọn trạng thái" />
                   </SelectTrigger>
-                  <SelectContent className="glass-card border-0">
-                    <SelectItem value="completed">
+                  <SelectContent className="glass-card border-0 bg-white dark:bg-slate-900">
+                    <SelectItem value="completed" className="hover:bg-green-50 dark:hover:bg-green-900/20">
                       <div className="flex items-center space-x-2">
                         <CheckCircle className="h-4 w-4 text-green-600" />
-                        <span>Đã hoàn thành</span>
+                        <span className="font-medium">Đã hoàn thành</span>
                       </div>
                     </SelectItem>
-                    <SelectItem value="absent">
+                    <SelectItem value="absent" className="hover:bg-red-50 dark:hover:bg-red-900/20">
                       <div className="flex items-center space-x-2">
                         <XCircle className="h-4 w-4 text-red-600" />
-                        <span>Vắng mặt</span>
+                        <span className="font-medium">Vắng mặt</span>
                       </div>
                     </SelectItem>
-                    <SelectItem value="cancelled">
+                    <SelectItem value="cancelled" className="hover:bg-slate-50 dark:hover:bg-slate-800">
                       <div className="flex items-center space-x-2">
                         <XCircle className="h-4 w-4 text-slate-600" />
-                        <span>Đã hủy</span>
+                        <span className="font-medium">Đã hủy</span>
                       </div>
                     </SelectItem>
                   </SelectContent>
@@ -780,20 +871,22 @@ const WorkSchedule: React.FC = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="notes">Ghi chú (tùy chọn)</Label>
+                <Label htmlFor="notes" className="text-sm font-semibold text-slate-900 dark:text-white">
+                  Ghi chú (tùy chọn)
+                </Label>
                 <Textarea
                   id="notes"
                   value={updateNotes}
                   onChange={(e) => setUpdateNotes(e.target.value)}
                   placeholder="Nhập ghi chú về ca làm việc..."
-                  className="glass border-slate-200/50 dark:border-slate-700/50 min-h-[100px]"
+                  className="glass border-slate-200/50 dark:border-slate-700/50 min-h-[100px] bg-white dark:bg-slate-900 resize-none"
                   rows={4}
                 />
               </div>
             </div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="border-t border-slate-200/50 dark:border-slate-700/50 pt-4 mt-4">
             <Button
               variant="outline"
               onClick={() => {
@@ -802,13 +895,14 @@ const WorkSchedule: React.FC = () => {
                 setUpdateNotes('');
               }}
               disabled={updating}
+              className="hover:scale-105 transition-all duration-200"
             >
               Hủy
             </Button>
             <Button
               onClick={handleUpdateStatus}
               disabled={updating}
-              className="bg-gradient-to-r from-green-500 to-emerald-500 text-white"
+              className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200"
             >
               {updating ? (
                 <>
@@ -816,7 +910,10 @@ const WorkSchedule: React.FC = () => {
                   Đang cập nhật...
                 </>
               ) : (
-                'Cập nhật'
+                <>
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  Cập nhật
+                </>
               )}
             </Button>
           </DialogFooter>
