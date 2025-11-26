@@ -81,8 +81,6 @@ const BatteryPricingManagement: React.FC = () => {
   const [editingPricing, setEditingPricing] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-
-
   // Transfer state
   const [transfers, setTransfers] = useState<BatteryTransfer[]>([]);
   const [showTransferForm, setShowTransferForm] = useState(false);
@@ -256,24 +254,37 @@ const BatteryPricingManagement: React.FC = () => {
               ...apiStats,
               available: apiStats.full || 0, // Map 'full' to 'available'
               // Calculate "damaged" as displayed in UI (not full, charging, maintenance)
-              damaged: (apiStats.in_use || 0) + (apiStats.reserved || 0) + (apiStats.damaged || 0),
+              damaged:
+                (apiStats.in_use || 0) +
+                (apiStats.reserved || 0) +
+                (apiStats.damaged || 0),
             },
           };
           setBatteryStats(transformedStats);
         } else {
-
           // Fallback: calculate stats from battery data using UI logic
           const fallbackStats = {
             total: batteriesData.length,
             by_status: {
-              available: batteriesData.filter((b: any) => b.status === "full").length,
-              charging: batteriesData.filter((b: any) => b.status === "charging").length,
-              maintenance: batteriesData.filter((b: any) => b.status === "maintenance").length,
-              damaged: batteriesData.filter((b: any) => 
-                b.status !== "full" && b.status !== "charging" && b.status !== "maintenance"
+              available: batteriesData.filter((b: any) => b.status === "full")
+                .length,
+              charging: batteriesData.filter(
+                (b: any) => b.status === "charging"
               ).length,
-              in_use: batteriesData.filter((b: any) => b.status === "in_use").length,
-              reserved: batteriesData.filter((b: any) => b.status === "reserved").length,
+              maintenance: batteriesData.filter(
+                (b: any) => b.status === "maintenance"
+              ).length,
+              damaged: batteriesData.filter(
+                (b: any) =>
+                  b.status !== "full" &&
+                  b.status !== "charging" &&
+                  b.status !== "maintenance"
+              ).length,
+              in_use: batteriesData.filter((b: any) => b.status === "in_use")
+                .length,
+              reserved: batteriesData.filter(
+                (b: any) => b.status === "reserved"
+              ).length,
             },
             by_model: Object.entries(
               batteriesData.reduce((acc: any, battery: any) => {
@@ -305,8 +316,11 @@ const BatteryPricingManagement: React.FC = () => {
           );
 
           // Find batteries that would be displayed as "Hỏng" (not full, charging, or maintenance)
-          const displayedAsDamaged = stationBatteries.filter((b: any) => 
-            b.status !== "full" && b.status !== "charging" && b.status !== "maintenance"
+          const displayedAsDamaged = stationBatteries.filter(
+            (b: any) =>
+              b.status !== "full" &&
+              b.status !== "charging" &&
+              b.status !== "maintenance"
           );
 
           const batteryStats = {
@@ -322,8 +336,9 @@ const BatteryPricingManagement: React.FC = () => {
             damaged: displayedAsDamaged.length,
             in_use: stationBatteries.filter((b: any) => b.status === "in_use")
               .length,
-            reserved: stationBatteries.filter((b: any) => b.status === "reserved")
-              .length,
+            reserved: stationBatteries.filter(
+              (b: any) => b.status === "reserved"
+            ).length,
           };
 
           return {
@@ -337,16 +352,27 @@ const BatteryPricingManagement: React.FC = () => {
 
         // If using fallback stats, recalculate from warehouseInfo for accuracy
         if (!statsResponse?.success) {
-          const totalStats = warehouseInfo.reduce((total: any, station: any) => {
-            total.total += station.batteryStats.total;
-            total.available += station.batteryStats.available;
-            total.charging += station.batteryStats.charging;
-            total.maintenance += station.batteryStats.maintenance;
-            total.damaged += station.batteryStats.damaged;
-            total.in_use += (station.batteryStats.in_use || 0);
-            total.reserved += (station.batteryStats.reserved || 0);
-            return total;
-          }, { total: 0, available: 0, charging: 0, maintenance: 0, damaged: 0, in_use: 0, reserved: 0 });
+          const totalStats = warehouseInfo.reduce(
+            (total: any, station: any) => {
+              total.total += station.batteryStats.total;
+              total.available += station.batteryStats.available;
+              total.charging += station.batteryStats.charging;
+              total.maintenance += station.batteryStats.maintenance;
+              total.damaged += station.batteryStats.damaged;
+              total.in_use += station.batteryStats.in_use || 0;
+              total.reserved += station.batteryStats.reserved || 0;
+              return total;
+            },
+            {
+              total: 0,
+              available: 0,
+              charging: 0,
+              maintenance: 0,
+              damaged: 0,
+              in_use: 0,
+              reserved: 0,
+            }
+          );
 
           const correctedStats = {
             total: totalStats.total,
@@ -477,16 +503,6 @@ const BatteryPricingManagement: React.FC = () => {
 
   // Ensure transfers is always an array
   const transfersArray = Array.isArray(transfers) ? transfers : [];
-  const totalTransfers = transfersArray.length;
-  const pendingTransfers = transfersArray.filter(
-    (t) => t.transfer_status === "pending"
-  ).length;
-  const completedTransfers = transfersArray.filter(
-    (t) => t.transfer_status === "completed"
-  ).length;
-  const failedTransfers = transfersArray.filter(
-    (t) => t.transfer_status === "cancelled"
-  ).length;
 
   return (
     <div className="container mx-auto max-w-7xl px-4 space-y-6">
@@ -573,63 +589,6 @@ const BatteryPricingManagement: React.FC = () => {
             <CardContent>
               <div className="text-2xl font-bold text-green-700">
                 {activePricings}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {activeTab === "transfer" && (
-        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-          <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-blue-700">
-                Tổng số
-              </CardTitle>
-              <Clock className="h-4 w-4 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-800">
-                {totalTransfers}
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-r from-amber-50 to-yellow-100 border-amber-200">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-amber-700">
-                Chờ duyệt
-              </CardTitle>
-              <Clock className="h-4 w-4 text-amber-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-amber-800">
-                {pendingTransfers}
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-r from-green-50 to-emerald-100 border-green-200">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-green-700">
-                Hoàn thành
-              </CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-700">
-                {completedTransfers}
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-r from-red-50 to-rose-100 border-red-200">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-red-700">
-                Thất bại
-              </CardTitle>
-              <XCircle className="h-4 w-4 text-red-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-700">
-                {failedTransfers}
               </div>
             </CardContent>
           </Card>
@@ -1120,9 +1079,14 @@ const BatteryPricingManagement: React.FC = () => {
                             {batteryStats.by_status.damaged || 0}
                           </div>
                           <p className="text-xs text-red-600">
-                            {batteryStats.total > 0 ? (
-                              ((batteryStats.by_status.damaged || 0) / batteryStats.total * 100).toFixed(1)
-                            ) : 0}%
+                            {batteryStats.total > 0
+                              ? (
+                                  ((batteryStats.by_status.damaged || 0) /
+                                    batteryStats.total) *
+                                  100
+                                ).toFixed(1)
+                              : 0}
+                            %
                           </p>
                         </CardContent>
                       </Card>

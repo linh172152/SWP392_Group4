@@ -1,48 +1,50 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Card, CardContent } from '../ui/card';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Badge } from '../ui/badge';
-import { Progress } from '../ui/progress';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { 
-  MapPin, 
-  Search, 
-  Navigation, 
-  Battery, 
+import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { Card, CardContent } from "../ui/card";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Badge } from "../ui/badge";
+import { Progress } from "../ui/progress";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import {
+  MapPin,
+  Search,
+  Navigation,
+  Battery,
   Star,
   Calendar,
   Loader2,
   AlertCircle,
-  ChevronDown
-} from 'lucide-react';
-import { ImageWithFallback } from '../figma/ImageWithFallback';
-import { useDriverStations } from '../../hooks/useDriverStations';
-import { Alert, AlertDescription } from '../ui/alert';
+  ChevronDown,
+} from "lucide-react";
+import { ImageWithFallback } from "../figma/ImageWithFallback";
+import { useDriverStations } from "../../hooks/useDriverStations";
+import { Alert, AlertDescription } from "../ui/alert";
 
 const StationFinding: React.FC = () => {
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [locationError, setLocationError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [userLocation, setUserLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
   const hasSearchedRef = useRef(false); // Tránh gọi API nhiều lần
   const locationSetRef = useRef(false); // Tránh set location nhiều lần
-  
-  const { 
-    stations, 
-    loading, 
-    error, 
+
+  const {
+    stations,
+    loading,
+    error,
     findNearbyPublicStations,
     searchStations,
-    clearError 
+    clearError,
   } = useDriverStations();
 
   // Lấy vị trí người dùng khi component mount
   useEffect(() => {
     if (locationSetRef.current) return; // Đã set rồi thì không set lại
-    
+
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -52,29 +54,11 @@ const StationFinding: React.FC = () => {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
           });
-          setLocationError(null);
         },
         (error) => {
           if (locationSetRef.current) return; // Double check
           locationSetRef.current = true;
-          
-          // Xử lý lỗi geolocation một cách thân thiện
-          let errorMessage = "Không thể lấy vị trí của bạn. ";
-          switch (error.code) {
-            case error.PERMISSION_DENIED:
-              errorMessage += "Vui lòng cho phép truy cập vị trí trong trình duyệt.";
-              break;
-            case error.POSITION_UNAVAILABLE:
-              errorMessage += "Thông tin vị trí không khả dụng.";
-              break;
-            case error.TIMEOUT:
-              errorMessage += "Hết thời gian chờ lấy vị trí.";
-              break;
-            default:
-              errorMessage += "Đã xảy ra lỗi không xác định.";
-          }
-          setLocationError(errorMessage);
-          
+
           // Sử dụng vị trí mặc định (TP.HCM) nếu không lấy được vị trí
           setUserLocation({
             latitude: 10.762622,
@@ -84,13 +68,12 @@ const StationFinding: React.FC = () => {
         {
           enableHighAccuracy: false,
           timeout: 5000,
-          maximumAge: 0
+          maximumAge: 0,
         }
       );
     } else {
       if (locationSetRef.current) return;
       locationSetRef.current = true;
-      setLocationError("Trình duyệt không hỗ trợ định vị. Sử dụng vị trí mặc định.");
       // Sử dụng vị trí mặc định nếu trình duyệt không hỗ trợ geolocation
       setUserLocation({
         latitude: 10.762622,
@@ -102,18 +85,18 @@ const StationFinding: React.FC = () => {
   // Tìm trạm gần đây
   const handleFindNearby = React.useCallback(async () => {
     if (!userLocation) {
-      console.warn('[StationFinding] No user location available');
+      console.warn("[StationFinding] No user location available");
       return;
     }
-    
+
     try {
-      console.log('[StationFinding] Finding nearby stations:', userLocation);
+      console.log("[StationFinding] Finding nearby stations:", userLocation);
       await findNearbyPublicStations({
         latitude: userLocation.latitude,
         longitude: userLocation.longitude,
         radius: 10,
       });
-      console.log('[StationFinding] Successfully found stations');
+      console.log("[StationFinding] Successfully found stations");
     } catch (err) {
       console.error("[StationFinding] Error finding nearby stations:", err);
       // Error đã được set trong hook, không cần set lại
@@ -125,7 +108,7 @@ const StationFinding: React.FC = () => {
     if (!hasSearchedRef.current) {
       hasSearchedRef.current = true;
       // Load tất cả trạm mặc định (không cần location)
-      searchStations('').catch((err) => {
+      searchStations("").catch((err) => {
         console.error("[StationFinding] Error loading all stations:", err);
       });
     }
@@ -137,9 +120,9 @@ const StationFinding: React.FC = () => {
     if (!searchQuery.trim()) {
       // Nếu search rỗng, load tất cả trạm
       try {
-        console.log('[StationFinding] Loading all stations');
-        await searchStations('');
-        console.log('[StationFinding] All stations loaded');
+        console.log("[StationFinding] Loading all stations");
+        await searchStations("");
+        console.log("[StationFinding] All stations loaded");
       } catch (err) {
         console.error("[StationFinding] Error loading all stations:", err);
       }
@@ -147,9 +130,9 @@ const StationFinding: React.FC = () => {
     }
 
     try {
-      console.log('[StationFinding] Searching stations:', searchQuery);
+      console.log("[StationFinding] Searching stations:", searchQuery);
       await searchStations(searchQuery);
-      console.log('[StationFinding] Search completed');
+      console.log("[StationFinding] Search completed");
     } catch (err) {
       console.error("[StationFinding] Error searching stations:", err);
       // Error đã được set trong hook
@@ -158,16 +141,16 @@ const StationFinding: React.FC = () => {
 
   // Xử lý khi nhấn Enter trong search box
   const handleSearchKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       handleSearch();
     }
   };
 
   const getAvailabilityColor = (available: number = 0, total: number = 1) => {
     const percentage = (available / total) * 100;
-    if (percentage >= 70) return 'text-green-600';
-    if (percentage >= 30) return 'text-yellow-600';
-    return 'text-red-600';
+    if (percentage >= 70) return "text-green-600";
+    if (percentage >= 30) return "text-yellow-600";
+    return "text-red-600";
   };
 
   const getBatteryTypes = (supportedModels: string[] | any): string[] => {
@@ -182,8 +165,12 @@ const StationFinding: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="float">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-blue-900 dark:from-white dark:to-blue-100 bg-clip-text text-transparent">Tìm trạm thay pin</h1>
-          <p className="text-slate-600 dark:text-slate-300">Tìm trạm gần nhất và đặt chỗ thay pin nhanh chóng</p>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-blue-900 dark:from-white dark:to-blue-100 bg-clip-text text-transparent">
+            Tìm trạm thay pin
+          </h1>
+          <p className="text-slate-600 dark:text-slate-300">
+            Tìm trạm gần nhất và đặt chỗ thay pin nhanh chóng
+          </p>
         </div>
       </div>
 
@@ -191,53 +178,16 @@ const StationFinding: React.FC = () => {
 
       {/* Error Alert */}
       {error && (
-        <Alert variant="destructive" className="glass-card border-red-200 dark:border-red-800">
+        <Alert
+          variant="destructive"
+          className="glass-card border-red-200 dark:border-red-800"
+        >
           <AlertCircle className="h-4 w-4" />
           <AlertDescription className="flex items-center justify-between">
             <span>{error}</span>
             <Button variant="ghost" size="sm" onClick={clearError}>
               Đóng
             </Button>
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Location Error Alert */}
-      {locationError && (
-        <Alert className="glass-card border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-900/20">
-          <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-          <AlertDescription className="flex flex-col gap-3">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1">
-                <p className="text-orange-800 dark:text-orange-200 font-medium mb-2">
-                  {locationError}
-                </p>
-                <p className="text-sm text-orange-700 dark:text-orange-300">
-                  Đang sử dụng vị trí mặc định: <strong>TP. Hồ Chí Minh</strong>. Bạn vẫn có thể tìm kiếm trạm theo tên hoặc địa chỉ.
-                </p>
-              </div>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setLocationError(null)}
-                className="text-orange-600 hover:text-orange-700 hover:bg-orange-100 dark:hover:bg-orange-900/30"
-              >
-                ✕
-              </Button>
-            </div>
-            
-            {/* Hướng dẫn cho phép vị trí */}
-            <details className="text-xs text-orange-700 dark:text-orange-300 cursor-pointer">
-              <summary className="font-medium hover:text-orange-800 dark:hover:text-orange-200">
-                📍 Cách bật quyền truy cập vị trí
-              </summary>
-              <div className="mt-2 pl-4 space-y-2 text-orange-600 dark:text-orange-400">
-                <p><strong>Chrome/Edge:</strong> Nhấn vào biểu tượng 🔒 bên trái thanh địa chỉ → Cài đặt trang web → Vị trí → Cho phép</p>
-                <p><strong>Firefox:</strong> Nhấn vào biểu tượng (i) bên trái thanh địa chỉ → Quyền → Vị trí → Cho phép</p>
-                <p><strong>Safari:</strong> Safari → Cài đặt → Trang web này → Vị trí → Cho phép</p>
-                <p className="text-orange-700 dark:text-orange-300 italic">Sau khi cho phép, hãy tải lại trang để sử dụng vị trí của bạn.</p>
-              </div>
-            </details>
           </AlertDescription>
         </Alert>
       )}
@@ -257,7 +207,7 @@ const StationFinding: React.FC = () => {
                 disabled={loading}
               />
             </div>
-            <Button 
+            <Button
               onClick={handleSearch}
               disabled={loading}
               className="gradient-primary text-white shadow-lg hover:shadow-xl transition-all duration-300"
@@ -269,7 +219,7 @@ const StationFinding: React.FC = () => {
               )}
               Tìm kiếm
             </Button>
-            <Button 
+            <Button
               onClick={handleFindNearby}
               disabled={loading || !userLocation}
               className="gradient-primary text-white shadow-lg hover:shadow-xl transition-all duration-300"
@@ -284,14 +234,16 @@ const StationFinding: React.FC = () => {
       {/* Stations List */}
       <div>
         <h2 className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-blue-900 dark:from-white dark:to-blue-100 bg-clip-text text-transparent mb-4">
-          {searchQuery ? 'Kết quả tìm kiếm' : 'Tất cả trạm'}
+          {searchQuery ? "Kết quả tìm kiếm" : "Tất cả trạm"}
         </h2>
 
         {/* Loading State */}
         {loading && (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-            <span className="ml-2 text-slate-600 dark:text-slate-400">Đang tải...</span>
+            <span className="ml-2 text-slate-600 dark:text-slate-400">
+              Đang tải...
+            </span>
           </div>
         )}
 
@@ -306,7 +258,10 @@ const StationFinding: React.FC = () => {
               <p className="text-slate-600 dark:text-slate-400 mb-4">
                 Thử tìm kiếm với địa chỉ khác hoặc mở rộng bán kính tìm kiếm
               </p>
-              <Button onClick={handleFindNearby} className="gradient-primary text-white">
+              <Button
+                onClick={handleFindNearby}
+                className="gradient-primary text-white"
+              >
                 <MapPin className="mr-2 h-4 w-4" />
                 Tìm trạm gần tôi
               </Button>
@@ -318,7 +273,10 @@ const StationFinding: React.FC = () => {
         {!loading && stations.length > 0 && (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
             {stations.map((station) => (
-              <Card key={station.station_id} className="overflow-hidden glass-card border-0 glow-hover group transform hover:scale-105 transition-all duration-300">
+              <Card
+                key={station.station_id}
+                className="overflow-hidden glass-card border-0 glow-hover group transform hover:scale-105 transition-all duration-300"
+              >
                 <div className="relative h-48">
                   <ImageWithFallback
                     src="https://images.unsplash.com/photo-1672542128826-5f0d578713d2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxlbGVjdHJpYyUyMHZlaGljbGUlMjBjaGFyZ2luZyUyMHN0YXRpb258ZW58MXx8fHwxNzU5NzEzOTIxfDA&ixlib=rb-4.1.0&q=80&w=1080"
@@ -332,19 +290,23 @@ const StationFinding: React.FC = () => {
                       {station.available_batteries || 0}/{station.capacity}
                     </Badge>
                   </div>
-                  {station.status !== 'active' && (
+                  {station.status !== "active" && (
                     <div className="absolute top-3 left-3">
                       <Badge variant="destructive" className="glass border-0">
-                        {station.status === 'maintenance' ? 'Bảo trì' : 'Đóng cửa'}
+                        {station.status === "maintenance"
+                          ? "Bảo trì"
+                          : "Đóng cửa"}
                       </Badge>
                     </div>
                   )}
                 </div>
-                
+
                 <CardContent className="p-4">
                   <div className="space-y-3">
                     <div>
-                      <h3 className="font-semibold text-lg text-slate-900 dark:text-white">{station.name}</h3>
+                      <h3 className="font-semibold text-lg text-slate-900 dark:text-white">
+                        {station.name}
+                      </h3>
                       <p className="text-sm text-slate-600 dark:text-slate-400 flex items-center">
                         <MapPin className="mr-1 h-3 w-3" />
                         {station.address}
@@ -355,14 +317,17 @@ const StationFinding: React.FC = () => {
                       <div className="flex items-center space-x-1">
                         <Star className="h-4 w-4 text-yellow-400 fill-current" />
                         <span className="text-sm font-medium text-slate-900 dark:text-white">
-                          {station.average_rating?.toFixed(1) || '0.0'}
+                          {station.average_rating?.toFixed(1) || "0.0"}
                         </span>
                         <span className="text-sm text-slate-600 dark:text-slate-400">
                           ({station.total_ratings || 0})
                         </span>
                       </div>
                       {station.distance_km !== undefined && (
-                        <Badge variant="outline" className="text-xs glass border-blue-200/50 dark:border-purple-400/30">
+                        <Badge
+                          variant="outline"
+                          className="text-xs glass border-blue-200/50 dark:border-purple-400/30"
+                        >
                           {station.distance_km.toFixed(1)} km
                         </Badge>
                       )}
@@ -370,26 +335,46 @@ const StationFinding: React.FC = () => {
 
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span className="text-slate-600 dark:text-slate-400">Tình trạng</span>
-                        <span className={`font-medium ${getAvailabilityColor(station.available_batteries, station.capacity)}`}>
-                          {Math.round(((station.available_batteries || 0) / station.capacity) * 100)}%
+                        <span className="text-slate-600 dark:text-slate-400">
+                          Tình trạng
+                        </span>
+                        <span
+                          className={`font-medium ${getAvailabilityColor(
+                            station.available_batteries,
+                            station.capacity
+                          )}`}
+                        >
+                          {Math.round(
+                            ((station.available_batteries || 0) /
+                              station.capacity) *
+                              100
+                          )}
+                          %
                         </span>
                       </div>
-                      <Progress 
-                        value={((station.available_batteries || 0) / station.capacity) * 100} 
+                      <Progress
+                        value={
+                          ((station.available_batteries || 0) /
+                            station.capacity) *
+                          100
+                        }
                         className="h-2"
                       />
                     </div>
 
                     <div className="flex justify-between text-sm">
                       <div>
-                        <p className="text-slate-600 dark:text-slate-400">Giờ hoạt động</p>
+                        <p className="text-slate-600 dark:text-slate-400">
+                          Giờ hoạt động
+                        </p>
                         <p className="font-medium text-slate-900 dark:text-white">
-                          {station.operating_hours || '24/7'}
+                          {station.operating_hours || "24/7"}
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-slate-600 dark:text-slate-400">Sức chứa</p>
+                        <p className="text-slate-600 dark:text-slate-400">
+                          Sức chứa
+                        </p>
                         <p className="font-medium text-slate-900 dark:text-white">
                           {station.capacity} pin
                         </p>
@@ -398,15 +383,24 @@ const StationFinding: React.FC = () => {
 
                     {getBatteryTypes(station.supported_models).length > 0 && (
                       <div className="flex flex-wrap gap-1">
-                        {getBatteryTypes(station.supported_models).slice(0, 3).map((type, idx) => (
-                          <Badge key={idx} variant="secondary" className="text-xs glass border-0">
-                            {type}
-                          </Badge>
-                        ))}
-                        {getBatteryTypes(station.supported_models).length > 3 && (
-                          <Popover 
-                            open={openPopoverId === station.station_id} 
-                            onOpenChange={(open) => setOpenPopoverId(open ? station.station_id : null)}
+                        {getBatteryTypes(station.supported_models)
+                          .slice(0, 3)
+                          .map((type, idx) => (
+                            <Badge
+                              key={idx}
+                              variant="secondary"
+                              className="text-xs glass border-0"
+                            >
+                              {type}
+                            </Badge>
+                          ))}
+                        {getBatteryTypes(station.supported_models).length >
+                          3 && (
+                          <Popover
+                            open={openPopoverId === station.station_id}
+                            onOpenChange={(open) =>
+                              setOpenPopoverId(open ? station.station_id : null)
+                            }
                           >
                             <PopoverTrigger asChild>
                               <button
@@ -414,26 +408,39 @@ const StationFinding: React.FC = () => {
                                 className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-0 cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setOpenPopoverId(openPopoverId === station.station_id ? null : station.station_id);
+                                  setOpenPopoverId(
+                                    openPopoverId === station.station_id
+                                      ? null
+                                      : station.station_id
+                                  );
                                 }}
                               >
-                                +{getBatteryTypes(station.supported_models).length - 3}
+                                +
+                                {getBatteryTypes(station.supported_models)
+                                  .length - 3}
                                 <ChevronDown className="ml-1 h-3 w-3 inline" />
                               </button>
                             </PopoverTrigger>
-                            <PopoverContent 
+                            <PopoverContent
                               className="w-64 p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-lg z-50"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <div className="space-y-2">
                                 <h4 className="font-semibold text-sm text-slate-900 dark:text-white mb-2">
-                                  Tất cả loại pin ({getBatteryTypes(station.supported_models).length})
+                                  Tất cả loại pin (
+                                  {
+                                    getBatteryTypes(station.supported_models)
+                                      .length
+                                  }
+                                  )
                                 </h4>
                                 <div className="flex flex-wrap gap-1.5">
-                                  {getBatteryTypes(station.supported_models).map((type, idx) => (
-                                    <Badge 
-                                      key={idx} 
-                                      variant="secondary" 
+                                  {getBatteryTypes(
+                                    station.supported_models
+                                  ).map((type, idx) => (
+                                    <Badge
+                                      key={idx}
+                                      variant="secondary"
                                       className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300"
                                     >
                                       {type}
@@ -448,14 +455,14 @@ const StationFinding: React.FC = () => {
                     )}
 
                     <div className="flex space-x-2 pt-2">
-                      <Button 
-                        className="flex-1 gradient-primary text-white shadow-lg hover:shadow-xl transition-all duration-300" 
+                      <Button
+                        className="flex-1 gradient-primary text-white shadow-lg hover:shadow-xl transition-all duration-300"
                         size="sm"
                         onClick={() => {
                           if (station.latitude && station.longitude) {
                             window.open(
                               `https://www.google.com/maps/dir/?api=1&destination=${station.latitude},${station.longitude}`,
-                              '_blank'
+                              "_blank"
                             );
                           }
                         }}
@@ -463,9 +470,9 @@ const StationFinding: React.FC = () => {
                         <Navigation className="mr-1 h-3 w-3" />
                         Dẫn đường
                       </Button>
-                      <Button 
-                        variant="outline" 
-                        className="flex-1 glass border-blue-200/50 dark:border-purple-400/30 hover:bg-blue-50/50 dark:hover:bg-purple-500/10" 
+                      <Button
+                        variant="outline"
+                        className="flex-1 glass border-blue-200/50 dark:border-purple-400/30 hover:bg-blue-50/50 dark:hover:bg-purple-500/10"
                         size="sm"
                         onClick={() => {
                           navigate(`/driver/booking/${station.station_id}`);
@@ -482,7 +489,6 @@ const StationFinding: React.FC = () => {
           </div>
         )}
       </div>
-
     </div>
   );
 };

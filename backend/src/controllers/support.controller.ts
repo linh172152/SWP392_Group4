@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
 import { prisma } from "../server";
+import { randomUUID } from "crypto";
 
 /**
  * Get user tickets
@@ -122,6 +123,7 @@ export const createSupportTicket = asyncHandler(
 
     const ticket = await prisma.support_tickets.create({
       data: {
+        ticket_id: randomUUID(),
         ticket_number: ticketNumber,
         user_id: userId,
         category: category as string,
@@ -379,17 +381,46 @@ export const adminListTickets = asyncHandler(
       priority,
       category,
       assigned,
+      search,
       page = 1,
       limit = 10,
     } = req.query;
 
     const whereClause: any = {};
 
-    if (status) whereClause.status = status;
-    if (priority) whereClause.priority = priority;
-    if (category) whereClause.category = category;
+    // Validate and set status filter
+    if (status) {
+      const allowedStatuses = ["open", "in_progress", "resolved", "closed"];
+      if (allowedStatuses.includes(status as string)) {
+        whereClause.status = status;
+      }
+    }
+
+    // Validate and set priority filter
+    if (priority) {
+      const allowedPriorities = ["low", "medium", "high", "urgent"];
+      if (allowedPriorities.includes(priority as string)) {
+        whereClause.priority = priority;
+      }
+    }
+
+    // Set category filter (if provided)
+    if (category) {
+      whereClause.category = category;
+    }
+
+    // Set assigned filter
     if (assigned === "true") whereClause.assigned_to_staff_id = { not: null };
     if (assigned === "false") whereClause.assigned_to_staff_id = null;
+
+    // Set search filter (search in title, description, or ticket_number)
+    if (search && typeof search === "string" && search.trim()) {
+      whereClause.OR = [
+        { title: { contains: search.trim(), mode: "insensitive" } },
+        { description: { contains: search.trim(), mode: "insensitive" } },
+        { ticket_number: { contains: search.trim(), mode: "insensitive" } },
+      ];
+    }
 
     const take = Math.max(1, parseInt(limit as string, 10));
     const skip = (Math.max(1, parseInt(page as string, 10)) - 1) * take;
@@ -630,6 +661,7 @@ export const adminReplyTicket = asyncHandler(
 
     const reply = await prisma.ticket_replies.create({
       data: {
+        reply_id: randomUUID(),
         ticket_id: id,
         user_id: adminId,
         message: message as string,
@@ -705,6 +737,7 @@ export const addTicketReply = asyncHandler(
 
     const reply = await prisma.ticket_replies.create({
       data: {
+        reply_id: randomUUID(),
         ticket_id: id,
         user_id: userId,
         message: message as string,

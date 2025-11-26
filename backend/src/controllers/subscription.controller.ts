@@ -108,18 +108,24 @@ export const subscribeToPackage = asyncHandler(
       );
     }
 
-    const durationDays = servicePackage.duration_days;
+    const durationDays = Number(servicePackage.duration_days);
+    if (!Number.isFinite(durationDays) || durationDays <= 0) {
+      throw new CustomError("Invalid package duration", 400);
+    }
     const endDate = new Date(now.getTime());
     endDate.setDate(endDate.getDate() + durationDays);
 
     const subscription = await prisma.$transaction(async (tx) => {
       const createdSubscription = await tx.user_subscriptions.create({
         data: {
+          subscription_id: randomUUID(),
           user_id: userId,
           package_id: packageId,
           start_date: now,
           end_date: endDate,
-          remaining_swaps: servicePackage.swap_limit ?? null,
+          remaining_swaps: servicePackage.swap_limit !== null && servicePackage.swap_limit !== undefined 
+            ? Number(servicePackage.swap_limit) 
+            : null,
           auto_renew: Boolean(autoRenew),
           updated_at: new Date(),
         } as Prisma.user_subscriptionsUncheckedCreateInput,

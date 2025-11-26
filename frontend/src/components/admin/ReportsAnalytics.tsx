@@ -364,19 +364,6 @@ const ReportsAnalytics: React.FC = () => {
 
                   <Card className="border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm text-slate-700 dark:text-slate-300">
-                        Số Tiền Trung Bình
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
-                        {formatCurrency(stats.transactions.average_amount)}
-                      </p>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
-                    <CardHeader className="pb-3">
                       <CardTitle className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
                         <Zap className="h-4 w-4" />
                         Theo Mẫu Pin

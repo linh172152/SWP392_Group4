@@ -68,7 +68,6 @@ import {
 } from "../../services/battery.service";
 import { useToast } from "../../hooks/use-toast";
 import { parseError, logError } from "../../utils/errorHandler";
-import AddBatteryDialog from "./AddBatteryDialog";
 
 type SortField =
   | "battery_code"
@@ -99,7 +98,6 @@ const BatteryInventory: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
 
   // Dialog states
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -527,13 +525,6 @@ const BatteryInventory: React.FC = () => {
             )}
             Làm mới
           </Button>
-          <Button
-            className="bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg hover:shadow-xl transition-all duration-300"
-            onClick={() => setAddDialogOpen(true)}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Thêm pin
-          </Button>
         </div>
       </div>
 
@@ -933,13 +924,6 @@ const BatteryInventory: React.FC = () => {
           </CardContent>
         </Card>
       )}
-
-      {/* Add Battery Dialog */}
-      <AddBatteryDialog
-        open={addDialogOpen}
-        onOpenChange={setAddDialogOpen}
-        onSuccess={fetchBatteries}
-      />
 
       {/* Battery Detail Dialog */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>

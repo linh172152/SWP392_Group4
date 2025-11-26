@@ -304,7 +304,10 @@ const applyWalletTopupIfNeeded = async (
 
   await prisma.$transaction(async (tx) => {
     const actualAmountDecimal = new Prisma.Decimal(actualAmountNumber);
+    const topupAmountNumber = Number(metadata.topup_amount ?? 0);
+    const bonusAmountNumber = Number(metadata.bonus_amount ?? 0);
 
+    // ✅ Cộng actualAmount vào ví (bao gồm cả bonus)
     await tx.wallets.upsert({
       where: { user_id: originalPayment.user_id },
       update: {
@@ -318,6 +321,7 @@ const applyWalletTopupIfNeeded = async (
       },
     });
 
+    // ✅ Update payment record TOPUP chính (số tiền thanh toán)
     await tx.payments.update({
       where: { payment_id: originalPayment.payment_id },
       data: {
@@ -329,6 +333,39 @@ const applyWalletTopupIfNeeded = async (
         },
       },
     });
+
+    // ✅ Tạo payment record riêng cho phần bonus (nếu có)
+    if (bonusAmountNumber > 0 && Number.isFinite(bonusAmountNumber)) {
+      const bonusAmountDecimal = new Prisma.Decimal(bonusAmountNumber);
+
+      // Lấy wallet balance sau khi cộng để hiển thị trong metadata
+      const wallet = await tx.wallets.findUnique({
+        where: { user_id: originalPayment.user_id },
+        select: { balance: true },
+      });
+
+      await tx.payments.create({
+        data: {
+          payment_id: randomUUID(),
+          user_id: originalPayment.user_id,
+          amount: bonusAmountDecimal,
+          payment_method: "wallet",
+          payment_status: "completed",
+          payment_type: "TOPUP",
+          paid_at: new Date(),
+          topup_package_id: metadata.topup_package_id ?? null,
+          metadata: {
+            type: "topup_bonus",
+            topup_package_id: metadata.topup_package_id,
+            original_payment_id: originalPayment.payment_id,
+            bonus_amount: bonusAmountNumber,
+            topup_amount: topupAmountNumber,
+            actual_amount: actualAmountNumber,
+            wallet_balance_after: wallet ? Number(wallet.balance) : null,
+          } as Prisma.InputJsonValue,
+        } as Prisma.paymentsUncheckedCreateInput,
+      });
+    }
   });
 };
 

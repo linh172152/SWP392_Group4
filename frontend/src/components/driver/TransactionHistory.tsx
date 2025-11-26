@@ -1,8 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
-import { 
+import React, { useState, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../ui/card";
+import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
+import {
   History,
   Loader2,
   RefreshCw,
@@ -11,64 +17,53 @@ import {
   Battery,
   Calendar,
   CreditCard,
-  Filter,
-  Star
-} from 'lucide-react';
-import { getUserTransactions, Transaction } from '../../services/transaction.service';
-import { formatCurrency, formatDate } from '../../utils/format';
+  Star,
+} from "lucide-react";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../ui/select';
-import RatingModal from './RatingModal';
+  getUserTransactions,
+  Transaction,
+} from "../../services/transaction.service";
+import { formatCurrency, formatDate } from "../../utils/format";
+import RatingModal from "./RatingModal";
 
 const TransactionHistory: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [limit] = useState(10);
   const [ratingModalOpen, setRatingModalOpen] = useState(false);
-  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [selectedTransaction, setSelectedTransaction] =
+    useState<Transaction | null>(null);
 
-  const loadTransactions = async (pageNum: number = 1, status?: string) => {
+  const loadTransactions = async (pageNum: number = 1) => {
     setLoading(true);
     try {
       const response = await getUserTransactions({
         page: pageNum,
         limit,
-        status: status && status !== 'all' ? status : undefined,
       });
       setTransactions(response.data.transactions);
       setTotalPages(response.data.pagination.pages);
       setPage(response.data.pagination.page);
     } catch (error) {
-      console.error('Error loading transactions:', error);
+      console.error("Error loading transactions:", error);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadTransactions(1, statusFilter);
-  }, [statusFilter]);
-
-  const handleFilterChange = (value: string) => {
-    setStatusFilter(value);
-    setPage(1);
-  };
+    loadTransactions(1);
+  }, []);
 
   const getPaymentStatusBadge = (status: string) => {
     switch (status) {
-      case 'completed':
+      case "completed":
         return <Badge className="bg-green-500 text-white">Hoàn thành</Badge>;
-      case 'pending':
+      case "pending":
         return <Badge variant="secondary">Đang xử lý</Badge>;
-      case 'failed':
+      case "failed":
         return <Badge variant="destructive">Thất bại</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
@@ -77,14 +72,14 @@ const TransactionHistory: React.FC = () => {
 
   const getPaymentMethodLabel = (method: string) => {
     switch (method) {
-      case 'wallet':
-        return 'Ví';
-      case 'cash':
-        return 'Tiền mặt';
-      case 'vnpay':
-        return 'VNPay';
-      case 'momo':
-        return 'MoMo';
+      case "wallet":
+        return "Ví";
+      case "cash":
+        return "Tiền mặt";
+      case "vnpay":
+        return "VNPay";
+      case "momo":
+        return "MoMo";
       default:
         return method;
     }
@@ -97,7 +92,7 @@ const TransactionHistory: React.FC = () => {
 
   const handleRatingSuccess = () => {
     // Reload transactions sau khi đánh giá thành công
-    loadTransactions(page, statusFilter);
+    loadTransactions(page);
   };
 
   return (
@@ -114,38 +109,13 @@ const TransactionHistory: React.FC = () => {
         </div>
         <Button
           variant="outline"
-          onClick={() => loadTransactions(page, statusFilter)}
+          onClick={() => loadTransactions(page)}
           className="shadow-sm"
         >
           <RefreshCw className="h-4 w-4 mr-2" />
           Làm mới
         </Button>
       </div>
-
-      {/* Filter */}
-      <Card className="glass-card border-0 shadow-xl">
-        <CardContent className="p-4">
-          <div className="flex items-center gap-4">
-            <Filter className="h-5 w-5 text-slate-600 dark:text-slate-400" />
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                Trạng thái:
-              </span>
-              <Select value={statusFilter} onValueChange={handleFilterChange}>
-                <SelectTrigger className="w-[180px] bg-white dark:bg-slate-800">
-                  <SelectValue placeholder="Tất cả" />
-                </SelectTrigger>
-                <SelectContent className="bg-white dark:bg-slate-800">
-                  <SelectItem value="all">Tất cả</SelectItem>
-                  <SelectItem value="completed">Hoàn thành</SelectItem>
-                  <SelectItem value="pending">Đang xử lý</SelectItem>
-                  <SelectItem value="failed">Thất bại</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Transactions List */}
       <Card className="glass-card border-0 shadow-xl">
@@ -157,7 +127,7 @@ const TransactionHistory: React.FC = () => {
           <CardDescription>
             {transactions.length > 0
               ? `Tổng cộng ${transactions.length} giao dịch`
-              : 'Chưa có giao dịch nào'}
+              : "Chưa có giao dịch nào"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -175,19 +145,24 @@ const TransactionHistory: React.FC = () => {
               {transactions.map((transaction) => {
                 const amount = transaction.payment?.amount || 0;
                 const isFree = amount === 0;
-                const canRate = !!(transaction.station_id || transaction.station);
-                
+                const canRate = !!(
+                  transaction.station_id || transaction.station
+                );
+
                 // Debug log
                 if (canRate && !transaction.station_rating) {
-                  console.log('[TransactionHistory] Transaction có thể đánh giá:', {
-                    transaction_id: transaction.transaction_id,
-                    transaction_code: transaction.transaction_code,
-                    station_id: transaction.station_id,
-                    has_station: !!transaction.station,
-                    has_rating: !!transaction.station_rating,
-                  });
+                  console.log(
+                    "[TransactionHistory] Transaction có thể đánh giá:",
+                    {
+                      transaction_id: transaction.transaction_id,
+                      transaction_code: transaction.transaction_code,
+                      station_id: transaction.station_id,
+                      has_station: !!transaction.station,
+                      has_rating: !!transaction.station_rating,
+                    }
+                  );
                 }
-                
+
                 return (
                   <div
                     key={transaction.transaction_id}
@@ -200,7 +175,10 @@ const TransactionHistory: React.FC = () => {
                           <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
                             {transaction.transaction_code}
                           </h3>
-                          {transaction.payment && getPaymentStatusBadge(transaction.payment.payment_status)}
+                          {transaction.payment &&
+                            getPaymentStatusBadge(
+                              transaction.payment.payment_status
+                            )}
                         </div>
                         <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400">
                           <div className="flex items-center gap-1">
@@ -216,16 +194,20 @@ const TransactionHistory: React.FC = () => {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className={`text-2xl font-bold ${
-                          isFree 
-                            ? 'text-green-600 dark:text-green-400' 
-                            : 'text-red-600 dark:text-red-400'
-                        }`}>
-                          {isFree ? 'Miễn phí' : `-${formatCurrency(amount)}`}
+                        <div
+                          className={`text-2xl font-bold ${
+                            isFree
+                              ? "text-green-600 dark:text-green-400"
+                              : "text-red-600 dark:text-red-400"
+                          }`}
+                        >
+                          {isFree ? "Miễn phí" : `-${formatCurrency(amount)}`}
                         </div>
                         {transaction.payment?.payment_method && (
                           <div className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                            {getPaymentMethodLabel(transaction.payment.payment_method)}
+                            {getPaymentMethodLabel(
+                              transaction.payment.payment_method
+                            )}
                           </div>
                         )}
                       </div>
@@ -259,7 +241,8 @@ const TransactionHistory: React.FC = () => {
                             </span>
                           </div>
                           <div className="text-sm text-slate-900 dark:text-white">
-                            {transaction.vehicle.license_plate} - {transaction.vehicle.model}
+                            {transaction.vehicle.license_plate} -{" "}
+                            {transaction.vehicle.model}
                           </div>
                         </div>
                       )}
@@ -276,7 +259,8 @@ const TransactionHistory: React.FC = () => {
                             {transaction.old_battery.battery_code}
                           </div>
                           <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                            {transaction.old_battery.model} - {transaction.old_battery.current_charge}%
+                            {transaction.old_battery.model} -{" "}
+                            {transaction.old_battery.current_charge}%
                           </div>
                         </div>
                       )}
@@ -293,7 +277,8 @@ const TransactionHistory: React.FC = () => {
                             {transaction.new_battery.battery_code}
                           </div>
                           <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                            {transaction.new_battery.model} - {transaction.new_battery.current_charge}%
+                            {transaction.new_battery.model} -{" "}
+                            {transaction.new_battery.current_charge}%
                           </div>
                         </div>
                       )}
@@ -303,7 +288,10 @@ const TransactionHistory: React.FC = () => {
                     {transaction.staff && (
                       <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
                         <div className="text-sm text-slate-600 dark:text-slate-400">
-                          Nhân viên xử lý: <span className="font-medium text-slate-900 dark:text-white">{transaction.staff.full_name}</span>
+                          Nhân viên xử lý:{" "}
+                          <span className="font-medium text-slate-900 dark:text-white">
+                            {transaction.staff.full_name}
+                          </span>
                         </div>
                       </div>
                     )}
@@ -315,7 +303,10 @@ const TransactionHistory: React.FC = () => {
                           <div className="flex items-center gap-2 text-sm">
                             <Star className="h-4 w-4 text-yellow-400 fill-current" />
                             <span className="text-slate-600 dark:text-slate-400">
-                              Đã đánh giá: <span className="font-medium text-slate-900 dark:text-white">{transaction.station_rating.rating}/5</span>
+                              Đã đánh giá:{" "}
+                              <span className="font-medium text-slate-900 dark:text-white">
+                                {transaction.station_rating.rating}/5
+                              </span>
                             </span>
                             {transaction.station_rating.comment && (
                               <span className="text-slate-500 dark:text-slate-400 italic">
@@ -346,7 +337,7 @@ const TransactionHistory: React.FC = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => loadTransactions(page - 1, statusFilter)}
+                    onClick={() => loadTransactions(page - 1)}
                     disabled={page === 1}
                   >
                     Trước
@@ -357,7 +348,7 @@ const TransactionHistory: React.FC = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => loadTransactions(page + 1, statusFilter)}
+                    onClick={() => loadTransactions(page + 1)}
                     disabled={page === totalPages}
                   >
                     Sau
@@ -370,23 +361,26 @@ const TransactionHistory: React.FC = () => {
       </Card>
 
       {/* Rating Modal */}
-      {selectedTransaction && (selectedTransaction.station || selectedTransaction.station_id) && (
-        <RatingModal
-          open={ratingModalOpen}
-          onClose={() => {
-            setRatingModalOpen(false);
-            setSelectedTransaction(null);
-          }}
-          onSuccess={handleRatingSuccess}
-          stationId={selectedTransaction.station?.station_id || selectedTransaction.station_id}
-          stationName={selectedTransaction.station?.name || 'Trạm đổi pin'}
-          transactionId={selectedTransaction.transaction_id}
-          transactionCode={selectedTransaction.transaction_code}
-        />
-      )}
+      {selectedTransaction &&
+        (selectedTransaction.station || selectedTransaction.station_id) && (
+          <RatingModal
+            open={ratingModalOpen}
+            onClose={() => {
+              setRatingModalOpen(false);
+              setSelectedTransaction(null);
+            }}
+            onSuccess={handleRatingSuccess}
+            stationId={
+              selectedTransaction.station?.station_id ||
+              selectedTransaction.station_id
+            }
+            stationName={selectedTransaction.station?.name || "Trạm đổi pin"}
+            transactionId={selectedTransaction.transaction_id}
+            transactionCode={selectedTransaction.transaction_code}
+          />
+        )}
     </div>
   );
 };
 
 export default TransactionHistory;
-

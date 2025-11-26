@@ -1,8 +1,14 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
-import { 
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../ui/card";
+import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
+import {
   History,
   Loader2,
   RefreshCw,
@@ -11,19 +17,14 @@ import {
   Battery,
   Calendar,
   CreditCard,
-  Filter,
   User,
-  Phone
-} from 'lucide-react';
-import { getTransactionHistory, TransactionHistoryItem } from '../../services/staff.service';
-import { formatCurrency, formatDate } from '../../utils/format';
+  Phone,
+} from "lucide-react";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../ui/select';
+  getTransactionHistory,
+  TransactionHistoryItem,
+} from "../../services/staff.service";
+import { formatCurrency, formatDate } from "../../utils/format";
 import {
   Pagination,
   PaginationContent,
@@ -32,24 +33,24 @@ import {
   PaginationNext,
   PaginationPrevious,
   PaginationEllipsis,
-} from '../ui/pagination';
-import { logError } from '../../utils/errorHandler';
+} from "../ui/pagination";
+import { logError } from "../../utils/errorHandler";
 
 const TransactionHistory: React.FC = () => {
-  const [transactions, setTransactions] = useState<TransactionHistoryItem[]>([]);
+  const [transactions, setTransactions] = useState<TransactionHistoryItem[]>(
+    []
+  );
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [limit] = useState(10);
 
-  const loadTransactions = async (pageNum: number = 1, status?: string) => {
+  const loadTransactions = async (pageNum: number = 1) => {
     setLoading(true);
     try {
       const response = await getTransactionHistory({
         page: pageNum,
         limit,
-        status: status && status !== 'all' ? status : undefined,
       });
       if (response.success && response.data) {
         setTransactions(response.data.transactions);
@@ -64,34 +65,26 @@ const TransactionHistory: React.FC = () => {
   };
 
   useEffect(() => {
-    // Reset về page 1 khi filter thay đổi
-    setPage(1);
-    loadTransactions(1, statusFilter);
+    loadTransactions(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter]);
-
-  // Memoize event handlers
-  const handleFilterChange = useCallback((value: string) => {
-    setStatusFilter(value);
-    setPage(1);
   }, []);
 
   const handlePageChange = useCallback((newPage: number) => {
     setPage(newPage);
-    loadTransactions(newPage, statusFilter);
+    loadTransactions(newPage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter]);
+  }, []);
 
   // Memoize helper functions
   const getPaymentStatusBadge = useCallback((status: string) => {
     switch (status) {
-      case 'completed':
+      case "completed":
         return <Badge className="bg-green-500 text-white">Hoàn thành</Badge>;
-      case 'pending':
+      case "pending":
         return <Badge variant="secondary">Đang xử lý</Badge>;
-      case 'failed':
+      case "failed":
         return <Badge variant="destructive">Thất bại</Badge>;
-      case 'covered_by_subscription':
+      case "covered_by_subscription":
         return <Badge className="bg-blue-500 text-white">Gói dịch vụ</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
@@ -99,18 +92,18 @@ const TransactionHistory: React.FC = () => {
   }, []);
 
   const getPaymentMethodLabel = useCallback((method?: string) => {
-    if (!method) return 'N/A';
+    if (!method) return "N/A";
     switch (method) {
-      case 'wallet':
-        return 'Ví';
-      case 'cash':
-        return 'Tiền mặt';
-      case 'vnpay':
-        return 'VNPay';
-      case 'momo':
-        return 'MoMo';
-      case 'subscription':
-        return 'Gói dịch vụ';
+      case "wallet":
+        return "Ví";
+      case "cash":
+        return "Tiền mặt";
+      case "vnpay":
+        return "VNPay";
+      case "momo":
+        return "MoMo";
+      case "subscription":
+        return "Gói dịch vụ";
       default:
         return method;
     }
@@ -135,39 +128,13 @@ const TransactionHistory: React.FC = () => {
         </div>
         <Button
           variant="outline"
-          onClick={() => loadTransactions(page, statusFilter)}
+          onClick={() => loadTransactions(page)}
           className="shadow-sm"
         >
           <RefreshCw className="h-4 w-4 mr-2" />
           Làm mới
         </Button>
       </div>
-
-      {/* Filter */}
-      <Card className="glass-card border-0 shadow-xl">
-        <CardContent className="p-4">
-          <div className="flex items-center gap-4">
-            <Filter className="h-5 w-5 text-slate-600 dark:text-slate-400" />
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                Trạng thái:
-              </span>
-              <Select value={statusFilter} onValueChange={handleFilterChange}>
-                <SelectTrigger className="w-[180px] bg-white dark:bg-slate-800">
-                  <SelectValue placeholder="Tất cả" />
-                </SelectTrigger>
-                <SelectContent className="bg-white dark:bg-slate-800">
-                  <SelectItem value="all">Tất cả</SelectItem>
-                  <SelectItem value="completed">Hoàn thành</SelectItem>
-                  <SelectItem value="covered_by_subscription">Gói dịch vụ</SelectItem>
-                  <SelectItem value="pending">Đang xử lý</SelectItem>
-                  <SelectItem value="failed">Thất bại</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Transactions List */}
       {loading ? (
@@ -251,7 +218,9 @@ const TransactionHistory: React.FC = () => {
                       <div className="flex items-center gap-2 text-sm">
                         <Calendar className="h-4 w-4 text-slate-500" />
                         <span className="text-slate-700 dark:text-slate-300">
-                          {formatDate(transaction.swap_at || transaction.created_at)}
+                          {formatDate(
+                            transaction.swap_at || transaction.created_at
+                          )}
                         </span>
                       </div>
                     </div>
@@ -286,41 +255,53 @@ const TransactionHistory: React.FC = () => {
                   <PaginationItem>
                     <PaginationPrevious
                       onClick={() => page > 1 && handlePageChange(page - 1)}
-                      className={page === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                      className={
+                        page === 1
+                          ? "pointer-events-none opacity-50"
+                          : "cursor-pointer"
+                      }
                     />
                   </PaginationItem>
-                  
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => {
-                    if (
-                      pageNum === 1 ||
-                      pageNum === totalPages ||
-                      (pageNum >= page - 1 && pageNum <= page + 1)
-                    ) {
-                      return (
-                        <PaginationItem key={pageNum}>
-                          <PaginationLink
-                            onClick={() => handlePageChange(pageNum)}
-                            isActive={pageNum === page}
-                            className="cursor-pointer"
-                          >
-                            {pageNum}
-                          </PaginationLink>
-                        </PaginationItem>
-                      );
-                    } else if (pageNum === page - 2 || pageNum === page + 2) {
-                      return (
-                        <PaginationItem key={pageNum}>
-                          <PaginationEllipsis />
-                        </PaginationItem>
-                      );
+
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                    (pageNum) => {
+                      if (
+                        pageNum === 1 ||
+                        pageNum === totalPages ||
+                        (pageNum >= page - 1 && pageNum <= page + 1)
+                      ) {
+                        return (
+                          <PaginationItem key={pageNum}>
+                            <PaginationLink
+                              onClick={() => handlePageChange(pageNum)}
+                              isActive={pageNum === page}
+                              className="cursor-pointer"
+                            >
+                              {pageNum}
+                            </PaginationLink>
+                          </PaginationItem>
+                        );
+                      } else if (pageNum === page - 2 || pageNum === page + 2) {
+                        return (
+                          <PaginationItem key={pageNum}>
+                            <PaginationEllipsis />
+                          </PaginationItem>
+                        );
+                      }
+                      return null;
                     }
-                    return null;
-                  })}
-                  
+                  )}
+
                   <PaginationItem>
                     <PaginationNext
-                      onClick={() => page < totalPages && handlePageChange(page + 1)}
-                      className={page === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                      onClick={() =>
+                        page < totalPages && handlePageChange(page + 1)
+                      }
+                      className={
+                        page === totalPages
+                          ? "pointer-events-none opacity-50"
+                          : "cursor-pointer"
+                      }
                     />
                   </PaginationItem>
                 </PaginationContent>
@@ -334,4 +315,3 @@ const TransactionHistory: React.FC = () => {
 };
 
 export default TransactionHistory;
-

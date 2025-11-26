@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../server";
 import { asyncHandler, CustomError } from "../middlewares/error.middleware";
+import { randomUUID } from "crypto";
 
 const parseBenefits = (input: any): Prisma.InputJsonValue | undefined => {
   if (input === undefined || input === null) {
@@ -167,15 +168,20 @@ export const adminCreatePackage = asyncHandler(
 
     const created = await prisma.service_packages.create({
       data: {
+        package_id: randomUUID(),
         name: name as string,
         description: description as string | null,
         battery_capacity_kwh: capacityNumber,
         duration_days: durationNumber,
         price: new Prisma.Decimal(priceNumber),
         billing_cycle: billingCycleValue,
-        ...(benefitsValue !== undefined ? { benefits: benefitsValue as Prisma.InputJsonValue } : {}),
+        ...(benefitsValue !== undefined
+          ? { benefits: benefitsValue as Prisma.InputJsonValue }
+          : {}),
         swap_limit: null,
-        ...(metadataValue !== undefined ? { metadata: metadataValue as Prisma.InputJsonValue } : {}),
+        ...(metadataValue !== undefined
+          ? { metadata: metadataValue as Prisma.InputJsonValue }
+          : {}),
         is_active: parseBoolean(is_active, true),
         updated_at: new Date(),
       } as Prisma.service_packagesUncheckedCreateInput,

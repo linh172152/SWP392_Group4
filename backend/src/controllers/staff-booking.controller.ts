@@ -936,6 +936,7 @@ export const completeBooking = asyncHandler(
 
       oldBattery = await prisma.batteries.create({
         data: {
+          battery_id: randomUUID(),
           battery_code: trimmedOldBatteryCode,
           model: vehicle.battery_model,
           status: "in_use", // Pin đang gắn trên xe

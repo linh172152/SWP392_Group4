@@ -80,10 +80,21 @@ export async function getAdminTickets(params?: GetTicketsParams) {
   if (params?.status) query.set("status", params.status);
   if (params?.priority) query.set("priority", params.priority);
   if (params?.category) query.set("category", params.category);
-  if (params?.assigned_to) query.set("assigned_to", params.assigned_to);
+  // Map assigned_to to assigned parameter expected by backend
+  if (params?.assigned_to) {
+    if (params.assigned_to === "assigned") {
+      query.set("assigned", "true");
+    } else if (params.assigned_to === "unassigned") {
+      query.set("assigned", "false");
+    } else {
+      query.set("assigned", params.assigned_to);
+    }
+  }
   if (params?.search) query.set("search", params.search);
 
-  const url = `${API_BASE_URL}/admin/support${query.toString() ? `?${query.toString()}` : ""}`;
+  const url = `${API_BASE_URL}/admin/support${
+    query.toString() ? `?${query.toString()}` : ""
+  }`;
   const res = await authFetch(url);
   return res;
 }
@@ -103,8 +114,8 @@ export async function getAdminTicketDetails(ticketId: string) {
 export async function assignTicket(ticketId: string, data: AssignTicketData) {
   const url = `${API_BASE_URL}/admin/support/${ticketId}/assign`;
   const res = await authFetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
   return res;
@@ -116,8 +127,8 @@ export async function assignTicket(ticketId: string, data: AssignTicketData) {
 export async function replyToTicket(ticketId: string, data: ReplyTicketData) {
   const url = `${API_BASE_URL}/admin/support/${ticketId}/reply`;
   const res = await authFetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
   return res;
@@ -126,11 +137,14 @@ export async function replyToTicket(ticketId: string, data: ReplyTicketData) {
 /**
  * Update ticket status (Admin only)
  */
-export async function updateTicketStatus(ticketId: string, data: UpdateTicketStatusData) {
+export async function updateTicketStatus(
+  ticketId: string,
+  data: UpdateTicketStatusData
+) {
   const url = `${API_BASE_URL}/admin/support/${ticketId}/status`;
   const res = await authFetch(url, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
   return res;

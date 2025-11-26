@@ -457,7 +457,7 @@ const BookingHistory: React.FC = () => {
     let confirmMessage = "Bạn có chắc muốn hủy đặt chỗ này?";
 
     if (cancelCheck.cancellationFee && cancelCheck.cancellationFee > 0) {
-      confirmMessage = `⚠️ CẢNH BÁO: Đặt chỗ này đã được nhân viên xác nhận. Hủy đặt chỗ sẽ bị trừ phí hủy muộn ${cancelCheck.cancellationFee.toLocaleString(
+      confirmMessage = `⚠️ CẢNH BÁO: Đặt chỗ này đã được nhân viên xác nhận. Hủy đặt chỗ sẽ bị trừ ${cancelCheck.cancellationFee.toLocaleString(
         "vi-VN"
       )}đ từ ví của bạn. Bạn có chắc muốn tiếp tục?`;
     } else if (
@@ -974,17 +974,6 @@ const BookingHistory: React.FC = () => {
                                   : "⚠️ " + cancelCheck.reason}
                               </p>
                             )}
-                            {cancelCheck.canCancel &&
-                              cancelCheck.cancellationFee !== undefined &&
-                              cancelCheck.cancellationFee > 0 && (
-                                <p className="text-xs text-red-600 dark:text-red-400 mt-1 font-semibold">
-                                  ⚠️ Phí hủy muộn:{" "}
-                                  {cancelCheck.cancellationFee.toLocaleString(
-                                    "vi-VN"
-                                  )}
-                                  đ
-                                </p>
-                              )}
                             {cancelCheck.canCancel &&
                               (!cancelCheck.cancellationFee ||
                                 cancelCheck.cancellationFee === 0) &&

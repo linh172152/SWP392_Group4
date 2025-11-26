@@ -1,8 +1,13 @@
 import { prisma } from "../server";
+import { randomUUID } from "crypto";
 
 export const vehicleService = {
   // Tạo xe mới
   createVehicle: async (vehicleData: any) => {
+    // Đảm bảo có vehicle_id nếu chưa có
+    if (!vehicleData.vehicle_id) {
+      vehicleData.vehicle_id = randomUUID();
+    }
     return await prisma.vehicles.create({
       data: vehicleData,
       include: {

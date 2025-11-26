@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
 import { prisma } from "../server";
+import { randomUUID } from "crypto";
 
 const batteryStatusLabels: Record<string, string> = {
   full: "Sẵn sàng",
@@ -167,6 +168,7 @@ export const addBattery = asyncHandler(async (req: Request, res: Response) => {
 
   const battery = await prisma.batteries.create({
     data: {
+      battery_id: randomUUID(),
       battery_code: battery_code as string,
       station_id: station_id as string,
       model: model as string,

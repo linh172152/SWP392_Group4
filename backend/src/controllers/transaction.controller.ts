@@ -537,6 +537,7 @@ export const createRefundRequest = asyncHandler(
 
     const supportTicket = await prisma.support_tickets.create({
       data: {
+        ticket_id: randomUUID(),
         ticket_number: ticketNumber,
         user_id: userId,
         category: "payment_issue",

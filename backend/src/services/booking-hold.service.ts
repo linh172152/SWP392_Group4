@@ -1,4 +1,10 @@
-import { Prisma, BatteryStatus, PaymentStatus } from "@prisma/client";
+import {
+  Prisma,
+  BatteryStatus,
+  PaymentStatus,
+  PaymentType,
+} from "@prisma/client";
+import { randomUUID } from "crypto";
 
 export type BookingHoldFields = {
   booking_id: string;
@@ -121,6 +127,23 @@ export async function releaseBookingHold({
         booking.locked_wallet_amount ?? new Prisma.Decimal(0);
       walletRefundAmount = Number(amountDecimal);
 
+      // ✅ Lấy booking_code từ booking hoặc payment metadata
+      let bookingCode: string | undefined;
+      try {
+        const bookingRecord = await tx.bookings.findUnique({
+          where: { booking_id: booking.booking_id },
+          select: { booking_code: true },
+        });
+        bookingCode = bookingRecord?.booking_code;
+      } catch (error) {
+        // Fallback: lấy từ payment metadata nếu có
+        const paymentMetadata = payment?.metadata as Record<
+          string,
+          unknown
+        > | null;
+        bookingCode = paymentMetadata?.booking_code as string | undefined;
+      }
+
       const wallet = await tx.wallets.upsert({
         where: { user_id: booking.user_id },
         update: {
@@ -134,6 +157,7 @@ export async function releaseBookingHold({
         },
       });
 
+      // ✅ Update payment cũ thành refunded
       await tx.payments.update({
         where: { payment_id: booking.locked_wallet_payment_id },
         data: {
@@ -148,12 +172,31 @@ export async function releaseBookingHold({
           },
         },
       });
+
+      // ✅ Tạo payment record mới cho REFUND để hiển thị trong lịch sử giao dịch
+      await tx.payments.create({
+        data: {
+          payment_id: randomUUID(),
+          user_id: booking.user_id,
+          amount: amountDecimal,
+          payment_method: "wallet",
+          payment_status: PAYMENT_STATUS_COMPLETED,
+          payment_type: PaymentType.REFUND,
+          paid_at: new Date(),
+          metadata: {
+            type: "booking_refund",
+            booking_id: booking.booking_id,
+            booking_code: bookingCode,
+            original_payment_id: booking.locked_wallet_payment_id,
+            refunded_reason: notes ?? "booking_cancelled",
+            refunded_amount: walletRefundAmount,
+            wallet_balance_after: Number(wallet.balance),
+          } as Prisma.InputJsonValue,
+        } as Prisma.paymentsUncheckedCreateInput,
+      });
     }
 
-    if (
-      booking.locked_subscription_id &&
-      booking.locked_swap_count > 0
-    ) {
+    if (booking.locked_subscription_id && booking.locked_swap_count > 0) {
       const now = new Date();
       const subscription = await tx.user_subscriptions.findUnique({
         where: { subscription_id: booking.locked_subscription_id },
@@ -174,7 +217,8 @@ export async function releaseBookingHold({
         await tx.user_subscriptions.update({
           where: { subscription_id: booking.locked_subscription_id },
           data: {
-            remaining_swaps: subscription.remaining_swaps + booking.locked_swap_count,
+            remaining_swaps:
+              subscription.remaining_swaps + booking.locked_swap_count,
           },
         });
       }

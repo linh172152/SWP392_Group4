@@ -7,6 +7,7 @@ import {
   deleteImage,
 } from "../services/cloudinary.service";
 import { prisma } from "../server";
+import { randomUUID } from "crypto";
 
 /**
  * Get all stations (Admin)
@@ -359,6 +360,7 @@ export const createStation = asyncHandler(
 
     const station = await prisma.stations.create({
       data: {
+        station_id: randomUUID(),
         name: name as string,
         address: address as string,
         latitude: latitude ? new Prisma.Decimal(parseFloat(latitude)) : null,

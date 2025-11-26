@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
 import { prisma } from "../server";
+import { randomUUID } from "crypto";
 
 /**
  * Get user's vehicles
@@ -145,6 +146,7 @@ export const addVehicle = asyncHandler(async (req: Request, res: Response) => {
   const { createdVehicle } = await prisma.$transaction(async (tx) => {
     const createdBattery = await tx.batteries.create({
       data: {
+        battery_id: randomUUID(),
         battery_code: trimmedBatteryCode,
         model: battery_model,
         status: "in_use",
@@ -162,6 +164,7 @@ export const addVehicle = asyncHandler(async (req: Request, res: Response) => {
 
     const newVehicle = await tx.vehicles.create({
       data: {
+        vehicle_id: randomUUID(),
         license_plate,
         vehicle_type: normalizedVehicleType as any,
         make: vehicleMake,
@@ -170,6 +173,7 @@ export const addVehicle = asyncHandler(async (req: Request, res: Response) => {
         battery_model,
         current_battery_id: createdBattery.battery_id,
         user_id: userId,
+        updated_at: new Date(),
       } as any,
       include: {
         users: {

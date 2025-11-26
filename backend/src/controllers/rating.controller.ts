@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { asyncHandler } from "../middlewares/error.middleware";
 import { CustomError } from "../middlewares/error.middleware";
 import { prisma } from "../server";
+import { randomUUID } from "crypto";
 
 /**
  * Create station rating
@@ -48,6 +49,7 @@ export const createRating = asyncHandler(
 
     const ratingData = await prisma.station_ratings.create({
       data: {
+        rating_id: randomUUID(),
         user_id: userId,
         station_id: station_id as string,
         transaction_id: transaction_id as string | null,
