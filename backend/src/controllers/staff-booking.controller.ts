@@ -629,6 +629,8 @@ export const confirmBooking = asyncHandler(
             station_id: true,
             name: true,
             address: true,
+            latitude: true,
+            longitude: true,
           },
         },
         users_bookings_checked_in_by_staff_idTousers: {
@@ -660,16 +662,35 @@ export const confirmBooking = asyncHandler(
       console.error("Failed to send notification:", error);
     }
 
+    const {
+      users_bookings_user_idTousers,
+      users_bookings_checked_in_by_staff_idTousers,
+      vehicles,
+      stations,
+      ...rest
+    } = updatedBooking;
     const mappedBooking = {
-      ...updatedBooking,
-      user: updatedBooking.users_bookings_user_idTousers || null,
-      vehicle: updatedBooking.vehicles
+      ...rest,
+      user: users_bookings_user_idTousers || null,
+      checked_in_by_staff: users_bookings_checked_in_by_staff_idTousers || null,
+      vehicle: vehicles
         ? {
-            ...updatedBooking.vehicles,
-            current_battery: (updatedBooking.vehicles as any).batteries || null,
+            ...vehicles,
+            current_battery: (vehicles as any).batteries || null,
+          }
+        : null,
+      station: stations
+        ? {
+            ...stations,
+            latitude: stations.latitude ? Number(stations.latitude) : null,
+            longitude: stations.longitude ? Number(stations.longitude) : null,
           }
         : null,
     };
+    // Remove batteries field if it exists
+    if (mappedBooking.vehicle && (mappedBooking.vehicle as any).batteries) {
+      delete (mappedBooking.vehicle as any).batteries;
+    }
 
     res.status(200).json({
       success: true,

@@ -108,10 +108,17 @@ export const getMyStaffSchedules = asyncHandler(
       },
     });
 
+    // Map Prisma's verbose relation names to simpler frontend-expected names
+    const mappedSchedules = schedules.map((schedule) => ({
+      ...schedule,
+      station: schedule.stations || null,
+      stations: undefined,
+    }));
+
     res.status(200).json({
       success: true,
       message: "Staff schedules retrieved successfully",
-      data: schedules,
+      data: mappedSchedules,
     });
   }
 );
@@ -243,6 +250,7 @@ export const adminListStaffSchedules = asyncHandler(
             select: {
               station_id: true,
               name: true,
+              address: true,
             },
           },
         },
@@ -250,11 +258,21 @@ export const adminListStaffSchedules = asyncHandler(
       prisma.staff_schedules.count({ where }),
     ]);
 
+    // Map Prisma's verbose relation names to simpler frontend-expected names
+    const mappedSchedules = schedules.map((schedule) => ({
+      ...schedule,
+      staff: schedule.users || null,
+      station: schedule.stations || null,
+      // Remove verbose relation names
+      users: undefined,
+      stations: undefined,
+    }));
+
     res.status(200).json({
       success: true,
       message: "Staff schedules retrieved",
       data: {
-        schedules,
+        schedules: mappedSchedules,
         pagination: {
           page: pageNumber,
           limit: pageSize,
@@ -316,15 +334,26 @@ export const adminCreateStaffSchedule = asyncHandler(
           select: {
             station_id: true,
             name: true,
+            address: true,
           },
         },
       },
     });
 
+    // Map Prisma's verbose relation names to simpler frontend-expected names
+    const mappedSchedule = {
+      ...schedule,
+      staff: schedule.users || null,
+      station: schedule.stations || null,
+      // Remove verbose relation names
+      users: undefined,
+      stations: undefined,
+    };
+
     res.status(201).json({
       success: true,
       message: "Staff schedule created",
-      data: schedule,
+      data: mappedSchedule,
     });
   }
 );
@@ -403,15 +432,26 @@ export const adminUpdateStaffSchedule = asyncHandler(
           select: {
             station_id: true,
             name: true,
+            address: true,
           },
         },
       },
     });
 
+    // Map Prisma's verbose relation names to simpler frontend-expected names
+    const mappedSchedule = {
+      ...updated,
+      staff: updated.users || null,
+      station: updated.stations || null,
+      // Remove verbose relation names
+      users: undefined,
+      stations: undefined,
+    };
+
     res.status(200).json({
       success: true,
       message: "Staff schedule updated",
-      data: updated,
+      data: mappedSchedule,
     });
   }
 );

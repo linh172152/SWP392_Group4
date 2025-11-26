@@ -93,6 +93,7 @@ export const getUserTransactions = asyncHandler(
       const {
         batteries_transactions_old_battery_idTobatteries,
         batteries_transactions_new_battery_idTobatteries,
+        users_transactions_staff_idTousers,
         amount,
         payments,
         ...rest
@@ -102,6 +103,7 @@ export const getUserTransactions = asyncHandler(
         amount: Number(amount),
         old_battery: batteries_transactions_old_battery_idTobatteries || null,
         new_battery: batteries_transactions_new_battery_idTobatteries || null,
+        staff: users_transactions_staff_idTousers || null,
         payments: payments
           ? {
               ...payments,
@@ -226,6 +228,7 @@ export const getTransactionDetails = asyncHandler(
     const {
       batteries_transactions_old_battery_idTobatteries,
       batteries_transactions_new_battery_idTobatteries,
+      users_transactions_staff_idTousers,
       amount,
       payments,
       ...rest
@@ -235,6 +238,7 @@ export const getTransactionDetails = asyncHandler(
       amount: Number(amount),
       old_battery: batteries_transactions_old_battery_idTobatteries || null,
       new_battery: batteries_transactions_new_battery_idTobatteries || null,
+      staff: users_transactions_staff_idTousers || null,
       payments: payments
         ? {
             ...payments,
@@ -468,12 +472,20 @@ export const payTransaction = asyncHandler(
       }
     }
 
+    // Map Prisma's verbose relation names to simpler frontend-expected names
+    const mappedTransaction = {
+      ...transaction,
+      user: transaction.users_transactions_user_idTousers || null,
+      // Remove verbose relation name
+      users_transactions_user_idTousers: undefined,
+    };
+
     res.status(200).json({
       success: true,
       message: "Payment processed successfully",
       data: {
         payment,
-        transaction,
+        transaction: mappedTransaction,
       },
     });
   }

@@ -66,11 +66,27 @@ export const getUserTickets = asyncHandler(
 
     const total = await prisma.support_tickets.count({ where: whereClause });
 
+    // Map Prisma's verbose relation names to simpler frontend-expected names
+    const mappedTickets = tickets.map((ticket: any) => ({
+      ...ticket,
+      assigned_staff:
+        ticket.users_support_tickets_assigned_to_staff_idTousers || null,
+      replies: ticket.ticket_replies
+        ? ticket.ticket_replies.map((reply: any) => ({
+            ...reply,
+            user: reply.users || null,
+            users: undefined,
+          }))
+        : [],
+      users_support_tickets_assigned_to_staff_idTousers: undefined,
+      ticket_replies: undefined,
+    }));
+
     res.status(200).json({
       success: true,
       message: "User tickets retrieved successfully",
       data: {
-        tickets,
+        tickets: mappedTickets,
         pagination: {
           page: parseInt(page as string),
           limit: parseInt(limit as string),
@@ -127,10 +143,17 @@ export const createSupportTicket = asyncHandler(
       },
     });
 
+    // Map Prisma's verbose relation names to simpler frontend-expected names
+    const mappedTicket = {
+      ...ticket,
+      user: ticket.users_support_tickets_user_idTousers || null,
+      users_support_tickets_user_idTousers: undefined,
+    };
+
     res.status(201).json({
       success: true,
       message: "Support ticket created successfully",
-      data: ticket,
+      data: mappedTicket,
     });
   }
 );
@@ -188,10 +211,22 @@ export const getTicketDetails = asyncHandler(
       throw new CustomError("Ticket not found", 404);
     }
 
+    // Map Prisma's verbose relation names to simpler frontend-expected names
+    const mappedTicket = {
+      ...ticket,
+      user: ticket.users_support_tickets_user_idTousers || null,
+      assigned_staff:
+        ticket.users_support_tickets_assigned_to_staff_idTousers || null,
+      replies: ticket.ticket_replies || [],
+      users_support_tickets_user_idTousers: undefined,
+      users_support_tickets_assigned_to_staff_idTousers: undefined,
+      ticket_replies: undefined,
+    };
+
     res.status(200).json({
       success: true,
       message: "Ticket details retrieved successfully",
-      data: ticket,
+      data: mappedTicket,
     });
   }
 );
@@ -246,10 +281,20 @@ export const updateTicket = asyncHandler(
       },
     });
 
+    // Map Prisma's verbose relation names to simpler frontend-expected names
+    const mappedTicket = {
+      ...updatedTicket,
+      user: updatedTicket.users_support_tickets_user_idTousers || null,
+      assigned_staff:
+        updatedTicket.users_support_tickets_assigned_to_staff_idTousers || null,
+      users_support_tickets_user_idTousers: undefined,
+      users_support_tickets_assigned_to_staff_idTousers: undefined,
+    };
+
     res.status(200).json({
       success: true,
       message: "Ticket updated successfully",
-      data: updatedTicket,
+      data: mappedTicket,
     });
   }
 );
@@ -301,11 +346,18 @@ export const getTicketReplies = asyncHandler(
       where: { ticket_id: id },
     });
 
+    // Map Prisma's verbose relation names to simpler frontend-expected names
+    const mappedReplies = replies.map((reply: any) => ({
+      ...reply,
+      user: reply.users || null,
+      users: undefined,
+    }));
+
     res.status(200).json({
       success: true,
       message: "Ticket replies retrieved successfully",
       data: {
-        replies,
+        replies: mappedReplies,
         pagination: {
           page: parseInt(page as string),
           limit: parseInt(limit as string),
@@ -369,11 +421,22 @@ export const adminListTickets = asyncHandler(
       prisma.support_tickets.count({ where: whereClause }),
     ]);
 
+    // Map Prisma's verbose relation names to simpler frontend-expected names
+    const mappedTickets = tickets.map((ticket) => ({
+      ...ticket,
+      user: ticket.users_support_tickets_user_idTousers || null,
+      assigned_staff:
+        ticket.users_support_tickets_assigned_to_staff_idTousers || null,
+      // Remove verbose relation names
+      users_support_tickets_user_idTousers: undefined,
+      users_support_tickets_assigned_to_staff_idTousers: undefined,
+    }));
+
     res.status(200).json({
       success: true,
       message: "Tickets retrieved successfully",
       data: {
-        tickets,
+        tickets: mappedTickets,
         pagination: {
           page: Math.max(1, parseInt(page as string, 10)),
           limit: take,
@@ -429,10 +492,23 @@ export const adminGetTicketDetails = asyncHandler(
       throw new CustomError("Ticket not found", 404);
     }
 
+    // Map Prisma's verbose relation names to simpler frontend-expected names
+    const mappedTicket = {
+      ...ticket,
+      user: ticket.users_support_tickets_user_idTousers || null,
+      assigned_staff:
+        ticket.users_support_tickets_assigned_to_staff_idTousers || null,
+      replies: ticket.ticket_replies || [],
+      // Remove verbose relation names
+      users_support_tickets_user_idTousers: undefined,
+      users_support_tickets_assigned_to_staff_idTousers: undefined,
+      ticket_replies: undefined,
+    };
+
     res.status(200).json({
       success: true,
       message: "Ticket details retrieved successfully",
-      data: ticket,
+      data: mappedTicket,
     });
   }
 );
@@ -483,10 +559,18 @@ export const adminAssignTicket = asyncHandler(
       },
     });
 
+    // Map Prisma's verbose relation names to simpler frontend-expected names
+    const mappedTicket = {
+      ...updated,
+      assigned_staff:
+        updated.users_support_tickets_assigned_to_staff_idTousers || null,
+      users_support_tickets_assigned_to_staff_idTousers: undefined,
+    };
+
     res.status(200).json({
       success: true,
       message: "Ticket assigned successfully",
-      data: updated,
+      data: mappedTicket,
     });
   }
 );
@@ -562,10 +646,17 @@ export const adminReplyTicket = asyncHandler(
       },
     });
 
+    // Map Prisma's verbose relation names to simpler frontend-expected names
+    const mappedReply = {
+      ...reply,
+      user: reply.users || null,
+      users: undefined,
+    };
+
     res.status(201).json({
       success: true,
       message: "Reply added successfully",
-      data: reply,
+      data: mappedReply,
     });
   }
 );
@@ -638,10 +729,17 @@ export const addTicketReply = asyncHandler(
       });
     }
 
+    // Map Prisma's verbose relation names to simpler frontend-expected names
+    const mappedReply = {
+      ...reply,
+      user: reply.users || null,
+      users: undefined,
+    };
+
     res.status(201).json({
       success: true,
       message: "Reply added successfully",
-      data: reply,
+      data: mappedReply,
     });
   }
 );
@@ -693,9 +791,19 @@ export const closeTicket = asyncHandler(async (req: Request, res: Response) => {
     },
   });
 
+  // Map Prisma's verbose relation names to simpler frontend-expected names
+  const mappedTicket = {
+    ...updatedTicket,
+    user: updatedTicket.users_support_tickets_user_idTousers || null,
+    assigned_staff:
+      updatedTicket.users_support_tickets_assigned_to_staff_idTousers || null,
+    users_support_tickets_user_idTousers: undefined,
+    users_support_tickets_assigned_to_staff_idTousers: undefined,
+  };
+
   res.status(200).json({
     success: true,
     message: "Ticket closed successfully",
-    data: updatedTicket,
+    data: mappedTicket,
   });
 });

@@ -102,6 +102,14 @@ export const getSystemOverview = asyncHandler(
       take: 10,
     });
 
+    // Map Prisma's verbose relation names to simpler frontend-expected names
+    const mappedRecentActivity = recentActivity.map((activity: any) => ({
+      ...activity,
+      user: activity.users_transactions_user_idTousers || null,
+      // Remove verbose relation name
+      users_transactions_user_idTousers: undefined,
+    }));
+
     res.status(200).json({
       success: true,
       message: "System overview retrieved successfully",
@@ -120,7 +128,7 @@ export const getSystemOverview = asyncHandler(
           batteries_by_status: batteryBreakdown,
           bookings_by_status: bookingBreakdown,
         },
-        recent_activity: recentActivity,
+        recent_activity: mappedRecentActivity,
         period: {
           from: dateFilter.gte,
           to: dateFilter.lte || new Date(),
