@@ -350,6 +350,49 @@ router.post('/upload-avatar', authenticateToken, upload.single('image'), handleM
  */
 router.get('/verify', authenticateToken, verifyToken);
 
+/**
+ * Debug endpoint - test auth components
+ */
+router.get('/debug', async (_req, res) => {
+  try {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    // Test database
+    const dbTest = await prisma.$queryRaw`SELECT 1 as test`;
+    
+    // Test JWT secrets
+    const jwtSecretOk = !!process.env.JWT_SECRET && process.env.JWT_SECRET !== 'your-super-secret-jwt-key';
+    const jwtRefreshSecretOk = !!process.env.JWT_REFRESH_SECRET && process.env.JWT_REFRESH_SECRET !== 'your-super-secret-refresh-key';
+    
+    // Count users
+    const userCount = await prisma.users.count();
+    
+    await prisma.$disconnect();
+    
+    res.status(200).json({
+      success: true,
+      message: 'Auth debug info',
+      data: {
+        database: 'connected',
+        dbTest,
+        userCount,
+        jwt_secret_ok: jwtSecretOk,
+        jwt_refresh_secret_ok: jwtRefreshSecretOk,
+        node_env: process.env.NODE_ENV,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: 'Debug endpoint error',
+      error: error?.message,
+      stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined,
+    });
+  }
+});
+
 export default router;
 
 

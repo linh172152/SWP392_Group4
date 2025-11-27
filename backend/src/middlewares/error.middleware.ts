@@ -180,7 +180,7 @@ export const errorHandler = (
       "Không thể kết nối đến cơ sở dữ liệu. Vui lòng liên hệ quản trị viên.";
   }
 
-  // Log error in development
+  // Log error (always log in production too, but without sensitive data)
   if (process.env.NODE_ENV === "development") {
     console.error("Error:", {
       message: error.message,
@@ -191,6 +191,17 @@ export const errorHandler = (
       body: req.body,
       params: req.params,
       query: req.query,
+    });
+  } else {
+    // Production logging - log error details but be careful with sensitive data
+    console.error("Error:", {
+      message: error.message,
+      name: error.name,
+      statusCode,
+      url: req.url,
+      method: req.method,
+      // Don't log body in production to avoid logging passwords
+      ...(error.stack && { stack: error.stack }),
     });
   }
 

@@ -201,10 +201,14 @@ export const loginUser = async (data: LoginData): Promise<AuthResponse> => {
       refreshToken,
     };
   } catch (error) {
+    console.error("Login error:", error);
     if (error instanceof CustomError) {
       throw error;
     }
-    throw new CustomError("Login failed", 500);
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    console.error("Login failed with error:", errorMessage);
+    throw new CustomError(`Login failed: ${errorMessage}`, 500);
   }
 };
 

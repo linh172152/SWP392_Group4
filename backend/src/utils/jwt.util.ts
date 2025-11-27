@@ -26,17 +26,27 @@ export interface RefreshTokenPayload {
  * Generate access token
  */
 export const generateAccessToken = (user: users): string => {
-  const payload: JWTPayload = {
-    userId: user.user_id,
-    email: user.email,
-    role: user.role,
-  };
+  try {
+    if (!JWT_SECRET || JWT_SECRET === "your-super-secret-jwt-key") {
+      console.error("⚠️ JWT_SECRET not properly configured!");
+      throw new Error("JWT_SECRET is not properly configured");
+    }
+    
+    const payload: JWTPayload = {
+      userId: user.user_id,
+      email: user.email,
+      role: user.role,
+    };
 
-  return jwt.sign(payload, JWT_SECRET, {
-    expiresIn: JWT_EXPIRES_IN,
-    issuer: "ev-battery-swap",
-    audience: "ev-battery-swap-users",
-  } as jwt.SignOptions);
+    return jwt.sign(payload, JWT_SECRET, {
+      expiresIn: JWT_EXPIRES_IN,
+      issuer: "ev-battery-swap",
+      audience: "ev-battery-swap-users",
+    } as jwt.SignOptions);
+  } catch (error) {
+    console.error("Error generating access token:", error);
+    throw error;
+  }
 };
 
 /**
@@ -46,16 +56,26 @@ export const generateRefreshToken = (
   userId: string,
   tokenVersion: number = 1
 ): string => {
-  const payload: RefreshTokenPayload = {
-    userId,
-    tokenVersion,
-  };
+  try {
+    if (!JWT_REFRESH_SECRET || JWT_REFRESH_SECRET === "your-super-secret-refresh-key") {
+      console.error("⚠️ JWT_REFRESH_SECRET not properly configured!");
+      throw new Error("JWT_REFRESH_SECRET is not properly configured");
+    }
+    
+    const payload: RefreshTokenPayload = {
+      userId,
+      tokenVersion,
+    };
 
-  return jwt.sign(payload, JWT_REFRESH_SECRET, {
-    expiresIn: JWT_REFRESH_EXPIRES_IN,
-    issuer: "ev-battery-swap",
-    audience: "ev-battery-swap-users",
-  } as jwt.SignOptions);
+    return jwt.sign(payload, JWT_REFRESH_SECRET, {
+      expiresIn: JWT_REFRESH_EXPIRES_IN,
+      issuer: "ev-battery-swap",
+      audience: "ev-battery-swap-users",
+    } as jwt.SignOptions);
+  } catch (error) {
+    console.error("Error generating refresh token:", error);
+    throw error;
+  }
 };
 
 /**

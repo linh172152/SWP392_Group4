@@ -57,35 +57,55 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
  * Login user
  */
 export const login = asyncHandler(async (req: Request, res: Response) => {
-  const { email, password }: LoginData = req.body;
-
-  // Validate required fields
-  if (!email || !password) {
-    return res.status(400).json({
-      success: false,
-      message: "Email and password are required",
+  try {
+    console.log("🔐 Login attempt:", {
+      email: req.body?.email,
+      hasPassword: !!req.body?.password,
+      bodyKeys: Object.keys(req.body || {}),
     });
+
+    const { email, password }: LoginData = req.body;
+
+    // Validate required fields
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and password are required",
+      });
+    }
+
+    const result = await loginUser({ email, password });
+
+    // Set refresh token as httpOnly cookie
+    // Use 'none' for sameSite on Render to avoid cookie issues
+    const cookieOptions: any = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    };
+
+    res.cookie("refresh_token", result.refreshToken, cookieOptions);
+
+    console.log("✅ Login successful for:", email);
+
+    return res.status(200).json({
+      success: true,
+      message: "Login successful",
+      data: {
+        user: result.user,
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken, // Also return in body for frontend localStorage
+      },
+    });
+  } catch (error: any) {
+    console.error("❌ Login controller error:", {
+      message: error?.message,
+      stack: error?.stack,
+      name: error?.name,
+    });
+    throw error; // Let asyncHandler handle it
   }
-
-  const result = await loginUser({ email, password });
-
-  // Set refresh token as httpOnly cookie
-  res.cookie("refresh_token", result.refreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-  });
-
-  return res.status(200).json({
-    success: true,
-    message: "Login successful",
-    data: {
-      user: result.user,
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken, // Also return in body for frontend localStorage
-    },
-  });
 });
 
 /**
