@@ -469,6 +469,7 @@ const AdminStaffScheduleManagement: React.FC = () => {
           "Ca làm việc phải từ 1-16 tiếng. Vui lòng kiểm tra lại thời gian."
         );
         return;
+        
       }
 
       // Convert time strings to UTC format to match backend expectation
@@ -765,7 +766,7 @@ const AdminStaffScheduleManagement: React.FC = () => {
       if (stationFilter && schedule.station_id !== stationFilter) return false;
       if (dateFilter && !schedule.shift_date.startsWith(dateFilter))
         return false;
-
+//acscscscsc
       return true;
     })
     .sort((a, b) => {
